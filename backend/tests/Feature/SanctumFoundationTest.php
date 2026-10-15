@@ -10,7 +10,7 @@ final class SanctumFoundationTest extends FoundationTestCase
 {
     public function test_csrf_handshake_creates_only_an_anonymous_session(): void
     {
-        config(['session.driver' => 'database']);
+        config(['session.driver' => 'versioned']);
         $this->get('/sanctum/csrf-cookie')->assertNoContent()->assertCookie('XSRF-TOKEN')->assertCookie(config('session.cookie'));
         $session = DB::table('sessions')->first();
         $this->assertNotNull($session);
@@ -27,9 +27,9 @@ final class SanctumFoundationTest extends FoundationTestCase
         $this->withToken('synthetic-not-a-token')->getJson('/api/test-protected')->assertUnauthorized();
     }
 
-    public function test_no_login_or_employee_crud_endpoints_are_exposed(): void
+    public function test_no_public_registration_endpoints_are_exposed(): void
     {
-        $this->postJson('/api/v1/auth/login', [])->assertNotFound();
+        $this->postJson('/api/v1/auth/register', [])->assertNotFound();
         $this->getJson('/api/v1/clinics')->assertNotFound();
     }
 

@@ -43,7 +43,7 @@ final class SchemaConstraintsTest extends FoundationTestCase
         $owner = DB::connection('migration');
         $this->assertSqlState('23514', fn () => $owner->table('users')->where('id', $ids['a']['user'])->update(['must_change_password' => true]));
         $this->assertSqlState('23514', fn () => $owner->table('users')->where('id', $ids['a']['user'])->update(['credential_version' => 0]));
-        $this->assertSqlState('23514', fn () => DB::table('sessions')->insert(['id' => 'synthetic', 'user_id' => $ids['a']['user'], 'payload' => '', 'last_activity' => time()]));
+        $this->assertSqlState('23514', fn () => $owner->table('sessions')->insert(['id' => 'synthetic', 'user_id' => $ids['a']['user'], 'payload' => '', 'last_activity' => time()]));
     }
 
     public function test_one_user_can_have_different_roles_in_two_clinics_without_duplicates(): void

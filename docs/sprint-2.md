@@ -84,10 +84,16 @@ creation/assignments/reset, безопасное linking и двухсторон
 никогда из body/header. SQL повторно проверяет active/credential version/first-login
 и нужные права; app.user_id/app.tenant_id — доверенная серверная граница.
 
-HTTP login/session transport подключается отдельно после version-aware session
-adapter: нельзя объявлять production login готовым на основании domain use cases.
-До этого действующие REST endpoints остаются health и CSRF handshake; новый
-неполный login API не публикуется. Frontend и медицинские/финансовые разделы не входят.
+HTTP transport подключён: Sanctum использует first-party request guard с
+version-aware server session, а не стандартный Eloquent SELECT * при restoration.
+Default Eloquent provider и users column grants сохранены для регрессии Sprint 1;
+guard получает только safe projection без hash через session_identity. Обычный
+Sanctum password-hash session middleware не применяется к этому request guard:
+его функцию выполняет проверка credential version и stage на каждом запросе.
+
+REST API и эксплуатационный сценарий описаны в sprint-2-api.md и openapi.yaml.
+First-party Origin/Referer, CSRF, no-store и full/limited middleware обязательны.
+Frontend и медицинские/финансовые разделы не входят.
 
 ## Проверки и приёмка
 
@@ -107,14 +113,15 @@ accounts не seed-ятся и не имеют default passwords. На стар�
 CEO бизнес-операции закрыты до отдельной проверенной миграции владельцев. Нельзя
 автоматически объявлять произвольного Clinic Admin владельцем.
 
-Для следующего шага нужны version-aware Sanctum session adapter, full/limited auth
-middleware, CSRF/no-store transport, безопасные HTTP DTO, trusted IP/proxy integration
-(внутренние sensitive actions сейчас используют actor bucket), REST controllers и
-OpenAPI contract tests. Затем — контролируемое создание platform operators, внешний
-identity-verification runbook и безопасная доставка временных паролей/recovery token.
-Верификация внешней личности не автоматизируется фактом наличия reference в БД.
-Transfer CEO, отказ от linking и self-service recovery обычных multi-clinic accounts
-остаются отдельными задачами; HTTP/UI не объявляются готовыми.
+Реализованы version-aware Sanctum session adapter, full/limited auth middleware,
+CSRF/no-store, DTO validation, actor/trusted-IP rate limits и REST controllers.
+Прокси по умолчанию не доверены: X-Forwarded-For не используется для обхода IP quota.
+Первый platform operator создаётся контролируемой CLI-командой с отдельными owner
+credentials и скрытым подтверждаемым вводом пароля, не через runtime API.
+Transfer CEO и self-service recovery рядовых multi-clinic accounts остаются
+отдельными задачами. Reject linking реализован. Для production нужны TLS,
+проверенный deployment/runbook, внешняя identity verification и безопасный канал
+доставки временных паролей/token; backend не заменяет эти процедуры.
 
 Credential verifier использует узкий identity_lookup с exact login; это намеренная
 серверная identity boundary, не общий SELECT пользователей и не Eloquent Auth bypass.

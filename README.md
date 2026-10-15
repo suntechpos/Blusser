@@ -1,7 +1,7 @@
 # Blusser
 
 Multi-tenant SaaS для независимых частных клиник. Sprint 1: **Backend Foundation**;
-Sprint 2: серверные операции CEO и управления пользователями ([контракт](docs/sprint-2.md)).
+Sprint 2: Sanctum REST API, CEO и управление пользователями ([контракт](docs/sprint-2.md)).
 Laravel 13, PHP 8.4, PostgreSQL 17, Docker Compose. Frontend не реализован.
 Согласованные архитектурные документы находятся в [docs](docs/architecture.md).
 
@@ -51,7 +51,8 @@ APP_KEY — `base64:` плюс 32 случайных байта в base64. Не 
 
 - `blusser_owner`: LOGIN, NOSUPERUSER, NOBYPASSRLS; владелец таблиц и миграций.
 - `blusser_app`: LOGIN, NOSUPERUSER, NOBYPASSRLS, не owner, без CREATE/SET ROLE
-  к привилегированным ролям. Только разрешённые reads и anonymous session storage.
+  к привилегированным ролям. Разрешённые RLS reads и точечный EXECUTE; session
+  INSERT/UPDATE выполняется только через version-aware persistence.
 - `blusser_security`: NOLOGIN, BYPASSRLS; точечные privileges для узких read helpers
   и governance mutations с фиксированным search_path. Runtime не член этой роли
   и может вызывать только явно разрешённые функции.
@@ -96,35 +97,45 @@ PHPUnit дополнительно отказывается выполнять d
 Результаты Sprint 1 — в [историческом отчёте](docs/sprint-1.md); текущие проверки
 и границы Sprint 2 — в [отчёте](docs/sprint-2-validation.md).
 
-## Границы безопасности и незавершённые функции
+## Sprint 2: доступ к API
 
-- Реализованы внутренние сервисы Identity, ClinicProvisioning, ClinicAdministration:
-  bootstrap tenant/CEO, password verification/change, custom roles/grants, employees,
-  consent linking и CEO recovery. HTTP login/logout/business endpoints и UI пока
-  не подключены. Не используйте domain-only реализацию для рабочих аккаунтов.
-- Sanctum подготовлен, но полный auth lifecycle **не готов**. CSRF endpoint создаёт
-  только anonymous session. Перед включением login обязателен credential-version
-  aware session adapter, проверка active/first-login state, CSRF, atomic rate limits,
-  reset/revocation, audit и все согласованные тесты. Session CHECK не позволяет
-  стандартному Laravel handler сохранить user-session без версии и auth stage.
-- Runtime не имеет прямого business DML. Governance functions проверяют actor,
-  credential version, tenant permissions/scopes и потолок делегирования под locks.
-  Protected CEO сохраняет последнего администратора. Platform не управляет
-  обычными сотрудниками. Создание первого platform operator — отдельный
-  контролируемый deployment step, автоматического seed/default password нет.
-- `TenantContext` — внутренняя серверная транзакционная граница: actor должен
-  поступать из проверенной аутентификации, а не body/header. Нет публичного способа
-  установить app.user_id/app.tenant_id. Nested contexts запрещены; SET LOCAL
-  сбрасывается при commit/rollback. Для будущих маршрутов нужны auth middleware
-  перед context и context перед route-model binding.
-- RLS защищает tenant boundary; custom settings не аутентифицируют человека.
-  SQL injection/утечка DB credentials остаются за этой границей доверия.
-  Соблюдайте backend policies и query predicates, даже при наличии RLS read scopes.
-- PostgreSQL limiter атомарно учитывает login/IP и чувствительные identity actions.
-  HTTP integration, trusted proxy settings и эксплуатационные процедуры ещё нужны.
-  Нет медицинских, пациентских, финансовых модулей и реальных данных.
-- Health проверяет runtime-подключение и наличие 11 FORCE RLS таблиц; это не
-  подтверждение полной готовности будущих функций или production environment.
+Полный контракт: [OpenAPI](docs/openapi.yaml), сценарий запуска и границы:
+[API guide](docs/sprint-2-api.md). Реализованы cookie login/logout, first-login password
+change, platform clinic/CEO provisioning, tenant roles/grants, employees/assignments,
+branches, scoped reads/audit, safe linking и CEO recovery.
+
+Первый platform operator создаётся **вручную** в migration-сервисе с hidden prompts:
+
+```sh
+docker compose run --rm migrate php artisan blusser:platform-admin YOUR_LOGIN
+```
+
+Runtime API не получает эти credentials. Нет default passwords, seeds, публичной
+регистрации, bearer tokens или remember-me. Не передавайте пароли в аргументах CLI,
+URL, истории shell или Git. Для независимого подтверждения CEO recovery нужны два
+разных platform operators и внешняя процедура проверки личности.
+
+Cookie flow: CSRF handshake → login → обязательная смена временного пароля →
+список своих клиник → выбор active clinic → tenant API. На изменяющих запросах
+обязателен X-XSRF-TOKEN; Origin/Referer должен соответствовать first-party allowlist.
+После login/change/logout cookies и CSRF token меняются. Cookie HttpOnly,
+SameSite=Lax; Secure включён по умолчанию и обязателен на HTTPS. Только локальный
+Compose HTTP использует явное SESSION_SECURE_COOKIE=false. Payload в БД зашифрован.
+
+Сессия проверяет current active/credential version/first-login state на каждом
+запросе. Права и memberships не кэшируются в cookies; все tenant reads используют
+RLS/context и scope. Запись сессии после logout/reset не восстанавливает доступ.
+Platform identities не входят в tenant context, даже с ошибочным membership.
+Tenant admin не сбрасывает пароль CEO, platform, себя, более привилегированного
+или multi-clinic пользователя. Назначение новой клиники требует consent владельца.
+
+Остаются эксплуатационные задачи: HTTPS web server, trusted proxy configuration,
+backup/restore, production Argon2id benchmark, безопасная доставка credentials,
+внешняя проверка личности и policy хранения audit. Transfer CEO и self-service
+recovery обычных multi-clinic identities — отдельные функции. Frontend и
+медицинские/финансовые модули отсутствуют. Health не означает production readiness.
+RLS/GUC — серверная граница; SQL injection/утечка DB credentials не входят в её
+модель защиты. Не включайте request body/query binding logging для auth paths.
 
 ## Сборка в сети с корпоративным/облачным proxy
 

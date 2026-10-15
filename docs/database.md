@@ -271,3 +271,42 @@ platform identities или пользователя с memberships в други
 credential, BYPASSRLS или прямой business DML. is_active_member и TenantContext
 также запрещают platform identities. Неизвестная legacy CEO identity не выводится
 автоматически из имени Clinic Admin или существующего permission набора.
+
+
+## Sprint 2: versioned cookie sessions (миграция 000005)
+
+Session schema сохраняет credential_version/auth_stage; payload Laravel зашифрован
+и base64 encoded. Внутри только server identity id/version/stage, CSRF и выбранный
+tenant, без credentials/grants. Cookie содержит зашифрованный случайный session ID.
+Runtime не имеет прямого INSERT/UPDATE sessions; узкие функции session_start/write
+проверяют identity под user lock. session_start регистрирует новый случайный id
+после password verification. Authenticated session_write только обновляет уже
+существующий id с совпадающими user/version/stage. Он никогда не вставляет
+удалённую row: даже старый запрос после logout не восстановит сессию при той же
+credential version. Anonymous upsert не может перезаписать authenticated row.
+Reset/change/recovery удаляют все sessions; смена user credential version делает
+позднее сохранение старой сессии недействительным. Имеется двухсоединительный тест
+с lock_timeout, проверяющий сериализацию session issuance/password change.
+
+session_identity возвращает только safe projection по серверным id/version при
+active identity и непросроченном temporary state. Нет общего SELECT hash или
+изменения users RLS. my_clinics возвращает только собственные активные memberships;
+select_clinic перепроверяет членство и пишет audit, а tenant operations всегда
+проверяют текущие permissions и scope. employee_directory — узкая authorized
+projection login/name/role/branches с can_view_member, без чужих tenant/credentials.
+Platform reads возвращают только clinic metadata и allowlisted operational audit.
+Все functions имеют fixed search_path, закрытого owner и точечные EXECUTE grants.
+
+После отказа SQL mutation откатывается; operation.denied пишется отдельной
+транзакцией только от актуальной identity, с server operation code без bindings.
+Успешные mutations и их audit по-прежнему атомарны. Auth lifecycle audit глобален
+и не раскрывается через platform tenant-data API. CLI platform bootstrap — owner
+операция с отдельным аудитом, недоступная runtime API.
+
+assert_branch_delegation — узкий boolean/exception guard без read projection:
+Governance вызывает его в той же транзакции после role/member/reset/link mutation,
+до commit и освобождения user/tenant locks. Для assigned_branches проверяется
+фактическое подмножество branch ids actor; equal scope names не разрешают иной
+набор филиалов. Для role edits проверяются существующие members; при link accept
+повторно используется initiating actor. Ошибка откатывает accounts/hash/sessions
+и исходный audit вместе с mutation, затем фиксируется operation.denied.

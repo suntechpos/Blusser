@@ -1,57 +1,70 @@
-# Проверка изменения модели CEO (Sprint 2)
+# Sprint 2: Backend API validation
 
-Ветка: `sprint-2/ceo-user-governance`, база — main после PR #2.
-Merge не выполнялся. Только backend, без медицинских/финансовых модулей и frontend.
+Ветка: `sprint-2/ceo-user-governance`, существующий PR #3. Merge не выполняется.
+Только backend; frontend, медицинские/финансовые данные и модули не добавлены.
 
-## Реализовано
+## Изменения завершающего этапа
 
-- `docs/architecture.md`, `database.md`, `implementation-plan.md` актуализированы;
-  отдельный подробный контракт — `sprint-2.md`.
-- `Identity/Services/Identity.php`: проверка hash, временные credentials, смена
-  пароля, PostgreSQL rate limits; не публикует password_hash в actor object.
-- `Platform/Services/ClinicProvisioning.php`, `RecoveryToken.php`: атомарный
-  tenant/CEO bootstrap и двухоператорный одноразовый CEO recovery.
-- `Tenancy/Services/ClinicAdministration.php`: custom roles/grants, филиалы,
-  сотрудники/назначения/reset, exact login lookup и consent linking.
-- `Access/Services/Governance.php`, `GovernanceDenied.php`: runtime-only
-  транзакционная граница, allowlist операций и исключения без SQL credential bindings.
-- Миграция `000004_add_ceo_governance.php` и `database/sql/governance.sql`:
-  protected role, tenant_ceos, recovery requests, link purpose/version,
-  точечные SECURITY DEFINER операции и platform deny в tenant RLS.
-- `TenantContext.php`: явный запрет platform identities даже с membership.
-- `CeoGovernanceTest.php`: 16 сценариев bootstrap, делегации, linking, credential
-  lifecycle, recovery, tenant isolation и запретов platform.
-  Усилены DatabaseSecurityTest/MigrationLifecycleTest и очистка соединений/limiter
-  в FoundationTestCase. README/OpenAPI отражают фактическую границу HTTP surface.
+- VersionedSessionHandler + request guard/Sanctum: real encrypted cookie sessions,
+  first-login limited stage, login/logout/password change, session id/CSRF rotation,
+  no-store и принудительные first-party/CSRF/full-identity checks.
+- Миграция 000005/sql/sessions.sql: безопасная выдача/обновление/отзыв sessions,
+  safe identity projection, own-clinic selection, scoped employee directory,
+  allowlisted platform reads, link reject, secret-free denied-operation audit.
+  Runtime session INSERT/UPDATE отозваны; поздняя запись только UPDATE existing row.
+- AuthController, platform/clinic REST controllers и routes/api.php: все CEO use
+  cases подключены к HTTP, включая custom roles/grants, branch assignments,
+  employees/reset, linking и двухоператорный CEO recovery.
+- CLI CreatePlatformOperator: hidden password confirmation, отдельный owner
+  credential, global UNIQUE login и atomic audit; нет runtime/bootstrap endpoint.
+- OpenAPI 3.1 описывает каждый опубликованный path/method, cookie/CSRF protocol,
+  input/output schemas, permissions/scopes, success/error codes и recovery boundary.
+- SprintTwoApiTest использует реальные cookies, CSRF и PostgreSQL, без actingAs.
+  OpenApiContractTest проверяет route coverage/security и все schema references;
+  PlatformBootstrapTest проверяет CLI/credential boundary. Сохранены регрессии Sprint 1.
+- README, архитектура, схема БД, план и sprint-2-api.md содержат актуальные инструкции.
 
-## Фактические проверки
+## Проверки
 
-PostgreSQL 17, PHP 8.4.26, Laravel 13; runtime `blusser_app`, fixtures/DDL — owner.
+PostgreSQL 17; PHP 8.4.26; Laravel 13; SQL под blusser_app, fixtures/DDL под owner.
+- php artisan test: **72 passed, 1943 assertions** (55 regressions + 17 новых tests).
+- vendor/bin/pint --test: **57 files, passed**.
+- composer validate --strict: passed.
+- composer check-platform-reqs: passed.
+- OpenAPI: все **35 operations / 27 paths**, security declarations и references проверены.
+- Apply/rollback/reapply и runtime-role/RLS checks включены в integration suite.
 
-- `php artisan test`: **55 passed, 356 assertions**.
-- `vendor/bin/pint --test`: passed.
-- `composer validate --strict`: passed.
-- `composer check-platform-reqs`: passed.
-- Apply/rollback/reapply миграций проверяются интеграционными тестами.
+Проверены реальные cookie/CSRF rotation и запрет cross-origin/bearer/anonymous;
+first-login и password confirmation; create tenant/CEO только platform; делегация
+без scope expansion; own/assigned branch visibility; foreign role/branch/member
+UUID и forged tenant parameters; protected CEO/self-role; session revocation после
+reset/change/logout; stale writer resurrection; multi-clinic consent/switch/revocation;
+recovery two-operator/expiry/replay/stale credential; login rate limits; FORCE RLS,
+column grants, migration rollback/reapply и отсутствие owner use в API.
+Проверена защита от получения чужих branch scopes через создание/reset аккаунтов,
+переназначение филиалов и изменение общей роли: сравниваются реальные branch sets,
+все отказы атомарны с rollback.
+Двухсоединительный PostgreSQL тест с lock_timeout подтверждает, что password change
+ждёт user lock выдачи session, а после смены поздний writer не восстанавливает row.
+Все identities/пароли в тестах синтетические. Рабочие accounts не создавались.
 
-Docker image обновляется исходниками поверх ранее проверенного dependency layer
-с неизменённым composer.lock. Чистая загрузка/пересборка зависимостей для этого
-изменения не повторяется; обычная команда полной сборки остаётся в README.
-Все тестовые identities и пароли синтетические; рабочие аккаунты не создавались.
+Выполнена чистая сборка docker/backend.Dockerfile по неизменённому composer.lock.
+Использованы официальные HTTPS Git sources и доверенный CA bundle через build secret;
+TLS/package verification не отключались. Финальные исходники добавлены поверх
+проверенного dependency layer. Финальные
+тесты выполняются без source mounts, от www-data; Dockerfile включает OpenAPI для
+contract tests. Обычная полная сборка: docker compose build backend.
 
-## Запуск и границы готовности
+## Локальный запуск и ограничения
 
-Из корня: `./scripts/init-local-env` (только если .env отсутствует),
-`docker compose build backend`, `docker compose up -d --wait db`,
-`docker compose run --rm migrate`, `docker compose up -d --wait backend`.
-Проверка: `curl --fail http://localhost:8000/api/v1/health`;
-тесты: `docker compose run --rm test` (только blusser_test).
-Не удалять существующий volume для обновления.
+Проверенные команды и cookie workflow — [sprint-2-api.md](sprint-2-api.md), README.
+У существующей среды выполнить build, migrate и recreate backend без удаления volume.
+Tests используют только blusser_test, destructive setup защищён проверкой имени базы.
+Runtime backend не получает MIGRATION_DB_PASSWORD/POSTGRES_PASSWORD.
 
-Готовы внутренние серверные use cases, **не весь Sprint 2 и не production login**.
-Нет HTTP business controllers/session adapter, UI, доставки credentials,
-platform operator CLI и self-service employee recovery. Следующие задачи и
-эксплуатационные prerequisites перечислены в sprint-2.md. Внешнее подтверждение
-личности CEO требует независимой организационной проверки, код не заменяет её.
-Реальные concurrent HTTP/session-save гонки нужно тестировать после session adapter;
-текущие DB mutations сериализуют user→tenant locks и повторно проверяют credentials.
+Sprint 2 backend scope реализован; production readiness отдельно не заявляется.
+Production требует TLS/web server, explicit trusted proxy/first-party configuration,
+backup/restore, Argon2id benchmark, audit retention, безопасную доставку credentials
+и внешнее независимое подтверждение личности CEO. Код не подтверждает документы.
+Transfer CEO и self-service recovery обычных multi-clinic identities остаются вне
+этого Sprint. Нет services CRUD, пациентов, frontend, очередей и финансов.

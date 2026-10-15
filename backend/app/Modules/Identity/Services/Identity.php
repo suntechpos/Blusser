@@ -34,7 +34,8 @@ final class Identity
     public function verify(User $actor, #[\SensitiveParameter] string $password, bool $allowTemporary = false): void
     {
         $record = $this->record((string) $actor->login);
-        if (! $record || $record['id'] !== $actor->getKey() || ! $record['active'] || (int) $record['credential_version'] !== $actor->credential_version || (! $allowTemporary && $record['must_change_password']) || ($record['must_change_password'] && CarbonImmutable::parse($record['temporary_password_expires_at'])->isPast()) || ! Hash::check($password, $record['password_hash'])) {
+        if (! $record || $record['id'] !== $actor->getKey() || ! $record['active'] || (int) $record['credential_version'] !== $actor->credential_version || (! $allowTemporary && $record['must_change_password']) || ($record['must_change_password'] && CarbonImmutable::parse($record['temporary_password_expires_at'])->isPast()) || mb_strlen($password) > 128 || ! Hash::check($password, $record['password_hash'])) {
+            $this->db->call('auth_failure', [hash_hmac('sha256', 'reauth:'.$actor->getKey(), (string) config('app.key'))]);
             throw new GovernanceDenied('credentials');
         }
     }

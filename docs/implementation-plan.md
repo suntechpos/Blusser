@@ -208,9 +208,9 @@ connection. Не использовать down -v как штатную оста
 
 ## Известные ограничения текущего этапа
 
-Sprint 1 реализован и протестирован. Sprint 2 добавляет domain use cases и DB
-операции; HTTP session adapter и бизнес-маршруты ещё не подключены. UI отсутствует.
-Полная готовность Sprint 2 и production readiness не заявляются.
+Sprint 1 реализован. Sprint 2 теперь подключает cookie auth lifecycle и REST API
+к governance use cases; контракт и проверки — sprint-2-api.md и sprint-2-validation.md.
+UI отсутствует. Production readiness отдельно не заявляется.
 Перед production отдельно потребуются backup/restore, TLS, управление секретами,
 self-service recovery рядовых multi-clinic identities, мониторинг и политика
 хранения аудита. Создание сотрудников и admin reset single-clinic аккаунтов
@@ -226,5 +226,7 @@ self-service recovery рядовых multi-clinic identities, мониторин
    first-login guard, изменением пароля, scopes и delegated administration.
 4. Сохранить exact-login linking с согласия target, expiry/revalidation и без reset.
 5. Проверить полный набор негативных сценариев и атомарный audit без секретов.
-6. Подключать REST auth transport только вместе с version-aware session adapter,
-   CSRF, rate limits и lifecycle тестами; не публиковать упрощённый login API.
+6. REST auth transport подключён вместе с version-aware session adapter,
+   CSRF, rate limits, scoped reads и HTTP lifecycle/security тестами.
+7. Проверить image без bind mounts, OpenAPI route coverage, apply/rollback и
+   отсутствие runtime migration credentials; обновить существующий PR без merge.
