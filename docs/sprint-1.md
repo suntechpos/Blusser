@@ -32,7 +32,7 @@
 
 ## Результаты проверки текущей среды
 
-- PHPUnit: **35 passed, 153 assertions**, без failed/skipped/warnings.
+- PHPUnit: **39 passed, 174 assertions**, без failed/skipped/warnings.
   Реальный PostgreSQL; fixtures записываются migration-owner, assertions
   изоляции выполняются через `blusser_app` (NOSUPERUSER, NOBYPASSRLS).
 - Проверены запрет cross-tenant reads/known UUID access, отсутствие context,
@@ -55,6 +55,22 @@
 - Дополнительный `composer audit --locked` не выполнен: сетевой proxy возвращает
   403 для packagist.org/api/security-advisories. Отсутствие уязвимостей не заявляется.
 - GitHub Actions описан, но его удалённый запуск не подтверждён локальными тестами.
+
+## Исправление auth provider в PR #2
+
+Auth provider использует `App\Modules\Identity\Models\User`. Регрессионные
+тесты проверяют реальный web guard/provider и создание модели, успешную проверку
+`password_hash`, отказ для неверного пароля и legacy-поля `password`.
+Положительная проверка verifier использует синтетическую модель в памяти,
+не привилегированное чтение хеша из БД.
+
+Под runtime-role стандартный lookup provider с SELECT * по-прежнему запрещён
+column grants; lookup разрешённых полей подчиняется users RLS: без контекста
+нет строк, в собственном контексте чужой пользователь не виден. Отсутствующий
+hash не приводит к fallback на owner connection или успешной проверке пароля.
+RLS, grants и миграции не изменены. Для полного входа в следующем спринте всё
+ещё необходимы узкий identity lookup/provider и version-aware session lifecycle;
+login API этим исправлением не добавляется.
 
 ## Что сознательно закрыто до следующего спринта
 
