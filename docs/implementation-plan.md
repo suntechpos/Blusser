@@ -48,6 +48,19 @@ SQLite для этих тестов не подходит. Migration tests ис�
 Определить predicates own/assigned_branches/entire_clinic до выполнения запросов;
 неподдерживаемые пары permission/scope отклонять.
 
+Добавить login canonicalization/global UNIQUE, hash-only credentials, временный
+пароль с expiry, first-login middleware, смену собственного пароля и отдельный
+admin reset. Реализовать credential version, ограниченные/full sessions и отзыв
+всех сессий, включая конкурентный login/session save. Добавить атомарные общие
+PostgreSQL rate limits на login/IP и отдельные identity actions, одинаковые login
+ошибки. Провести Argon2id benchmark без отключения проверки hash.
+Развести employees.create, assign_role, assign_branches, lookup_identity и
+reset_password; create не подразумевает reset. Link существующего user требует
+self-confirmation/reauth, expiry и повторную проверку инициатора; пароль не меняется.
+Для multi-clinic identity запретить tenant reset и документировать platform recovery
+с проверкой личности как отдельную процедуру, не подменяя её новым аккаунтом.
+Согласованный user→tenant lock order обязателен для identity и membership writes.
+
 Критерий: анонимный запрос отклоняется; неактивные user/membership/tenant не дают
 доступа; один user корректно переключается между двумя клиниками с разными ролями.
 Platform Super Admin без membership не читает tenant API. Права не передаются
@@ -63,8 +76,9 @@ delete и специальные actions только для поддержив�
 исходное и итоговое состояние.
 При создании клиники branch не обязателен: филиал создаётся отдельной операцией.
 Ограничить employee responses необходимыми полями, не возвращать password hash.
-Публичную регистрацию, email delivery и восстановление пароля не подключать
-без отдельно согласованного решения.
+Реализовать создание сотрудника администратором и сброс временного пароля без
+почтового сервиса. Публичная регистрация и email recovery остаются вне этапа;
+не откладывать согласованные create/change/reset workflows из-за отсутствия email.
 
 Критерий: создание клиники и филиала, валидация, пагинация, consistent errors,
 permission checks и атомарный аудит. Нет медицинских и финансовых endpoints.
@@ -75,6 +89,9 @@ permission checks и атомарный аудит. Нет медицински�
 Clinics List, Create Clinic, Clinic Admin Dashboard, Branches, Employees, Services.
 Добавить Roles & Permissions: создание должностей, редактор action/scope grants
 и назначение должности/филиалов сотруднику с backend validation feedback.
+Добавить создание с login/временным паролем, reset с reauth, обязательную смену
+при первом входе и self-confirmation link. Секретные поля очищаются, не сохраняются
+в Pinia persistence/localStorage/analytics и не отображаются повторно.
 Добавить typed API client и Pinia session/context stores. При переключении клиники
 очищать tenant state, отменять/игнорировать старые запросы, чтобы ответы предыдущей
 клиники не попадали на новый экран.
@@ -118,11 +135,40 @@ Dashboard получает реальные counts через API; до появ
   доступно только разрешённой роли. Ошибка оставляет БД без частичных записей.
 - Нельзя привязать сотрудника A к филиалу B; конкурентное удаление/понижение
   администраторов не оставляет клинику без активного Clinic Admin.
-- Session login/logout, CSRF и throttling; disabled identities лишаются доступа.
+- Создание аккаунта/роли/membership/audit атомарно; без каждого требуемого права
+  create/assign_role/assign_branches операция отклоняется. employees.update/view
+  не даёт reset. Только синтетические login/password fixtures.
+- Login глобально уникален после канонизации: case/space и конкурентный create
+  не создают дубликат; конфликт не меняет чужие password/profile/memberships.
+- Exact-login lookup доступен только по permission, ограничен rate limit, не выдаёт
+  чужие профили/клиники. Link подтверждает сам существующий user после reauth;
+  подмена user/tenant/role, expiry, повторное принятие, отзыв прав инициатора и
+  concurrent accept не обходят проверки и не создают дубликат membership.
+- Первый вход с временным паролем даёт только password-change session;
+  backend запрещает tenant/platform API и link accept до смены даже по прямому URL.
+  Проверить expiry 24h, новый пароль≠текущий, границы длины, hash verify/rehash,
+  отказ старого временного пароля после смены/reset. В БД только hash.
+- Администратор не может читать/retrieve пароль/hash; ни API, ни аудит, ни session,
+  security logs, exception/validation output не содержат введённые секреты.
+- Self-change требует текущий пароль/CSRF, admin reset — permission и недавний reauth;
+  нельзя reset самого себя, чужого tenant, platform admin или более привилегированного
+  сотрудника. Multi-clinic target и pending-only link не дают tenant reset.
+- Reset отзывает все target sessions; change отзывает старые и выдаёт новую.
+  Проверить stale cookies, rollback, повторный reset, конкурентные reset/login,
+  change/session save и login/link. Старый credential_version всегда запрещает доступ;
+  ошибки не оставляют частично обновлённый hash, audit или sessions.
+- Account created/password changed/reset имеют actor/subject/request_id/result;
+  tenant audit не раскрывает другие clinics, global audit закрыт tenant-admin.
+- Login limits атомарны на login и IP, включая неизвестные logins и параллельные
+  процессы; временный cooldown истекает по времени тестовых часов, restart не
+  сбрасывает его. Нельзя обходить лимит регистром login или подменой X-Forwarded-For.
+  Ошибки входа не раскрывают существование/блокировку аккаунта.
+- Session login/logout, CSRF и отдельные change/reset/lookup/link limits;
+  disabled identities лишаются доступа; согласованный lock order не даёт deadlocks.
 - Audit нельзя изменить/удалить или подделать actor; секретов в metadata нет.
 
 Frontend: typecheck и production build, тесты выбора клиники, очистки state,
-прав и scope, редактора должностей, основных форм и узбекских сообщений; локальный HTTP smoke
+прав и scope, редактора должностей, first-login/reset/link flows, основных форм и узбекских сообщений; локальный HTTP smoke
 на собранном UI и API. Конкретный минимальный test runner выбирается при реализации,
 без введения дополнительных сервисов.
 
@@ -163,4 +209,6 @@ connection. Не использовать down -v как штатную оста
 Существуют только архитектурные документы и README. Автоматических тестов,
 сборки, API, UI и миграций пока нет. Readiness приложения не заявляется.
 Перед production отдельно потребуются backup/restore, TLS, управление секретами,
-доставка приглашений/восстановление доступа, мониторинг и политика хранения аудита.
+platform identity recovery для multi-clinic аккаунтов, мониторинг и политика
+хранения аудита. Создание сотрудников и admin reset single-clinic аккаунтов
+входят в реализацию этапа; почтовая доставка не является их prerequisite.

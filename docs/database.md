@@ -10,14 +10,18 @@ PostgreSQL — единая база и shared schema. Идентификато�
 | --- | --- | --- |
 | tenants | id, name, slug, status, created_at, updated_at | slug unique; status active/suspended |
 | branches | id, tenant_id, name, code, active, timestamps | unique(tenant_id, code), unique(tenant_id, id) |
-| users | id, name, email, password, is_platform_admin, active, timestamps | normalized email unique; platform flag изменяет только platform provisioning |
+| users | id, login, name, email nullable, password_hash, must_change_password, temporary_password_expires_at nullable, password_changed_at, credential_version, is_platform_admin, active, timestamps | canonical login unique; credential_version positive; только hash, platform flag изменяет только platform provisioning |
+| membership_link_requests | id, tenant_id, target_user_id, initiated_by_user_id, role_id, status, expires_at, resolved_at nullable, timestamps | tenant-role composite FK; pending/accepted/rejected/expired; не содержит credentials |
+| membership_link_request_branches | tenant_id, request_id, branch_id | composite FK к request и branch; unique(tenant_id, request_id, branch_id) |
+| sessions | id, user_id, credential_version, auth_stage, last_reauthenticated_at nullable, payload, last_activity | FK user_id; индекс user_id; auth_stage password_change_required/full |
+| auth_rate_limits | key_digest, window_started_at, attempts, blocked_until nullable, expires_at | key_digest primary key; атомарный учёт login/IP/action buckets, без raw login |
 | tenant_memberships | id, tenant_id, user_id, role_id, active, timestamps | unique(tenant_id, user_id), unique(tenant_id, id) |
 | membership_branches | id, tenant_id, membership_id, branch_id | unique(tenant_id, membership_id, branch_id); составные FK |
 | tenant_roles | id, tenant_id, code, name, active, timestamps | unique(tenant_id, code), unique(tenant_id, id); code не даёт полномочий |
 | permissions | id, code, allowed_scopes | code unique; каталог backend actions, allowed_scopes — допустимое непустое подмножество scopes |
 | role_permissions | tenant_id, role_id, permission_id, scope | primary key(tenant_id, role_id, permission_id); scope: own/assigned_branches/entire_clinic |
 | services | id, tenant_id, name, code, description nullable, active, timestamps | unique(tenant_id, code), unique(tenant_id, id) |
-| audit_logs | id, tenant_id nullable, actor_user_id nullable, branch_id nullable, action, resource_type, resource_id nullable, metadata jsonb, request_id, created_at | append-only; tenant_id NULL только для platform events |
+| audit_logs | id, tenant_id nullable, actor_user_id nullable, branch_id nullable, action, resource_type, resource_id nullable, metadata jsonb, request_id, created_at | append-only; tenant_id NULL только для platform/identity events |
 
 `membership_branches` определяет назначенные филиалы для assigned_branches.
 Scope хранится отдельно для каждого permission роли, не на users или tenant.
@@ -26,8 +30,9 @@ branch/owner не выводятся из произвольного created_by.
 клинике целиком, без цен и филиальных overrides; им доступен только entire_clinic.
 Для audit branch_id заполняется сервером по ресурсу события; для событий уровня
 клиники остаётся NULL и не подходит под assigned_branches.
-Дополнительные технические таблицы Laravel для server-side sessions создаются
-при реализации и не содержат tenant-owned бизнес-данных.
+Server-side sessions используют PostgreSQL. Auth payload не содержит паролей,
+hashes и долгоживущих permissions; raw session ID не пишется в аудит. Точные
+Laravel adapters/schema будут проверены при реализации.
 
 ## Связи и жизненный цикл
 
@@ -54,8 +59,10 @@ branch/owner не выводятся из произвольного created_by.
 tenant_roles(tenant_id, active), membership_branches(tenant_id, branch_id, membership_id),
 branches(tenant_id, active), services(tenant_id, active),
 audit_logs(tenant_id, created_at, id). Порядок списка стабилизируется id.
-Уникальность email проверяется по нормализованному lower-case значению,
-не только case-sensitive unique исходного ввода.
+Login хранится в каноническом формате trim + ASCII lower-case с CHECK формата
+и длины 3–64; глобальный UNIQUE не зависит от tenant. Email не используется
+для идентификации/автопривязки и не обязан быть уникальным. Конкурентные create
+одного login обрабатывают unique conflict без перезаписи существующего user.
 
 ## Роли БД
 
@@ -75,7 +82,8 @@ runtime credentials выходят за эту границу доверия. П
 ## RLS: политики и fail-closed
 
 ENABLE и FORCE ROW LEVEL SECURITY обязательны на branches, services,
-tenant_memberships, membership_branches, tenant_roles, role_permissions, audit_logs. Runtime-тесты выполняются
+tenant_memberships, membership_branches, tenant_roles, role_permissions,
+membership_link_requests, membership_link_request_branches, audit_logs. Runtime-тесты выполняются
 именно как blusser_app: тестирование под superuser не подтверждает изоляцию.
 
 Tenant predicate использует:
@@ -124,6 +132,53 @@ membership/role mappings и возвращают только boolean для т�
 REVOKE EXECUTE FROM PUBLIC и минимальный GRANT обязательны. Тесты должны
 проверить отсутствие рекурсии, fail-closed и отсутствие повышения прав.
 
+## Identity: ограничения хранения и атомарность
+
+CHECK: must_change_password=true требует temporary_password_expires_at NOT NULL;
+после обычной смены expiry NULL. credential_version увеличивается при любой
+смене/reset; в sessions хранится версия, актуальная при аутентификации.
+Index sessions(user_id) нужен для удаления всех сессий. Прямой доступ к sessions,
+auth_rate_limits и password_hash отсутствует в tenant API и tenant DB helpers.
+Runtime auth service использует узкие identity functions: login lookup возвращает
+hash только доверенному verifier, directory/employee serializers не получают его.
+Users self-read возвращает только allowlisted profile fields, не SELECT *.
+Запись credentials, credential_version и sessions управляется identity service,
+а не общим employee DML. Argon2id hash — единственное сохранённое представление
+обычного/временного пароля; нет reversible encryption или отдельного plaintext field.
+
+Account create + membership + роль + audit выполняются атомарно с проверкой
+permissions. При занятом login разрешён только отдельный link flow, не upsert
+credentials. link_requests имеют unique(tenant_id, id) для composite FK в branch
+pivot и partial unique(tenant_id, target_user_id) WHERE status='pending'.
+Просроченный pending переводится в expired перед повторным созданием.
+FK (tenant_id, role_id) ссылается на tenant_roles; FK request/branch в pivot
+исключают межклиническую связь. При accept повторно проверяются expiration,
+инициатор, role/grants/branches, отсутствие self-assignment и membership unique.
+Целевой user читает только собственные pending proposals через ограниченный
+identity endpoint/helper, даже без membership: только клиника, роль и срок,
+без списка её сотрудников/grants. Запись proposal допускается tenant RLS и
+employees.create/assign_role; accept требует полноценную self-session и reauth,
+не tenant admin impersonation. Один proposal не может быть принят дважды.
+
+Для create/reset/change/link и изменений membership используется согласованный
+порядок блокировок: затронутые users по UUID, затем tenants по UUID, затем
+остальные строки. Операция, начавшая с tenant lock, не захватывает user lock позже;
+при необходимости пересобирается транзакция с правильным порядком. Это дополняет
+сериализацию tenant RBAC и исключает deadlock с глобальной деактивацией пользователя.
+Reset проверяет все memberships, а не только видимые под текущим tenant RLS;
+узкий helper возвращает разрешение/отказ, не чужие строки. Другой tenant или
+platform identity → tenant reset запрещён. Сравнение полномочий actor/target
+исключает обход потолка делегирования через знание временного пароля.
+
+Reset/change под user lock обновляют hash/flags/version, удаляют старые sessions
+и создают audit event в одной транзакции. Change может создать новую session
+актуальной версии; reset не создаёт сессию для target. Session save/login сверяют
+версию, поэтому конкурентное восстановление старой session row не восстанавливает
+доступ. Новый reset делает ранее выданный временный пароль недействительным.
+Rate-limit buckets используют digest нормализованного login/IP с серверным ключом
+вне Git, timestamps и атомарный increment/upsert; TTL cleanup не удаляет активную
+блокировку. Перезапуск процесса не сбрасывает лимиты.
+
 ## Scope и целостность RBAC
 
 Tenant RLS — обязательная нижняя граница для любой операции, включая helpers.
@@ -149,13 +204,21 @@ membership сохраняется хотя бы один полный актив
 
 ## Аудит
 
-Tenant SELECT audit_logs требует tenant predicate и audit.view. Platform events
+Tenant SELECT audit_logs требует tenant predicate и audit.view. Platform/identity events
 с tenant_id NULL доступны только platform admin через отдельную read policy.
 UPDATE и DELETE не разрешены runtime-role; права очистки остаются вне API.
 INSERT идёт через audit helper: он проверяет context, подставляет actor и tenant,
 принимает только allowlisted action/resource/metadata. Platform creation пишет
 событие внутри provisioning-функции. Обычная роль не получает прямой INSERT
 с произвольным tenant_id NULL или поддельным actor.
+
+Identity audit использует глобальные события tenant_id NULL с subject user ID
+в allowlisted metadata и actor_user_id (actor=subject для self-change). Tenant
+create/reset/link пишет дополнительное событие только в инициирующую клинику.
+Глобальные auth failures/limits идут в security log; для неизвестного login
+сохраняется digest, не пароль или raw login. Tenant-admin не получает global
+identity audit других клиник. password_hash и все секреты исключены даже из
+before/after diff. Сроки и access к security log определяются до production.
 
 Бизнес-изменение и его audit event атомарны. Записываются создание клиники,
 изменения филиалов, memberships/branch assignments, tenant_roles, permissions
@@ -168,11 +231,12 @@ INSERT идёт через audit helper: он проверяет context, под
 
 ## Порядок миграций
 
-1. users и глобальный каталог permissions с допустимыми scopes.
+1. users с login/credential state и глобальный каталог permissions с допустимыми scopes.
 2. tenants, branches, tenant_roles, role_permissions, memberships и membership_branches.
-3. services и audit_logs, составные FK и индексы.
+3. services, link_requests с branch pivot и audit_logs, составные FK и индексы.
 4. DB roles/grants, helper/provisioning функции, RLS policies и FORCE RLS.
-5. Server-side sessions и остальные действительно нужные Laravel таблицы.
+5. Server-side sessions с credential version/auth stage, auth_rate_limits
+   и остальные действительно нужные Laravel таблицы.
 
 Создание DB roles может потребовать bootstrap-команды с административным
 credential; такой credential доступен только Compose initialization/migrations.
