@@ -1,0 +1,62 @@
+openapi: 3.1.0
+info:
+  title: Blusser Backend Foundation API
+  version: 0.1.0
+  description: >-
+    Sprint 1. Only health and the Sanctum CSRF handshake are available.
+    Login, password lifecycle, tenant CRUD and RBAC mutation APIs are not implemented.
+    No personal access tokens, public registration or sample credentials.
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      summary: Check PostgreSQL runtime connection and RLS schema prerequisites
+      security: []
+      responses:
+        '200':
+          description: Runtime role and expected RLS tables are present
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+        '503':
+          description: Database unavailable, unsafe runtime role or incomplete schema
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: unavailable
+  /sanctum/csrf-cookie:
+    get:
+      operationId: initializeCsrf
+      summary: Initialize anonymous session and XSRF cookie for future first-party SPA
+      description: >-
+        Does not authenticate a user. Future state-changing session endpoints must
+        send the URL-decoded XSRF-TOKEN cookie in X-XSRF-TOKEN and the session cookie.
+      security: []
+      responses:
+        '204':
+          description: CSRF and HttpOnly session cookies set
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: blusser-session
+      description: Reserved for future stateful Sanctum login; no login endpoint in Sprint 1

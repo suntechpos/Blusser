@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+/backend/vendor/
+/backend/.env
+/backend/.env.*
+!/backend/.env.example
+/backend/storage/*.key
+/backend/storage/logs/*
+/backend/.phpunit.result.cache
+/backend/.phpunit.cache/
+!/backend/.env.testing

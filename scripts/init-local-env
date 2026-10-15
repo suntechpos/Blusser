@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+python3 - <<'PY'
+import base64
+import os
+import secrets
+from pathlib import Path
+path = Path('.env')
+# O_EXCL preserves any existing user configuration; never prints secret values.
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+values = {
+    'APP_KEY': 'base64:' + base64.b64encode(secrets.token_bytes(32)).decode(),
+    'BACKEND_PORT': '8000',
+    'POSTGRES_PASSWORD': secrets.token_hex(32),
+    'DB_OWNER_PASSWORD': secrets.token_hex(32),
+    'DB_APP_PASSWORD': secrets.token_hex(32),
+    'SESSION_SECURE_COOKIE': 'false',
+}
+with os.fdopen(fd, 'w') as stream:
+    stream.write(''.join(f'{key}={value}\n' for key, value in values.items()))
+print('Created ignored .env with local random credentials (mode 0600).')
+PY
