@@ -1,6 +1,7 @@
 # Blusser
 
-Multi-tenant SaaS для независимых частных клиник. Sprint 1: **Backend Foundation**.
+Multi-tenant SaaS для независимых частных клиник. Sprint 1: **Backend Foundation**;
+Sprint 2: серверные операции CEO и управления пользователями ([контракт](docs/sprint-2.md)).
 Laravel 13, PHP 8.4, PostgreSQL 17, Docker Compose. Frontend не реализован.
 Согласованные архитектурные документы находятся в [docs](docs/architecture.md).
 
@@ -51,8 +52,9 @@ APP_KEY — `base64:` плюс 32 случайных байта в base64. Не 
 - `blusser_owner`: LOGIN, NOSUPERUSER, NOBYPASSRLS; владелец таблиц и миграций.
 - `blusser_app`: LOGIN, NOSUPERUSER, NOBYPASSRLS, не owner, без CREATE/SET ROLE
   к привилегированным ролям. Только разрешённые reads и anonymous session storage.
-- `blusser_security`: NOLOGIN, BYPASSRLS; только SELECT нужных таблиц для узких
-  boolean/scope helpers с фиксированным search_path. Runtime не член этой роли.
+- `blusser_security`: NOLOGIN, BYPASSRLS; точечные privileges для узких read helpers
+  и governance mutations с фиксированным search_path. Runtime не член этой роли
+  и может вызывать только явно разрешённые функции.
 
 Owner credential получает только одноразовый сервис `migrate` и тестовый сервис.
 Процесс API не получает MIGRATION_DB_PASSWORD или POSTGRES_PASSWORD.
@@ -91,22 +93,25 @@ PHPUnit дополнительно отказывается выполнять d
 не `blusser_test`. Для генерации нового образа после изменения файлов повторите
 `docker compose build backend`: исходники включены в image, bind mount не используется.
 Параллельный запуск test-сервиса на одной test DB не поддерживается.
-Результаты текущей проверки и границы готовности — в [отчёте Sprint 1](docs/sprint-1.md).
+Результаты Sprint 1 — в [историческом отчёте](docs/sprint-1.md); текущие проверки
+и границы Sprint 2 — в [отчёте](docs/sprint-2-validation.md).
 
 ## Границы безопасности и незавершённые функции
 
-- Нет login/logout/password-change/reset, employee/clinic/role CRUD, provisioning
-  первого администратора или authenticated business endpoints. Не выдавайте
-  сотрудникам временные пароли через этот Sprint: соответствующие flows ещё закрыты.
+- Реализованы внутренние сервисы Identity, ClinicProvisioning, ClinicAdministration:
+  bootstrap tenant/CEO, password verification/change, custom roles/grants, employees,
+  consent linking и CEO recovery. HTTP login/logout/business endpoints и UI пока
+  не подключены. Не используйте domain-only реализацию для рабочих аккаунтов.
 - Sanctum подготовлен, но полный auth lifecycle **не готов**. CSRF endpoint создаёт
   только anonymous session. Перед включением login обязателен credential-version
   aware session adapter, проверка active/first-login state, CSRF, atomic rate limits,
   reset/revocation, audit и все согласованные тесты. Session CHECK не позволяет
   стандартному Laravel handler сохранить user-session без версии и auth stage.
-- Роли, grants, memberships, links и audit пока доступны на запись только migration/
-  provisioning-owner. Узкие mutation services с потолком делегирования, запретом
-  self-escalation и защитой последнего admin реализуются в следующем спринте.
-  Отсутствие endpoints/write grants не заменяется временным CRUD с обходом правил.
+- Runtime не имеет прямого business DML. Governance functions проверяют actor,
+  credential version, tenant permissions/scopes и потолок делегирования под locks.
+  Protected CEO сохраняет последнего администратора. Platform не управляет
+  обычными сотрудниками. Создание первого platform operator — отдельный
+  контролируемый deployment step, автоматического seed/default password нет.
 - `TenantContext` — внутренняя серверная транзакционная граница: actor должен
   поступать из проверенной аутентификации, а не body/header. Нет публичного способа
   установить app.user_id/app.tenant_id. Nested contexts запрещены; SET LOCAL
@@ -115,8 +120,9 @@ PHPUnit дополнительно отказывается выполнять d
 - RLS защищает tenant boundary; custom settings не аутентифицируют человека.
   SQL injection/утечка DB credentials остаются за этой границей доверия.
   Соблюдайте backend policies и query predicates, даже при наличии RLS read scopes.
-- Схема auth_rate_limits подготовлена, но auth handlers и атомарный limiter ещё
-  не реализованы. Нет медицинских, пациентских, финансовых модулей и реальных данных.
+- PostgreSQL limiter атомарно учитывает login/IP и чувствительные identity actions.
+  HTTP integration, trusted proxy settings и эксплуатационные процедуры ещё нужны.
+  Нет медицинских, пациентских, финансовых модулей и реальных данных.
 - Health проверяет runtime-подключение и наличие 11 FORCE RLS таблиц; это не
   подтверждение полной готовности будущих функций или production environment.
 

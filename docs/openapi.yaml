@@ -3,7 +3,8 @@ info:
   title: Blusser Backend Foundation API
   version: 0.1.0
   description: >-
-    Sprint 1. Only health and the Sanctum CSRF handshake are available.
+    Sprint 1 REST surface. Sprint 2 adds internal CEO governance use cases,
+    not HTTP business endpoints. Only health and the Sanctum CSRF handshake are available.
     Login, password lifecycle, tenant CRUD and RBAC mutation APIs are not implemented.
     No personal access tokens, public registration or sample credentials.
 paths:

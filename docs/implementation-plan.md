@@ -1,7 +1,8 @@
 # Blusser: пошаговый план первого этапа
 
-Статус: ожидает подтверждения архитектуры. Сейчас изменяются только документы.
-Описанные ниже команды и проверки являются планом, а не выполненными результатами.
+Статус: Sprint 1 реализован. Приоритет Sprint 2 — окончательная модель CEO,
+описанная в sprint-2.md. Старые упоминания первого Clinic Admin означают CEO;
+platform не управляет обычными сотрудниками. Проверки будущих этапов — план.
 
 ## 0. Согласовать проект
 
@@ -24,8 +25,9 @@ Compose: frontend, backend, PostgreSQL, healthchecks, persistent volume.
 ## 2. Схема, DB-роли и RLS
 
 Реализовать tenant_roles, role_permissions со scope, глобальный каталог
-permissions и составные tenant FK по database.md. Стартовые шаблоны копируются
-в tenant при provisioning; глобальных назначаемых ролей нет.
+permissions и составные tenant FK по database.md. При provisioning создаётся
+только защищённая CEO role; остальные должности создаёт CEO. Глобальных
+назначаемых tenant-ролей нет.
 Разделить owner/migration и runtime connections; включить FORCE RLS.
 Реализовать ограниченные helpers, provisioning и audit functions. Не выдавать
 runtime-role superuser, ownership или BYPASSRLS.
@@ -57,18 +59,18 @@ PostgreSQL rate limits на login/IP и отдельные identity actions, о�
 Развести employees.create, assign_role, assign_branches, lookup_identity и
 reset_password; create не подразумевает reset. Link существующего user требует
 self-confirmation/reauth, expiry и повторную проверку инициатора; пароль не меняется.
-Для multi-clinic identity запретить tenant reset и документировать platform recovery
-с проверкой личности как отдельную процедуру, не подменяя её новым аккаунтом.
+Для multi-clinic identity запретить tenant reset. Для CEO — отдельный двухоператорный
+recovery; для остальных — будущий self-service recovery, без platform employee reset.
 Согласованный user→tenant lock order обязателен для identity и membership writes.
 
 Критерий: анонимный запрос отклоняется; неактивные user/membership/tenant не дают
 доступа; один user корректно переключается между двумя клиниками с разными ролями.
-Platform Super Admin без membership не читает tenant API. Права не передаются
+Platform Super Admin не читает tenant API даже с ошибочным membership. Права не передаются
 из клиента и не сохраняются устаревшими в session claims.
 
 ## 4. Базовые REST-модули
 
-Реализовать platform clinics list/create и атомарное назначение первого Clinic Admin.
+Реализовать platform clinics list/create и атомарное создание единственного первоначального CEO (existing login — consent).
 В tenant API: branches, employees/memberships, services, dashboard, audit view,
 tenant roles и permissions editor. Каталог содержит отдельные view/create/update/
 delete и специальные actions только для поддерживаемых операций. Query services
@@ -129,7 +131,7 @@ Dashboard получает реальные counts через API; до появ
 - Проверить конкурентные изменения grants/roles/memberships, деактивацию user/role,
   удаление роли и отзыв последнего admin-capability: активный полный администратор
   сохраняется, даже при изменении общей роли и нескольких clinics одного user.
-- Platform Super Admin без membership не получает tenant data и scopes bypass;
+- Platform Super Admin даже с ошибочным membership не получает tenant data и scopes bypass;
   tenant-admin не может назначить глобальный platform-признак.
 - Создание клиники + первого admin + audit атомарно; отдельное создание филиала
   доступно только разрешённой роли. Ошибка оставляет БД без частичных записей.
@@ -195,8 +197,8 @@ docker compose exec frontend npm run build
 docker compose down
 ```
 
-Это будущий контракт команд: сейчас compose.yaml и приложение отсутствуют,
-поэтому запускать эти команды пока нельзя. В реализации будут документированы
+Это исходный целевой контракт; актуальные проверенные команды приведены в README.
+Sprint 1 уже содержит Compose и backend. Документированы
 инициализация APP_KEY, раздельные DB credentials и правильный выбор migration
 connection. Не использовать down -v как штатную остановку: он удаляет данные.
 
@@ -206,9 +208,23 @@ connection. Не использовать down -v как штатную оста
 
 ## Известные ограничения текущего этапа
 
-Существуют только архитектурные документы и README. Автоматических тестов,
-сборки, API, UI и миграций пока нет. Readiness приложения не заявляется.
+Sprint 1 реализован и протестирован. Sprint 2 добавляет domain use cases и DB
+операции; HTTP session adapter и бизнес-маршруты ещё не подключены. UI отсутствует.
+Полная готовность Sprint 2 и production readiness не заявляются.
 Перед production отдельно потребуются backup/restore, TLS, управление секретами,
-platform identity recovery для multi-clinic аккаунтов, мониторинг и политика
+self-service recovery рядовых multi-clinic identities, мониторинг и политика
 хранения аудита. Создание сотрудников и admin reset single-clinic аккаунтов
 входят в реализацию этапа; почтовая доставка не является их prerequisite.
+
+## Приоритет Sprint 2: окончательная модель CEO
+
+1. Ввести immutable tenant_ceos, protected bootstrap-role, pending provisioning
+   для существующего login и отдельный двухоператорный CEO recovery.
+2. Разделить platform-only provisioning/recovery и tenant-only RBAC/employees.
+   Platform flag запрещает tenant context даже при наличии membership.
+3. Реализовать backend use cases с узкими DB-функциями, password_hash verification,
+   first-login guard, изменением пароля, scopes и delegated administration.
+4. Сохранить exact-login linking с согласия target, expiry/revalidation и без reset.
+5. Проверить полный набор негативных сценариев и атомарный audit без секретов.
+6. Подключать REST auth transport только вместе с version-aware session adapter,
+   CSRF, rate limits и lifecycle тестами; не публиковать упрощённый login API.
