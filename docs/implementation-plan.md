@@ -6,7 +6,7 @@
 ## 0. Согласовать проект
 
 Рассмотреть architecture.md и database.md: shared-schema RLS, membership per clinic,
-фиксированную матрицу RBAC, bootstrap первого администратора, узбекскую латиницу,
+tenant-owned роли, action permissions и scopes, bootstrap первого администратора, узбекскую латиницу,
 отсутствие финансовых и медицинских модулей. После явного подтверждения перейти
 к коду. Изменения оформлять отдельной веткой и PR; merge требует согласия.
 
@@ -23,7 +23,9 @@ Compose: frontend, backend, PostgreSQL, healthchecks, persistent volume.
 
 ## 2. Схема, DB-роли и RLS
 
-Реализовать миграции и минимальный каталог ролей/permissions по database.md.
+Реализовать tenant_roles, role_permissions со scope, глобальный каталог
+permissions и составные tenant FK по database.md. Стартовые шаблоны копируются
+в tenant при provisioning; глобальных назначаемых ролей нет.
 Разделить owner/migration и runtime connections; включить FORCE RLS.
 Реализовать ограниченные helpers, provisioning и audit functions. Не выдавать
 runtime-role superuser, ownership или BYPASSRLS.
@@ -38,7 +40,13 @@ SQLite для этих тестов не подходит. Migration tests ис�
 Реализовать session auth с Sanctum, CSRF, rate limits, login/logout,
 безопасное создание первого Platform Super Admin. Tenant middleware устанавливает
 проверенный context внутри транзакции до route binding. Реализовать self-memberships,
-выбор клиники, permissions policies и защиту последнего Clinic Admin.
+выбор клиники, action/scope policies и защиту последнего полного администратора.
+Добавить tenant-owned роли, редактирование grants и отдельные действия назначения
+роли/филиалов. Проверять потолок делегирования, запрет self-escalation (включая
+изменение общей роли и собственных филиалов), итоговый граф активных capabilities.
+Сериализовать все RBAC changes блокировкой tenant, перечитывать права и писать аудит.
+Определить predicates own/assigned_branches/entire_clinic до выполнения запросов;
+неподдерживаемые пары permission/scope отклонять.
 
 Критерий: анонимный запрос отклоняется; неактивные user/membership/tenant не дают
 доступа; один user корректно переключается между двумя клиниками с разными ролями.
@@ -48,7 +56,11 @@ Platform Super Admin без membership не читает tenant API. Права 
 ## 4. Базовые REST-модули
 
 Реализовать platform clinics list/create и атомарное назначение первого Clinic Admin.
-В tenant API: branches, employees/memberships, services, dashboard и audit read.
+В tenant API: branches, employees/memberships, services, dashboard, audit view,
+tenant roles и permissions editor. Каталог содержит отдельные view/create/update/
+delete и специальные actions только для поддерживаемых операций. Query services
+применяют scopes к спискам, поиску, aggregates и ресурсам, write policies проверяют
+исходное и итоговое состояние.
 При создании клиники branch не обязателен: филиал создаётся отдельной операцией.
 Ограничить employee responses необходимыми полями, не возвращать password hash.
 Публичную регистрацию, email delivery и восстановление пароля не подключать
@@ -61,6 +73,8 @@ permission checks и атомарный аудит. Нет медицински�
 
 Создать login, выбор клиники и семь запрошенных экранов: Super Admin Dashboard,
 Clinics List, Create Clinic, Clinic Admin Dashboard, Branches, Employees, Services.
+Добавить Roles & Permissions: создание должностей, редактор action/scope grants
+и назначение должности/филиалов сотруднику с backend validation feedback.
 Добавить typed API client и Pinia session/context stores. При переключении клиники
 очищать tenant state, отменять/игнорировать старые запросы, чтобы ответы предыдущей
 клиники не попадали на новый экран.
@@ -81,8 +95,25 @@ Dashboard получает реальные counts через API; до появ
   INSERT/UPDATE с tenant B отклоняются; отсутствующий context не открывает данные.
 - Контекст не протекает при повторном использовании соединения, rollback,
   исключении и переключении A→B; self-policy раскрывает лишь собственные memberships.
-- Матрица permissions проверяется для всех четырёх ролей; Platform Super Admin
-  без membership не получает tenant data, Clinic Admin не повышает себя до platform.
+- Клиники создают собственные роли; одинаковые названия не связывают права.
+  Чужая роль/grant не назначается через ID, nested route или прямой SQL.
+- Для каждого action проверить независимость view/create/update/delete/special;
+  default deny и неподдерживаемые permission/scope combinations.
+- Для own, assigned_branches, entire_clinic проверить списки, поиск, pagination,
+  counts/dashboard, detail и writes. Пустые филиалы, NULL branch и общие справочники
+  не получают fallback к clinic-wide. Проверить пересечение scopes dashboard/source.
+- Один user с разными ролями в A/B не объединяет permissions; отключение роли,
+  отзыв grant и смена филиалов действуют на следующем запросе.
+- Только уполномоченные actors управляют ролями и назначениями; нельзя делегировать
+  отсутствующий action или более широкий scope, в том числе назначением готовой роли.
+- Нельзя повысить себя через membership, общую роль, собственные branch assignments,
+  employee update или косвенное создание self-membership. Другой администратор
+  может изменить доступ в пределах своего потолка; операции обязательно аудируются.
+- Проверить конкурентные изменения grants/roles/memberships, деактивацию user/role,
+  удаление роли и отзыв последнего admin-capability: активный полный администратор
+  сохраняется, даже при изменении общей роли и нескольких clinics одного user.
+- Platform Super Admin без membership не получает tenant data и scopes bypass;
+  tenant-admin не может назначить глобальный platform-признак.
 - Создание клиники + первого admin + audit атомарно; отдельное создание филиала
   доступно только разрешённой роли. Ошибка оставляет БД без частичных записей.
 - Нельзя привязать сотрудника A к филиалу B; конкурентное удаление/понижение
@@ -91,7 +122,7 @@ Dashboard получает реальные counts через API; до появ
 - Audit нельзя изменить/удалить или подделать actor; секретов в metadata нет.
 
 Frontend: typecheck и production build, тесты выбора клиники, очистки state,
-прав доступа, основных форм и узбекских сообщений; локальный HTTP smoke
+прав и scope, редактора должностей, основных форм и узбекских сообщений; локальный HTTP smoke
 на собранном UI и API. Конкретный минимальный test runner выбирается при реализации,
 без введения дополнительных сервисов.
 
