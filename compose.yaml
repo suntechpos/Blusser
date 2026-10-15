@@ -1,0 +1,77 @@
+name: blusser
+x-backend: &backend
+  image: blusser-backend:local
+  build:
+    context: .
+    dockerfile: docker/backend.Dockerfile
+  init: true
+  depends_on:
+    db:
+      condition: service_healthy
+x-app-env: &app-env
+  APP_NAME: Blusser
+  APP_ENV: local
+  APP_DEBUG: "false"
+  APP_KEY: ${APP_KEY:?Set APP_KEY in .env}
+  APP_URL: http://localhost:${BACKEND_PORT:-8000}
+  APP_LOCALE: uz
+  APP_FALLBACK_LOCALE: uz
+  DB_CONNECTION: pgsql
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_DATABASE: blusser
+  DB_USERNAME: blusser_app
+  DB_PASSWORD: ${DB_APP_PASSWORD:?Set DB_APP_PASSWORD in .env}
+  SESSION_DRIVER: database
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-false}
+  CACHE_STORE: file
+  QUEUE_CONNECTION: sync
+  LOG_CHANNEL: stderr
+  HASH_DRIVER: argon2id
+services:
+  db:
+    image: postgres:17-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+    environment:
+      POSTGRES_DB: blusser
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?Set DB_OWNER_PASSWORD in .env}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?Set DB_APP_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/10-bootstrap.sh:/docker-entrypoint-initdb.d/10-bootstrap.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d blusser]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  backend:
+    <<: *backend
+    environment: *app-env
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: [CMD, php, -r, "exit(@file_get_contents('http://127.0.0.1:8000/api/v1/health') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+  migrate:
+    <<: *backend
+    profiles: [tools]
+    environment:
+      <<: *app-env
+      MIGRATION_DB_USERNAME: blusser_owner
+      MIGRATION_DB_PASSWORD: ${DB_OWNER_PASSWORD:?Set DB_OWNER_PASSWORD in .env}
+    command: [php, artisan, migrate, --database=migration, --force]
+  test:
+    <<: *backend
+    profiles: [tools]
+    environment:
+      <<: *app-env
+      APP_ENV: testing
+      DB_DATABASE: blusser_test
+      MIGRATION_DB_USERNAME: blusser_owner
+      MIGRATION_DB_PASSWORD: ${DB_OWNER_PASSWORD:?Set DB_OWNER_PASSWORD in .env}
+    command: [php, artisan, test]
+volumes:
+  postgres_data:

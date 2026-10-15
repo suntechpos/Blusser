@@ -1,0 +1,37 @@
+name: Backend Foundation
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Generate ephemeral local credentials
+        run: ./scripts/init-local-env
+      - name: Build backend
+        run: docker compose build backend
+      - name: Start PostgreSQL and migrate
+        run: |
+          docker compose up -d --wait db
+          docker compose run --rm migrate
+      - name: Test real PostgreSQL runtime role
+        run: docker compose run --rm test
+      - name: Validate style, lockfile and PHP extensions
+        run: |
+          docker compose run --rm test vendor/bin/pint --test
+          docker compose run --rm test composer validate --strict
+          docker compose run --rm test composer check-platform-reqs
+      - name: HTTP smoke
+        run: |
+          docker compose up -d --wait backend
+          curl --fail --silent http://localhost:8000/api/v1/health
+      - name: Clean disposable CI database
+        if: always()
+        run: docker compose down -v
