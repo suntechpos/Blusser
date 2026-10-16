@@ -237,3 +237,10 @@ See [sprint-3.md](sprint-3.md) for the seven-stage delivery and acceptance matri
 Only contracts, permission vocabulary, planned OpenAPI and security design are
 in scope now. Stage 2 requires separate owner approval. The deployed API contract
 stays in openapi.yaml; planned operations are in openapi-sprint-3.yaml.
+
+## Sprint 3 stage 2 — delivered scope
+
+Patients registry, branch linking, reversible archive/restore and explicit CSV
+export are implemented; Stage 3–7 are not started. See
+[sprint-3-stage-2.md](sprint-3-stage-2.md). Next: review Stage 2 before separately
+authorizing Doctors/Scheduling. Frontend stays demo until Stage 6.

@@ -363,3 +363,11 @@ The approved tenant-wide patient registry, active doctor-patient relationship sc
 appointment/visit/ticket boundaries and transition contracts are specified in
 [sprint-3.md](sprint-3.md). This is a design-stage addition; no clinical APIs are
 implemented by stage 1. Existing identity, CEO governance and RLS remain unchanged.
+
+## Sprint 3 stage 2 — Patients
+
+[Stage 2 delivery](sprint-3-stage-2.md) implements the tenant-wide registry with
+branch-scoped projections and controlled writes. Doctor own scope remains
+fail-closed until actual care relations exist. Approved optimistic concurrency
+clarification: Patient JSON unchanged; ETag exposes expected_version for archive/
+restore. Later operational modules and frontend integration are still deferred.

@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Blusser Sprint 3 — PLANNED clinic operations",
+    "title": "Blusser Sprint 3 — staged clinic operations contract",
     "version": "0.1.0-stage-1",
-    "description": "Design contract only. No listed operation is deployed. See sprint-3.md and sprint-3-security-schema.md. Existing deployed API remains openapi.yaml."
+    "description": "Stage 2 Patients operations marked implemented are published in openapi.yaml. Other operations remain planned and are not deployed. See sprint-3.md, sprint-3-stage-2.md and sprint-3-security-schema.md."
   },
   "x-implementation-status": "planned",
   "x-contract-version": "sprint-3-stage-1",
@@ -11,8 +11,8 @@
     "/api/v1/clinic/patients": {
       "get": {
         "operationId": "get_patients",
-        "summary": "PLANNED: GET patients",
-        "x-implementation-status": "planned",
+        "summary": "GET patients",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "patients.view"
         ],
@@ -56,19 +56,16 @@
             }
           },
           {
-            "name": "doctor_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "status",
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 32
+              "enum": [
+                "active",
+                "archived",
+                "all"
+              ],
+              "default": "active"
             }
           },
           {
@@ -86,11 +83,21 @@
               "type": "string",
               "format": "date-time"
             }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "description": "Reserved Stage 1 parameter. Unsupported in Stage 2 (422); real doctor/care filtering requires Stage 3–4.",
+            "x-unavailable-until-stage": 4,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Patient operation response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -144,14 +151,33 @@
           },
           "429": {
             "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Patient read unavailable; no SQL bindings or sensitive details returned.",
+            "headers": {
+              "Cache-Control": {
+                "description": "No caching.",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       },
       "post": {
         "operationId": "post_patients",
-        "summary": "PLANNED: POST patients",
-        "x-implementation-status": "planned",
+        "summary": "POST patients",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "patients.create"
         ],
@@ -181,7 +207,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Planned response; not implemented.",
+            "description": "Patient operation response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -189,6 +215,13 @@
                   "const": "no-store, private"
                 },
                 "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
               }
             },
             "content": {
@@ -231,14 +264,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/export": {
       "get": {
         "operationId": "get_patients_export",
-        "summary": "PLANNED: GET patients/export",
-        "x-implementation-status": "planned",
+        "summary": "GET patients/export",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "patients.export"
         ],
@@ -282,19 +315,16 @@
             }
           },
           {
-            "name": "doctor_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
             "name": "status",
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 32
+              "enum": [
+                "active",
+                "archived",
+                "all"
+              ],
+              "default": "active"
             }
           },
           {
@@ -312,11 +342,21 @@
               "type": "string",
               "format": "date-time"
             }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "description": "Reserved Stage 1 parameter. Unsupported in Stage 2 (422); real doctor/care filtering requires Stage 3–4.",
+            "x-unavailable-until-stage": 4,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Patient operation response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -354,16 +394,35 @@
           },
           "429": {
             "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Patient read unavailable; no SQL bindings or sensitive details returned.",
+            "headers": {
+              "Cache-Control": {
+                "description": "No caching.",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/{patient}": {
       "get": {
         "operationId": "get_patients_patient",
-        "summary": "PLANNED: GET patients/{patient}",
-        "x-implementation-status": "planned",
+        "summary": "GET patients/{patient}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "patients.view"
         ],
@@ -385,7 +444,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Patient operation response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -393,6 +452,13 @@
                   "const": "no-store, private"
                 },
                 "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
               }
             },
             "content": {
@@ -423,14 +489,33 @@
           },
           "429": {
             "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Patient read unavailable; no SQL bindings or sensitive details returned.",
+            "headers": {
+              "Cache-Control": {
+                "description": "No caching.",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       },
       "patch": {
         "operationId": "patch_patients_patient",
-        "summary": "PLANNED: PATCH patients/{patient}",
-        "x-implementation-status": "planned",
+        "summary": "PATCH patients/{patient}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "patients.update"
         ],
@@ -469,7 +554,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Patient operation response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -477,6 +562,13 @@
                   "const": "no-store, private"
                 },
                 "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
               }
             },
             "content": {
@@ -519,14 +611,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/{patient}/archive": {
       "post": {
         "operationId": "post_patients_patient_archive",
-        "summary": "PLANNED: POST patients/{patient}/archive",
-        "x-implementation-status": "planned",
+        "summary": "POST patients/{patient}/archive",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "patients.archive"
         ],
@@ -565,7 +657,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Patient operation response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -573,6 +665,13 @@
                   "const": "no-store, private"
                 },
                 "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
               }
             },
             "content": {
@@ -615,14 +714,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/{patient}/restore": {
       "post": {
         "operationId": "post_patients_patient_restore",
-        "summary": "PLANNED: POST patients/{patient}/restore",
-        "x-implementation-status": "planned",
+        "summary": "POST patients/{patient}/restore",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "patients.restore"
         ],
@@ -661,7 +760,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Patient operation response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -669,6 +768,13 @@
                   "const": "no-store, private"
                 },
                 "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
               }
             },
             "content": {
@@ -711,14 +817,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/{patient}/branches": {
       "post": {
         "operationId": "post_patients_patient_branches",
-        "summary": "PLANNED: POST patients/{patient}/branches",
-        "x-implementation-status": "planned",
+        "summary": "POST patients/{patient}/branches",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "patients.link_branch",
           "patients.view"
@@ -758,7 +864,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Patient operation response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -766,6 +872,13 @@
                   "const": "no-store, private"
                 },
                 "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
               }
             },
             "content": {
@@ -808,7 +921,7 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/doctors": {

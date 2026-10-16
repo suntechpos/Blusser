@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Identity\Http\AuthController;
+use App\Modules\Patients\Http\PatientController;
 use App\Modules\Platform\Http\ClinicController as PlatformController;
 use App\Modules\Platform\Http\HealthController;
 use App\Modules\Tenancy\Http\ClinicController;
@@ -26,6 +27,14 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
             Route::post('platform/clinics/{tenant}/ceo-recovery', [PlatformController::class, 'recovery']);
             Route::post('platform/ceo-recoveries/{recovery}/approve', [PlatformController::class, 'approve']);
             Route::prefix('clinic')->group(function () {
+                Route::get('patients/export', [PatientController::class, 'export']);
+                Route::get('patients', [PatientController::class, 'index']);
+                Route::post('patients', [PatientController::class, 'store']);
+                Route::get('patients/{patient}', [PatientController::class, 'show'])->whereUuid('patient');
+                Route::patch('patients/{patient}', [PatientController::class, 'update'])->whereUuid('patient');
+                Route::post('patients/{patient}/branches', [PatientController::class, 'link'])->whereUuid('patient');
+                Route::post('patients/{patient}/archive', [PatientController::class, 'archive'])->whereUuid('patient');
+                Route::post('patients/{patient}/restore', [PatientController::class, 'restore'])->whereUuid('patient');
                 Route::get('permissions', [ClinicController::class, 'permissions']);
                 Route::get('roles', [ClinicController::class, 'roles']);
                 Route::get('roles/{role}', [ClinicController::class, 'roles']);

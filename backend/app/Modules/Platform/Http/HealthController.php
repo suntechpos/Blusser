@@ -12,8 +12,8 @@ final class HealthController
     {
         try {
             $role = DB::selectOne('SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user');
-            $security = DB::selectOne("SELECT count(*) AS total FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relrowsecurity AND relforcerowsecurity AND relname IN ('users','tenants','branches','tenant_roles','role_permissions','tenant_memberships','membership_branches','services','membership_link_requests','membership_link_request_branches','audit_logs')");
-            if ($role->name !== 'blusser_app' || $role->rolsuper || $role->rolbypassrls || (int) $security->total !== 11) {
+            $security = DB::selectOne("SELECT count(*) AS total FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relrowsecurity AND relforcerowsecurity AND relname IN ('users','tenants','branches','tenant_roles','role_permissions','tenant_memberships','membership_branches','services','membership_link_requests','membership_link_request_branches','audit_logs','tenant_ceos','ceo_recovery_requests','patients','patient_branches','patient_counters','patient_idempotency','patient_grant_provenance')");
+            if ($role->name !== 'blusser_app' || $role->rolsuper || $role->rolbypassrls || (int) $security->total !== 18) {
                 throw new \RuntimeException('Runtime database prerequisites are not satisfied.');
             }
         } catch (Throwable) {

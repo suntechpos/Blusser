@@ -16,10 +16,20 @@ abstract class FoundationTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        if (config('database.connections.migration.database') !== 'blusser_test') {
+        if (config('database.connections.migration.database') !== 'blusser_test' || config('database.connections.pgsql.database') !== 'blusser_test') {
             throw new \RuntimeException('Destructive integration tests require the dedicated blusser_test database.');
         }
         if (! self::$migrated) {
+            // Production down() intentionally refuses patient data. Cleanup is authorized
+            // ONLY here after checking both actual database names, never in migrations.
+            foreach (['migration', 'pgsql'] as $name) {
+                if (DB::connection($name)->selectOne('SELECT current_database() AS name')->name !== 'blusser_test') {
+                    throw new \RuntimeException('Refusing cleanup outside the isolated test database.');
+                }
+            }
+            if (DB::connection('migration')->selectOne("SELECT to_regclass('public.tenants') AS name")->name !== null) {
+                DB::connection('migration')->statement('TRUNCATE tenants, users CASCADE');
+            }
             $exit = Artisan::call('migrate:refresh', ['--database' => 'migration', '--force' => true]);
             if ($exit !== 0) {
                 throw new \RuntimeException(Artisan::output());

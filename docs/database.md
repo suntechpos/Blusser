@@ -316,3 +316,10 @@ Governance вызывает его в той же транзакции посл�
 See [sprint-3-security-schema.md](sprint-3-security-schema.md) for future additive
 relations, composite constraints, RLS predicates, controlled writes, concurrency
 and migration provenance requirements. No Sprint 3 migration runs at stage 1.
+
+## Sprint 3 stage 2 — additive Patients schema
+
+Migration 000006 adds patients/patient_branches, locked tenant patient counters,
+PII-free idempotency references and permission/grant provenance. See
+[sprint-3-stage-2.md](sprint-3-stage-2.md) for actual RLS/command boundaries and
+non-destructive rollback refusal rules. No doctor, appointment or visit table exists.

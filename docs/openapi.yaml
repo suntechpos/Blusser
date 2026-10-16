@@ -3105,6 +3105,922 @@
           }
         }
       }
+    },
+    "/api/v1/clinic/patients": {
+      "get": {
+        "operationId": "get_patients",
+        "summary": "GET patients",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "archived",
+                "all"
+              ],
+              "default": "active"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "description": "Reserved Stage 1 parameter. Unsupported in Stage 2 (422); real doctor/care filtering requires Stage 3–4.",
+            "x-unavailable-until-stage": 4,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Patient"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Patient read unavailable; no SQL bindings or sensitive details returned.",
+            "headers": {
+              "Cache-Control": {
+                "description": "No caching.",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+      },
+      "post": {
+        "operationId": "post_patients",
+        "summary": "POST patients",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+      }
+    },
+    "/api/v1/clinic/patients/export": {
+      "get": {
+        "operationId": "get_patients_export",
+        "summary": "GET patients/export",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.export"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "archived",
+                "all"
+              ],
+              "default": "active"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "description": "Reserved Stage 1 parameter. Unsupported in Stage 2 (422); real doctor/care filtering requires Stage 3–4.",
+            "x-unavailable-until-stage": 4,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Patient read unavailable; no SQL bindings or sensitive details returned.",
+            "headers": {
+              "Cache-Control": {
+                "description": "No caching.",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+      }
+    },
+    "/api/v1/clinic/patients/{patient}": {
+      "get": {
+        "operationId": "get_patients_patient",
+        "summary": "GET patients/{patient}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Patient read unavailable; no SQL bindings or sensitive details returned.",
+            "headers": {
+              "Cache-Control": {
+                "description": "No caching.",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+      },
+      "patch": {
+        "operationId": "patch_patients_patient",
+        "summary": "PATCH patients/{patient}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientUpdate"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+      }
+    },
+    "/api/v1/clinic/patients/{patient}/archive": {
+      "post": {
+        "operationId": "post_patients_patient_archive",
+        "summary": "POST patients/{patient}/archive",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.archive"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+      }
+    },
+    "/api/v1/clinic/patients/{patient}/restore": {
+      "post": {
+        "operationId": "post_patients_patient_restore",
+        "summary": "POST patients/{patient}/restore",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.restore"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+      }
+    },
+    "/api/v1/clinic/patients/{patient}/branches": {
+      "post": {
+        "operationId": "post_patients_patient_branches",
+        "summary": "POST patients/{patient}/branches",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.link_branch",
+          "patients.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              },
+              "ETag": {
+                "description": "Quoted positive integer resource version, e.g. \"1\".",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Patient"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BranchLinkInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+      }
     }
   },
   "components": {
@@ -3927,6 +4843,193 @@
           "status"
         ],
         "additionalProperties": false
+      },
+      "Patient": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient_number": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date"
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "branch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "patient_number",
+          "name",
+          "branch_ids"
+        ]
+      },
+      "Meta": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "page",
+          "per_page",
+          "total"
+        ]
+      },
+      "PatientInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 32
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date"
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "female",
+              "male",
+              "unspecified",
+              null
+            ]
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "name",
+          "date_of_birth",
+          "branch_id"
+        ]
+      },
+      "PatientUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 32
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date"
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "female",
+              "male",
+              "unspecified",
+              null
+            ]
+          }
+        },
+        "required": [],
+        "minProperties": 1
+      },
+      "CommandInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason_code": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "expected_version"
+        ]
+      },
+      "BranchLinkInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "branch_id"
+        ]
       }
     },
     "responses": {
@@ -4088,6 +5191,139 @@
               "type": "string"
             },
             "description": "Encrypted session cookie (HttpOnly, SameSite=Lax, Secure on HTTPS) and XSRF-TOKEN. IDs and CSRF token rotate on login/password change/logout."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Failure401": {
+        "description": "Generic failure; no hidden resource details.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store, private"
+            },
+            "description": "Sensitive operational response; no caching."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Failure403": {
+        "description": "Generic failure; no hidden resource details.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store, private"
+            },
+            "description": "Sensitive operational response; no caching."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Failure404": {
+        "description": "Generic failure; no hidden resource details.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store, private"
+            },
+            "description": "Sensitive operational response; no caching."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Failure409": {
+        "description": "Generic failure; no hidden resource details.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store, private"
+            },
+            "description": "Sensitive operational response; no caching."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Failure419": {
+        "description": "Generic failure; no hidden resource details.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store, private"
+            },
+            "description": "Sensitive operational response; no caching."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Failure422": {
+        "description": "Generic failure; no hidden resource details.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store, private"
+            },
+            "description": "Sensitive operational response; no caching."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Failure429": {
+        "description": "Generic failure; no hidden resource details.",
+        "headers": {
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store, private"
+            },
+            "description": "Sensitive operational response; no caching."
           }
         },
         "content": {
