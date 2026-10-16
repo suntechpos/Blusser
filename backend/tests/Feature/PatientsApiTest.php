@@ -41,13 +41,16 @@ final class PatientsApiTest extends FoundationTestCase
         }
     }
 
-    private function browser(array &$jar, string $method, string $path, array $body = [], bool $csrf = true, ?string $key = null): TestResponse
+    private function browser(array &$jar, string $method, string $path, array $body = [], bool $csrf = true, ?string $key = null, ?string $ifMatch = '"1"'): TestResponse
     {
         Auth::forgetGuards();
         $this->app->make('session')->forgetDrivers();
         $server = ['HTTP_ACCEPT' => 'application/json', 'CONTENT_TYPE' => 'application/json', 'HTTPS' => 'on', 'SERVER_PORT' => 443, 'REMOTE_ADDR' => '192.0.2.15', 'HTTP_ORIGIN' => 'https://localhost'];
         if ($csrf && isset($jar['XSRF-TOKEN'])) {
             $server['HTTP_X_XSRF_TOKEN'] = $jar['XSRF-TOKEN'];
+        }
+        if ($method === 'PATCH' && $ifMatch !== null) {
+            $server['HTTP_IF_MATCH'] = $ifMatch;
         }
         $server['HTTP_IDEMPOTENCY_KEY'] = $key ?? (string) Str::uuid();
         $response = $this->call($method, $path, [], $jar, [], $server, json_encode($body));
@@ -295,6 +298,110 @@ final class PatientsApiTest extends FoundationTestCase
         DB::connection('migration')->statement("INSERT INTO patients(tenant_id,patient_number,name,date_of_birth) SELECT ?::uuid,'limit-'||n,'Synthetic export limit',DATE '1990-01-01' FROM generate_series(1,10001) n", [$a['tenant']]);
         $this->browser($jar, 'GET', '/api/v1/clinic/patients/export')->assertUnprocessable();
         $this->assertSame(0, DB::connection('migration')->table('audit_logs')->where('action', 'patient.export')->count());
+    }
+
+    public function test_patch_requires_strong_if_match_and_preserves_replay_and_version_guards(): void
+    {
+        $a = $this->fixture()['a'];
+        $id = $this->command($a)['patient']['id'];
+        $jar = $this->patientSession($a);
+        $uri = '/api/v1/clinic/patients/'.$id;
+        $etag = $this->browser($jar, 'GET', $uri)->assertOk()->headers->get('ETag');
+        foreach ([null, '1', 'W/"1"', '*', '"0"', '"01"', '"-1"', '"1", "2"', '"9223372036854775808"', '"'.str_repeat('9', 40).'"'] as $invalid) {
+            $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic rejected'], ifMatch: $invalid)->assertUnprocessable();
+        }
+        $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic rejected', 'expected_version' => 1], ifMatch: $etag)->assertUnprocessable();
+        $this->browser($jar, 'GET', $uri)->assertHeader('ETag', $etag)->assertJsonPath('name', 'Synthetic Patient');
+        $key = (string) Str::uuid();
+        $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic changed'], key: $key, ifMatch: $etag)->assertOk()->assertHeader('ETag', '"2"');
+        $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic changed'], key: $key, ifMatch: $etag)->assertOk()->assertHeader('ETag', '"2"');
+        $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic lost update'], ifMatch: $etag)->assertConflict();
+        $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic changed'], key: $key, ifMatch: '"2"')->assertConflict();
+        $this->browser($jar, 'GET', $uri)->assertJsonPath('name', 'Synthetic changed')->assertHeader('ETag', '"2"');
+        $this->assertSame(1, DB::connection('migration')->table('audit_logs')->where('resource_id', $id)->where('action', 'patient.update')->count());
+        $this->assertSame(1, DB::connection('migration')->table('patient_idempotency')->where('patient_id', $id)->where('operation', 'update')->count());
+        $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic latest'], ifMatch: '"2"')->assertOk()->assertHeader('ETag', '"3"');
+        $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic changed'], key: $key, ifMatch: $etag)->assertOk()->assertJsonPath('name', 'Synthetic latest')->assertHeader('ETag', '"3"');
+        $this->grant($a, 'patients.update', null);
+        $this->browser($jar, 'PATCH', $uri, ['name' => 'Synthetic changed'], key: $key, ifMatch: $etag)->assertForbidden();
+    }
+
+    public function test_parallel_http_patches_and_committed_row_changes_cannot_lose_updates(): void
+    {
+        $ids = $this->fixture();
+        $a = $ids['a'];
+        $second = [...$a, 'user' => $ids['b']['user'], 'membership' => (string) Str::uuid()];
+        DB::connection('migration')->table('tenant_memberships')->insert(['id' => $second['membership'], 'tenant_id' => $a['tenant'], 'user_id' => $second['user'], 'role_id' => $a['role']]);
+        $jars = [$this->patientSession($a), $this->patientSession($second)];
+        $code = <<<'CODE'
+require 'vendor/autoload.php'; $app=require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->detectEnvironment(fn ()=>'local');
+$app['config']->set(['session.driver'=>'versioned','session.secure'=>true,'session.encrypt'=>true,'session.lottery'=>[0,100]]);
+$i=json_decode(stream_get_contents(STDIN),true);
+Illuminate\Support\Facades\DB::connection('pgsql')->select("SELECT set_config('application_name',?,false)",[$i['tag']]);
+$r=Illuminate\Http\Request::create('/api/v1/clinic/patients/'.$i['id'],'PATCH',[],$i['jar'],[],[
+'HTTP_ACCEPT'=>'application/json','CONTENT_TYPE'=>'application/json','HTTPS'=>'on','SERVER_PORT'=>443,
+'HTTP_ORIGIN'=>'https://localhost','REMOTE_ADDR'=>'192.0.2.15','HTTP_IF_MATCH'=>'"1"',
+'HTTP_X_XSRF_TOKEN'=>$i['jar']['XSRF-TOKEN'],'HTTP_IDEMPOTENCY_KEY'=>$i['key']],json_encode(['name'=>$i['name']]));
+$kernel=$app->make(Illuminate\Contracts\Http\Kernel::class);$response=$kernel->handle($r);$kernel->terminate($r,$response);
+echo json_encode(['status'=>$response->getStatusCode(),'etag'=>$response->headers->get('ETag'),'body'=>json_decode($response->getContent(),true)]);
+CODE;
+        foreach ([false, true] as $interveningCommit) {
+            $id = $this->command($a)['patient']['id'];
+            $owner = DB::connection('migration');
+            $owner->beginTransaction();
+            $owner->select('SELECT id FROM patients WHERE id=? FOR UPDATE', [$id]);
+            $workers = [];
+            try {
+                foreach ([0, 1] as $i) {
+                    $workers[$i] = new Process([PHP_BINARY, '-r', $code], base_path(), ['APP_ENV' => 'testing']);
+                    $workers[$i]->setInput(json_encode(['jar' => $jars[$i], 'id' => $id, 'key' => (string) Str::uuid(), 'name' => 'Synthetic writer '.$i, 'tag' => 'patient-patch-race-'.$i]));
+                    $workers[$i]->setTimeout(20)->start();
+                }
+                $blocked = 0;
+                for ($attempt = 0; $attempt < 150; $attempt++) {
+                    $blocked = (int) DB::selectOne("SELECT count(*) AS n FROM pg_stat_activity WHERE application_name LIKE 'patient-patch-race-%' AND wait_event_type='Lock'")->n;
+                    if ($blocked === 2) {
+                        break;
+                    }
+                    usleep(20000);
+                }
+                $this->assertSame(2, $blocked, 'Both HTTP requests must be blocked on real PostgreSQL locks.');
+                if ($interveningCommit) {
+                    $owner->table('patients')->where('id', $id)->update(['name' => 'Synthetic intervening commit', 'version' => 2]);
+                }
+                $owner->commit();
+                $results = [];
+                foreach ($workers as $worker) {
+                    $this->assertSame(0, $worker->wait(), $worker->getErrorOutput());
+                    $results[] = json_decode($worker->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+                }
+                $statuses = array_column($results, 'status');
+                sort($statuses);
+                $this->assertSame($interveningCommit ? [409, 409] : [200, 409], $statuses);
+                $patient = $owner->table('patients')->where('id', $id)->first();
+                $this->assertSame(2, (int) $patient->version);
+                if ($interveningCommit) {
+                    $this->assertSame('Synthetic intervening commit', $patient->name);
+                } else {
+                    $winner = array_values(array_filter($results, fn ($r) => $r['status'] === 200))[0];
+                    $this->assertSame('"2"', $winner['etag']);
+                    $this->assertSame($winner['body']['name'], $patient->name);
+                }
+                $this->assertSame($interveningCommit ? 0 : 1, $owner->table('audit_logs')->where('resource_id', $id)->where('action', 'patient.update')->count());
+                $this->assertSame($interveningCommit ? 0 : 1, $owner->table('patient_idempotency')->where('patient_id', $id)->where('operation', 'update')->count());
+            } finally {
+                if ($owner->transactionLevel()) {
+                    $owner->rollBack();
+                }
+                foreach ($workers as $worker) {
+                    if ($worker->isRunning()) {
+                        $worker->stop();
+                    }
+                }
+            }
+        }
     }
 
     public function test_parallel_allocations_and_duplicate_requests_use_real_runtime_transactions(): void

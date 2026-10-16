@@ -3648,6 +3648,16 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Exactly one strong ETag from GET detail, e.g. \"1\". Wildcard, weak tags, lists, zero, leading zeros and values above 9223372036854775807 are rejected with 422. A stale version returns 409.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]{0,18}\"$"
+            }
           }
         ],
         "responses": {
@@ -3709,7 +3719,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore. PATCH requires If-Match; PostgreSQL checks the version after locking the patient row. The header participates in the idempotency request digest. An authorized identical replay may reuse its original If-Match without performing another update; changing If-Match under the same key conflicts. Patient JSON is unchanged."
       }
     },
     "/api/v1/clinic/patients/{patient}/archive": {

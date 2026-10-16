@@ -93,3 +93,29 @@ Stage 3 requires separate approval. No merge is authorized by this delivery.
 - `docs/openapi.yaml`
 - `docs/sprint-3-stage-2-validation.md`
 - `docs/sprint-3-stage-2.md`
+
+## PR #6 follow-up — optimistic PATCH locking
+
+PATCH now requires one strong quoted positive integer If-Match from GET detail;
+missing/invalid/weak/list/wildcard/out-of-bigint-range tags return 422. The controller
+passes it as internal command metadata, never as a new Patient JSON field. New
+additive migration 000007 replaces only the existing command body, preserving its
+owner/ACL and all tenant/branch/permission guards. It compares the version after
+SELECT FOR UPDATE; stale edits return 409 and roll back domain changes/audit/key
+registration. Existing archive/restore expected_version remains unchanged.
+
+Idempotency digest includes the expected version. Authorized identical replays
+with the original header return the current authorized representation/ETag without
+another write; changed header under the same key conflicts. Revoked permissions
+still deny replay. Down restores the previous command without dropping patient
+rows; lifecycle tests restore up after intentional refusal of older schema down.
+
+Final checks for this follow-up: **94 backend tests passed, 5555 assertions**
+(91.13 seconds), **68 Pint files passed**, Composer validation/platform passed,
+frontend TypeScript/Vite build passed (1805 modules), Docker build passed and
+`git diff --check` passed. Actual concurrent HTTP PATCH requests from two different
+users are observed blocked in PostgreSQL: one succeeds/one conflicts; when a row
+changes while locked, both stale requests conflict. Tests also verify malformed
+headers, new ETag, replay, unchanged failed-write audit/ledger, migration roundtrip,
+and existing RLS/session/permissions regressions. Test cleanup remains blusser_test
+only. Stage 3 is not started.

@@ -22,8 +22,12 @@ CSRF for mutations, full identity and a session-selected active clinic.
 Writes require UUID Idempotency-Key; unknown input is rejected. POST creation
 returns 201, other writes 200, Patient JSON exactly follows Stage 1. With owner
 approval, detail/write responses add `ETag: "N"`; parse N as positive integer for
-archive/restore expected_version. Stale version/state is 409. PATCH still uses the
-original demographic-only payload, no new required field. Missing/invisible IDs
+archive/restore expected_version. Stale version/state is 409. PATCH keeps the original demographic-only JSON payload, but now requires the
+If-Match header with that quoted ETag. Missing/malformed/unsupported tags return
+422; a stale version returns 409 without mutation. Version validation occurs after
+PostgreSQL row locking. Identical authorized idempotency replays retain their original
+If-Match and do not execute another update; changed If-Match under the same key is
+a different request (409). Archive/restore expected_version is unchanged. Missing/invisible IDs
 are 404, absent action permission 403, validation 422, missing active clinic 409.
 
 List/export: page/per_page, q (literal case-insensitive name/patient_number/normalized

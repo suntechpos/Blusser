@@ -32,6 +32,14 @@ final class PatientController
         $data = $this->demographics($request, false);
         abort_if($data === [], 422, 'No changes supplied.');
 
+        $etag = $request->header('If-Match');
+        if (! is_string($etag) || ! preg_match('/^"([1-9][0-9]{0,18})"$/D', $etag, $match)
+            || strlen($match[1]) === 19 && strcmp($match[1], '9223372036854775807') > 0) {
+            throw ValidationException::withMessages(['If-Match' => 'A single strong quoted positive integer ETag is required.']);
+        }
+        // Internal command metadata only; PatientUpdate JSON remains demographic-only.
+        $data['expected_version'] = (int) $match[1];
+
         return $this->write($request, 'update', $patient, $data);
     }
 

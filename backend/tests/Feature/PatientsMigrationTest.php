@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Modules\Access\Services\GovernanceDenied;
 use App\Modules\ClinicOperations\Contracts\OperationsContract;
 use App\Modules\Patients\Services\Patients;
 use Illuminate\Support\Facades\Artisan;
@@ -14,7 +15,7 @@ final class PatientsMigrationTest extends FoundationTestCase
 {
     private function rollback(): void
     {
-        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]));
     }
 
     public function test_verified_ceo_only_backfill_provenance_repeatability_and_safe_down(): void
@@ -70,14 +71,42 @@ final class PatientsMigrationTest extends FoundationTestCase
         }
     }
 
+    public function test_patch_lock_migration_roundtrip_preserves_patient_rows_and_restores_guard(): void
+    {
+        $a = $this->fixture()['a'];
+        $service = app(Patients::class);
+        $actor = $this->actor($a['user']);
+        $created = $service->command($actor, $a['tenant'], 'create', null, ['name' => 'Synthetic retained version', 'date_of_birth' => '1990-01-01', 'branch_id' => $a['branch']], (string) Str::uuid());
+        $id = $created['patient']['id'];
+        try {
+            $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
+            $legacy = $service->command($actor, $a['tenant'], 'update', $id, ['name' => 'Synthetic legacy update'], (string) Str::uuid());
+            $this->assertSame(2, $legacy['version']);
+        } finally {
+            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
+        }
+        try {
+            $service->command($actor, $a['tenant'], 'update', $id, ['name' => 'Synthetic rejected update'], (string) Str::uuid());
+            $this->fail('Version guard must be restored.');
+        } catch (GovernanceDenied $exception) {
+            $this->assertSame('invalid_input', $exception->reason);
+        }
+        $updated = $service->command($actor, $a['tenant'], 'update', $id, ['name' => 'Synthetic guarded update', 'expected_version' => 2], (string) Str::uuid());
+        $this->assertSame(3, $updated['version']);
+        $this->assertSame($id, $updated['patient']['id']);
+        $this->assertSame($created['patient']['patient_number'], $updated['patient']['patient_number']);
+    }
+
     public function test_down_refuses_later_delegated_grants_even_without_patient_records(): void
     {
         $this->fixture();
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]);
             $this->fail('Later delegated grants must not be deleted.');
         } catch (RuntimeException $exception) {
             $this->assertStringContainsString('forward migration', $exception->getMessage());
+        } finally {
+            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
         }
         $this->assertSame(0, DB::connection('migration')->table('patients')->count());
         $this->assertSame(70, DB::connection('migration')->table('role_permissions')->whereIn('permission_id', DB::connection('migration')->table('permissions')->whereIn('code', array_keys(OperationsContract::permissions()))->pluck('id'))->count());
@@ -88,10 +117,12 @@ final class PatientsMigrationTest extends FoundationTestCase
         $a = $this->fixture()['a'];
         app(Patients::class)->command($this->actor($a['user']), $a['tenant'], 'create', null, ['name' => 'Synthetic retained', 'date_of_birth' => '1990-01-01', 'branch_id' => $a['branch']], (string) Str::uuid());
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]);
             $this->fail('Clinical data must prevent destructive rollback.');
         } catch (RuntimeException $exception) {
             $this->assertStringContainsString('forward migration', $exception->getMessage());
+        } finally {
+            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
         }
         $this->assertSame(1, DB::connection('migration')->table('patients')->count());
         $this->assertSame(2, DB::connection('migration')->table('users')->count());
