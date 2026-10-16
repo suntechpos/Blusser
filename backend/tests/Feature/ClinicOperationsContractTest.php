@@ -26,11 +26,16 @@ final class ClinicOperationsContractTest extends TestCase
         foreach ($document['paths'] as $path => $methods) {
             $this->assertStringStartsWith('/api/v1/clinic/', $path);
             foreach ($methods as $method => $operation) {
-                $this->assertArrayNotHasKey($method, $published['paths'][$path] ?? []);
+                $implemented = $operation['x-implementation-status'] === 'implemented';
+                $this->assertSame($implemented, isset($published['paths'][$path][$method]));
+                $matches = 0;
                 foreach (Route::getRoutes() as $route) {
-                    $this->assertFalse('/'.$route->uri() === $path && in_array(strtoupper($method), $route->methods(), true));
+                    if ('/'.$route->uri() === $path && in_array(strtoupper($method), $route->methods(), true)) {
+                        $matches++;
+                    }
                 }
-                $this->assertSame('planned', $operation['x-implementation-status']);
+                $this->assertSame($implemented ? 1 : 0, $matches);
+                $this->assertContains($operation['x-implementation-status'], ['planned', 'implemented']);
                 $this->assertSame([['cookieAuth' => []]], $operation['security']);
                 $this->assertNotContains($operation['operationId'], $ids);
                 $ids[] = $operation['operationId'];

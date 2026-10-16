@@ -11,7 +11,7 @@ final class MigrationLifecycleTest extends FoundationTestCase
     public function test_rolling_back_only_security_migration_does_not_leave_column_grants_open(): void
     {
         try {
-            $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 3, '--force' => true]));
+            $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 5, '--force' => true]));
             $this->assertSqlState('42501', fn () => DB::table('users')->select('id')->get());
             $this->assertSqlState('42501', fn () => DB::table('sessions')->get());
             $this->getJson('/api/v1/health')->assertStatus(503);
