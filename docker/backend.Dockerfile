@@ -15,7 +15,7 @@ RUN --mount=type=cache,id=blusser-composer,target=/tmp/composer-cache \
     COMPOSER_CACHE_DIR=/tmp/composer-cache composer install --no-interaction --prefer-install="$COMPOSER_PREFER_INSTALL" --no-progress --no-scripts \
     && find vendor -type d -name .git -prune -exec rm -rf {} +
 COPY --chown=www-data:www-data backend/ /app/
-COPY --chown=www-data:www-data docs/openapi.yaml /app/docs/openapi.yaml
+COPY --chown=www-data:www-data docs/openapi.yaml docs/openapi-sprint-3.yaml /app/docs/
 RUN composer dump-autoload --no-interaction \
     && chown -R www-data:www-data storage bootstrap/cache
 USER www-data

@@ -310,3 +310,9 @@ Governance вызывает его в той же транзакции посл�
 набор филиалов. Для role edits проверяются существующие members; при link accept
 повторно используется initiating actor. Ошибка откатывает accounts/hash/sessions
 и исходный audit вместе с mutation, затем фиксируется operation.denied.
+
+## Sprint 3 stage 1 — planned security schema
+
+See [sprint-3-security-schema.md](sprint-3-security-schema.md) for future additive
+relations, composite constraints, RLS predicates, controlled writes, concurrency
+and migration provenance requirements. No Sprint 3 migration runs at stage 1.

@@ -230,3 +230,10 @@ self-service recovery рядовых multi-clinic identities, мониторин
    CSRF, rate limits, scoped reads и HTTP lifecycle/security тестами.
 7. Проверить image без bind mounts, OpenAPI route coverage, apply/rollback и
    отсутствие runtime migration credentials; обновить существующий PR без merge.
+
+## Sprint 3 stage 1
+
+See [sprint-3.md](sprint-3.md) for the seven-stage delivery and acceptance matrix.
+Only contracts, permission vocabulary, planned OpenAPI and security design are
+in scope now. Stage 2 requires separate owner approval. The deployed API contract
+stays in openapi.yaml; planned operations are in openapi-sprint-3.yaml.

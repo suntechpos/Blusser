@@ -356,3 +356,10 @@ healthcheck БД предшествует миграциям. Schema migrations 
 Логи не содержат паролей, session tokens, request bodies или медицинских данных.
 Настройка backup, TLS, production deployment и disaster recovery требует отдельного
 этапа перед реальной эксплуатацией.
+
+## Sprint 3 stage 1 — planned clinic operations
+
+The approved tenant-wide patient registry, active doctor-patient relationship scope,
+appointment/visit/ticket boundaries and transition contracts are specified in
+[sprint-3.md](sprint-3.md). This is a design-stage addition; no clinical APIs are
+implemented by stage 1. Existing identity, CEO governance and RLS remain unchanged.
