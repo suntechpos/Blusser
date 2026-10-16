@@ -937,8 +937,8 @@
     "/api/v1/clinic/doctors": {
       "get": {
         "operationId": "get_doctors",
-        "summary": "PLANNED: GET doctors",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/doctors",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "doctors.view"
         ],
@@ -1016,7 +1016,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1072,12 +1072,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Membership identity is immutable. Branches must be current active membership assignments. Removing a branch referenced by schedule history returns 409. Creating a profile never grants patient access."
       },
       "post": {
         "operationId": "post_doctors",
-        "summary": "PLANNED: POST doctors",
-        "x-implementation-status": "planned",
+        "summary": "POST /api/v1/clinic/doctors",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "doctors.create"
         ],
@@ -1107,7 +1107,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1157,14 +1157,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Membership identity is immutable. Branches must be current active membership assignments. Removing a branch referenced by schedule history returns 409. Creating a profile never grants patient access."
       }
     },
     "/api/v1/clinic/doctors/{id}": {
       "get": {
         "operationId": "get_doctors_id",
-        "summary": "PLANNED: GET doctors/{id}",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/doctors/{id}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "doctors.view"
         ],
@@ -1186,7 +1186,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1226,12 +1226,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Membership identity is immutable. Branches must be current active membership assignments. Removing a branch referenced by schedule history returns 409. Creating a profile never grants patient access."
       },
       "put": {
         "operationId": "put_doctors_id",
-        "summary": "PLANNED: PUT doctors/{id}",
-        "x-implementation-status": "planned",
+        "summary": "PUT /api/v1/clinic/doctors/{id}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "doctors.update"
         ],
@@ -1270,7 +1270,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1320,14 +1320,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Membership identity is immutable. Branches must be current active membership assignments. Removing a branch referenced by schedule history returns 409. Creating a profile never grants patient access."
       }
     },
     "/api/v1/clinic/rooms": {
       "get": {
         "operationId": "get_rooms",
-        "summary": "PLANNED: GET rooms",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/rooms",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "rooms.view"
         ],
@@ -1405,7 +1405,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1461,12 +1461,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Branch identity is immutable. Changes to active/availability/service_type conflict with current/future schedules. Room number is unique per branch."
       },
       "post": {
         "operationId": "post_rooms",
-        "summary": "PLANNED: POST rooms",
-        "x-implementation-status": "planned",
+        "summary": "POST /api/v1/clinic/rooms",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "rooms.create"
         ],
@@ -1496,7 +1496,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1546,14 +1546,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Branch identity is immutable. Changes to active/availability/service_type conflict with current/future schedules. Room number is unique per branch."
       }
     },
     "/api/v1/clinic/rooms/{id}": {
       "get": {
         "operationId": "get_rooms_id",
-        "summary": "PLANNED: GET rooms/{id}",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/rooms/{id}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "rooms.view"
         ],
@@ -1575,7 +1575,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1615,12 +1615,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Branch identity is immutable. Changes to active/availability/service_type conflict with current/future schedules. Room number is unique per branch."
       },
       "put": {
         "operationId": "put_rooms_id",
-        "summary": "PLANNED: PUT rooms/{id}",
-        "x-implementation-status": "planned",
+        "summary": "PUT /api/v1/clinic/rooms/{id}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "rooms.update"
         ],
@@ -1659,7 +1659,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1709,14 +1709,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Branch identity is immutable. Changes to active/availability/service_type conflict with current/future schedules. Room number is unique per branch."
       }
     },
     "/api/v1/clinic/schedules": {
       "get": {
         "operationId": "get_schedules",
-        "summary": "PLANNED: GET schedules",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/schedules",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.view"
         ],
@@ -1794,7 +1794,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1850,12 +1850,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Doctor and branch identity is immutable. Updates retain prior schedule and breaks in append-only history. Overlapping doctor/room windows return 409; breaks are bounded non-overlapping half-open intervals."
       },
       "post": {
         "operationId": "post_schedules",
-        "summary": "PLANNED: POST schedules",
-        "x-implementation-status": "planned",
+        "summary": "POST /api/v1/clinic/schedules",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.create"
         ],
@@ -1885,7 +1885,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -1935,14 +1935,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Doctor and branch identity is immutable. Updates retain prior schedule and breaks in append-only history. Overlapping doctor/room windows return 409; breaks are bounded non-overlapping half-open intervals."
       }
     },
     "/api/v1/clinic/schedules/{id}": {
       "get": {
         "operationId": "get_schedules_id",
-        "summary": "PLANNED: GET schedules/{id}",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/schedules/{id}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.view"
         ],
@@ -1964,7 +1964,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -2004,12 +2004,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Doctor and branch identity is immutable. Updates retain prior schedule and breaks in append-only history. Overlapping doctor/room windows return 409; breaks are bounded non-overlapping half-open intervals."
       },
       "put": {
         "operationId": "put_schedules_id",
-        "summary": "PLANNED: PUT schedules/{id}",
-        "x-implementation-status": "planned",
+        "summary": "PUT /api/v1/clinic/schedules/{id}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.update"
         ],
@@ -2048,7 +2048,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -2098,14 +2098,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Doctor and branch identity is immutable. Updates retain prior schedule and breaks in append-only history. Overlapping doctor/room windows return 409; breaks are bounded non-overlapping half-open intervals."
       }
     },
     "/api/v1/clinic/schedule-exceptions": {
       "get": {
         "operationId": "get_schedule_exceptions",
-        "summary": "PLANNED: GET schedule-exceptions",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/schedule-exceptions",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.view"
         ],
@@ -2183,7 +2183,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -2239,12 +2239,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Exception identity doctor/branch/date is immutable. Replacement doctor/branch/weekday/effective dates must cover that date. Replacement response canonicalizes effective dates to that date."
       },
       "post": {
         "operationId": "post_schedule_exceptions",
-        "summary": "PLANNED: POST schedule-exceptions",
-        "x-implementation-status": "planned",
+        "summary": "POST /api/v1/clinic/schedule-exceptions",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.create"
         ],
@@ -2274,7 +2274,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -2324,14 +2324,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Exception identity doctor/branch/date is immutable. Replacement doctor/branch/weekday/effective dates must cover that date. Replacement response canonicalizes effective dates to that date."
       }
     },
     "/api/v1/clinic/schedule-exceptions/{id}": {
       "get": {
         "operationId": "get_schedule_exceptions_id",
-        "summary": "PLANNED: GET schedule-exceptions/{id}",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/schedule-exceptions/{id}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.view"
         ],
@@ -2353,7 +2353,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -2393,12 +2393,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Exception identity doctor/branch/date is immutable. Replacement doctor/branch/weekday/effective dates must cover that date. Replacement response canonicalizes effective dates to that date."
       },
       "put": {
         "operationId": "put_schedule_exceptions_id",
-        "summary": "PLANNED: PUT schedule-exceptions/{id}",
-        "x-implementation-status": "planned",
+        "summary": "PUT /api/v1/clinic/schedule-exceptions/{id}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.update"
         ],
@@ -2437,7 +2437,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -2487,14 +2487,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Exception identity doctor/branch/date is immutable. Replacement doctor/branch/weekday/effective dates must cover that date. Replacement response canonicalizes effective dates to that date."
       }
     },
     "/api/v1/clinic/doctors/{doctor}/availability": {
       "get": {
         "operationId": "get_doctors_doctor_availability",
-        "summary": "PLANNED: GET doctors/{doctor}/availability",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/doctors/{doctor}/availability",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "schedules.view",
           "doctors.view",
@@ -2595,7 +2595,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -2603,6 +2603,13 @@
                   "const": "no-store, private"
                 },
                 "description": "Sensitive operational response; no caching."
+              },
+              "X-Availability-Mode": {
+                "description": "No reservation/occupancy check before Stage 4.",
+                "schema": {
+                  "type": "string",
+                  "const": "schedule-only"
+                }
               }
             },
             "content": {
@@ -2651,7 +2658,7 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Schedule-only availability hints, NOT reservations. Stage 4 occupancy/appointments do not exist yet. Active doctor, membership, role, specialty, branch, service and room required. A date exception overrides the entire doctor/branch day: closed removes it; replace supplies its sole replacement window. Room compatibility is the explicit same-branch room selected in an approved schedule; service_type is descriptive, not a service ID. Duration uses doctor_service override when present, otherwise schedule slot_minutes. At most 31 local calendar days. DST ambiguous/nonexistent slot boundaries or intervals return 422. UTC Z output ordered by starts_at, room_id, ends_at. Offset pagination; no fabricated occupancy."
       }
     },
     "/api/v1/clinic/services": {
@@ -2798,8 +2805,8 @@
     "/api/v1/clinic/specialties": {
       "get": {
         "operationId": "get_specialties",
-        "summary": "PLANNED: GET specialties",
-        "x-implementation-status": "planned",
+        "summary": "GET /api/v1/clinic/specialties",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "doctors.view"
         ],
@@ -2877,7 +2884,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Authorized scheduling response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -2933,7 +2940,92 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. POST/PUT extension approved by project owner. No implicit employee grants. Specialty response retains Stage-1 id/name fields."
+      },
+      "post": {
+        "operationId": "post_specialties",
+        "summary": "POST /api/v1/clinic/specialties",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Specialty"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialtyInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. POST/PUT extension approved by project owner. No implicit employee grants. Specialty response retains Stage-1 id/name fields."
       }
     },
     "/api/v1/clinic/appointments": {
@@ -5623,6 +5715,102 @@
         },
         "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
       }
+    },
+    "/api/v1/clinic/specialties/{id}": {
+      "put": {
+        "operationId": "put_specialties_id",
+        "summary": "PUT /api/v1/clinic/specialties/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Specialty"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialtyInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. POST/PUT extension approved by project owner. No implicit employee grants. Specialty response retains Stage-1 id/name fields."
+      }
     }
   },
   "components": {
@@ -6839,6 +7027,30 @@
         "required": [
           "permissions",
           "branch_ids"
+        ]
+      },
+      "SpecialtyInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "active"
         ]
       }
     },

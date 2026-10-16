@@ -4,6 +4,7 @@ use App\Modules\Identity\Http\AuthController;
 use App\Modules\Patients\Http\PatientController;
 use App\Modules\Platform\Http\ClinicController as PlatformController;
 use App\Modules\Platform\Http\HealthController;
+use App\Modules\Scheduling\Http\SchedulingController;
 use App\Modules\Tenancy\Http\ClinicController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,15 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
             Route::post('platform/clinics/{tenant}/ceo-recovery', [PlatformController::class, 'recovery']);
             Route::post('platform/ceo-recoveries/{recovery}/approve', [PlatformController::class, 'approve']);
             Route::prefix('clinic')->group(function () {
+                foreach (['doctors', 'rooms', 'schedules', 'schedule-exceptions', 'specialties'] as $kind) {
+                    Route::get($kind, [SchedulingController::class, 'index'])->defaults('resourceKind', $kind);
+                    Route::post($kind, [SchedulingController::class, 'store'])->defaults('resourceKind', $kind);
+                    if ($kind !== 'specialties') {
+                        Route::get($kind.'/{id}', [SchedulingController::class, 'show'])->whereUuid('id')->defaults('resourceKind', $kind);
+                    }
+                    Route::put($kind.'/{id}', [SchedulingController::class, 'update'])->whereUuid('id')->defaults('resourceKind', $kind);
+                }
+                Route::get('doctors/{doctor}/availability', [SchedulingController::class, 'availability'])->whereUuid('doctor');
                 Route::get('patients/export', [PatientController::class, 'export']);
                 Route::get('patients', [PatientController::class, 'index']);
                 Route::post('patients', [PatientController::class, 'store']);
