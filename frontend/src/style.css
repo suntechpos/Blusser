@@ -1,0 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root{font-family:Inter,Arial,sans-serif;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;background:#fff;color:#102345}
+*,*::before,*::after{box-sizing:border-box}
+html,body,#app{margin:0;width:100%;min-height:100%;padding:0}
+#app{min-height:100vh;max-width:none}body{min-width:320px}button,input,select{font-family:inherit}
