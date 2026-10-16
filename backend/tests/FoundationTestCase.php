@@ -27,6 +27,15 @@ abstract class FoundationTestCase extends TestCase
             self::$migrated = true;
         }
         DB::connection('migration')->statement('TRUNCATE tenants, users CASCADE');
+        DB::connection('migration')->statement('TRUNCATE auth_rate_limits');
+    }
+
+    protected function tearDown(): void
+    {
+        foreach (DB::getConnections() as $connection) {
+            $connection->disconnect();
+        }
+        parent::tearDown();
     }
 
     protected function fixture(): array

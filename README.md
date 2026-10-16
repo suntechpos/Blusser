@@ -1,6 +1,7 @@
 # Blusser
 
-Multi-tenant SaaS для независимых частных клиник. Sprint 1: **Backend Foundation**.
+Multi-tenant SaaS для независимых частных клиник. Sprint 1: **Backend Foundation**;
+Sprint 2: Sanctum REST API, CEO и управление пользователями ([контракт](docs/sprint-2.md)).
 Laravel 13, PHP 8.4, PostgreSQL 17, Docker Compose. Frontend не реализован.
 Согласованные архитектурные документы находятся в [docs](docs/architecture.md).
 
@@ -50,9 +51,11 @@ APP_KEY — `base64:` плюс 32 случайных байта в base64. Не 
 
 - `blusser_owner`: LOGIN, NOSUPERUSER, NOBYPASSRLS; владелец таблиц и миграций.
 - `blusser_app`: LOGIN, NOSUPERUSER, NOBYPASSRLS, не owner, без CREATE/SET ROLE
-  к привилегированным ролям. Только разрешённые reads и anonymous session storage.
-- `blusser_security`: NOLOGIN, BYPASSRLS; только SELECT нужных таблиц для узких
-  boolean/scope helpers с фиксированным search_path. Runtime не член этой роли.
+  к привилегированным ролям. Разрешённые RLS reads и точечный EXECUTE; session
+  INSERT/UPDATE выполняется только через version-aware persistence.
+- `blusser_security`: NOLOGIN, BYPASSRLS; точечные privileges для узких read helpers
+  и governance mutations с фиксированным search_path. Runtime не член этой роли
+  и может вызывать только явно разрешённые функции.
 
 Owner credential получает только одноразовый сервис `migrate` и тестовый сервис.
 Процесс API не получает MIGRATION_DB_PASSWORD или POSTGRES_PASSWORD.
@@ -91,34 +94,48 @@ PHPUnit дополнительно отказывается выполнять d
 не `blusser_test`. Для генерации нового образа после изменения файлов повторите
 `docker compose build backend`: исходники включены в image, bind mount не используется.
 Параллельный запуск test-сервиса на одной test DB не поддерживается.
-Результаты текущей проверки и границы готовности — в [отчёте Sprint 1](docs/sprint-1.md).
+Результаты Sprint 1 — в [историческом отчёте](docs/sprint-1.md); текущие проверки
+и границы Sprint 2 — в [отчёте](docs/sprint-2-validation.md).
 
-## Границы безопасности и незавершённые функции
+## Sprint 2: доступ к API
 
-- Нет login/logout/password-change/reset, employee/clinic/role CRUD, provisioning
-  первого администратора или authenticated business endpoints. Не выдавайте
-  сотрудникам временные пароли через этот Sprint: соответствующие flows ещё закрыты.
-- Sanctum подготовлен, но полный auth lifecycle **не готов**. CSRF endpoint создаёт
-  только anonymous session. Перед включением login обязателен credential-version
-  aware session adapter, проверка active/first-login state, CSRF, atomic rate limits,
-  reset/revocation, audit и все согласованные тесты. Session CHECK не позволяет
-  стандартному Laravel handler сохранить user-session без версии и auth stage.
-- Роли, grants, memberships, links и audit пока доступны на запись только migration/
-  provisioning-owner. Узкие mutation services с потолком делегирования, запретом
-  self-escalation и защитой последнего admin реализуются в следующем спринте.
-  Отсутствие endpoints/write grants не заменяется временным CRUD с обходом правил.
-- `TenantContext` — внутренняя серверная транзакционная граница: actor должен
-  поступать из проверенной аутентификации, а не body/header. Нет публичного способа
-  установить app.user_id/app.tenant_id. Nested contexts запрещены; SET LOCAL
-  сбрасывается при commit/rollback. Для будущих маршрутов нужны auth middleware
-  перед context и context перед route-model binding.
-- RLS защищает tenant boundary; custom settings не аутентифицируют человека.
-  SQL injection/утечка DB credentials остаются за этой границей доверия.
-  Соблюдайте backend policies и query predicates, даже при наличии RLS read scopes.
-- Схема auth_rate_limits подготовлена, но auth handlers и атомарный limiter ещё
-  не реализованы. Нет медицинских, пациентских, финансовых модулей и реальных данных.
-- Health проверяет runtime-подключение и наличие 11 FORCE RLS таблиц; это не
-  подтверждение полной готовности будущих функций или production environment.
+Полный контракт: [OpenAPI](docs/openapi.yaml), сценарий запуска и границы:
+[API guide](docs/sprint-2-api.md). Реализованы cookie login/logout, first-login password
+change, platform clinic/CEO provisioning, tenant roles/grants, employees/assignments,
+branches, scoped reads/audit, safe linking и CEO recovery.
+
+Первый platform operator создаётся **вручную** в migration-сервисе с hidden prompts:
+
+```sh
+docker compose run --rm migrate php artisan blusser:platform-admin YOUR_LOGIN
+```
+
+Runtime API не получает эти credentials. Нет default passwords, seeds, публичной
+регистрации, bearer tokens или remember-me. Не передавайте пароли в аргументах CLI,
+URL, истории shell или Git. Для независимого подтверждения CEO recovery нужны два
+разных platform operators и внешняя процедура проверки личности.
+
+Cookie flow: CSRF handshake → login → обязательная смена временного пароля →
+список своих клиник → выбор active clinic → tenant API. На изменяющих запросах
+обязателен X-XSRF-TOKEN; Origin/Referer должен соответствовать first-party allowlist.
+После login/change/logout cookies и CSRF token меняются. Cookie HttpOnly,
+SameSite=Lax; Secure включён по умолчанию и обязателен на HTTPS. Только локальный
+Compose HTTP использует явное SESSION_SECURE_COOKIE=false. Payload в БД зашифрован.
+
+Сессия проверяет current active/credential version/first-login state на каждом
+запросе. Права и memberships не кэшируются в cookies; все tenant reads используют
+RLS/context и scope. Запись сессии после logout/reset не восстанавливает доступ.
+Platform identities не входят в tenant context, даже с ошибочным membership.
+Tenant admin не сбрасывает пароль CEO, platform, себя, более привилегированного
+или multi-clinic пользователя. Назначение новой клиники требует consent владельца.
+
+Остаются эксплуатационные задачи: HTTPS web server, trusted proxy configuration,
+backup/restore, production Argon2id benchmark, безопасная доставка credentials,
+внешняя проверка личности и policy хранения audit. Transfer CEO и self-service
+recovery обычных multi-clinic identities — отдельные функции. Frontend и
+медицинские/финансовые модули отсутствуют. Health не означает production readiness.
+RLS/GUC — серверная граница; SQL injection/утечка DB credentials не входят в её
+модель защиты. Не включайте request body/query binding logging для auth paths.
 
 ## Сборка в сети с корпоративным/облачным proxy
 

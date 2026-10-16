@@ -1,6 +1,6 @@
 # Blusser: проект базы данных
 
-Статус: схема для согласования, SQL-миграции пока не созданы.
+Статус: foundation миграции реализованы; дополнения Sprint 2 — модель CEO и recovery.
 PostgreSQL — единая база и shared schema. Идентификаторы сущностей — UUID,
 время — timestamptz в UTC. Все внешние ключи и индексы создаются миграциями.
 
@@ -8,10 +8,12 @@ PostgreSQL — единая база и shared schema. Идентификато�
 
 | Таблица | Основные поля | Ограничения |
 | --- | --- | --- |
-| tenants | id, name, slug, status, created_at, updated_at | slug unique; status active/suspended |
+| tenants | id, name, slug, status, created_at, updated_at | slug unique; status pending/active/suspended |
+| tenant_ceos | tenant_id, user_id, membership_id | tenant_id PK; composite membership/user FK; одна immutable CEO identity на tenant |
+| ceo_recovery_requests | id, tenant_id, target_user_id, initiated_by, verified_by nullable, verification_reference nullable, credential_version, token_digest nullable, token_expires_at nullable, status, expires_at, timestamps | actor/verifier/target разные; токен одноразовый; FORCE RLS, нет direct runtime DML |
 | branches | id, tenant_id, name, code, active, timestamps | unique(tenant_id, code), unique(tenant_id, id) |
 | users | id, login, name, email nullable, password_hash, must_change_password, temporary_password_expires_at nullable, password_changed_at, credential_version, is_platform_admin, active, timestamps | canonical login unique; credential_version positive; только hash, platform flag изменяет только platform provisioning |
-| membership_link_requests | id, tenant_id, target_user_id, initiated_by_user_id, role_id, status, expires_at, resolved_at nullable, timestamps | tenant-role composite FK; pending/accepted/rejected/expired; не содержит credentials |
+| membership_link_requests | id, tenant_id, target_user_id, initiated_by_user_id, initiator_version nullable, role_id, purpose, status, expires_at, resolved_at nullable, timestamps | tenant-role composite FK; pending/accepted/rejected/expired; не содержит credentials |
 | membership_link_request_branches | tenant_id, request_id, branch_id | composite FK к request и branch; unique(tenant_id, request_id, branch_id) |
 | sessions | id, user_id, credential_version, auth_stage, last_reauthenticated_at nullable, payload, last_activity | FK user_id; индекс user_id; auth_stage password_change_required/full |
 | auth_rate_limits | key_digest, window_started_at, attempts, blocked_until nullable, expires_at | key_digest primary key; атомарный учёт login/IP/action buckets, без raw login |
@@ -83,7 +85,8 @@ runtime credentials выходят за эту границу доверия. П
 
 ENABLE и FORCE ROW LEVEL SECURITY обязательны на branches, services,
 tenant_memberships, membership_branches, tenant_roles, role_permissions,
-membership_link_requests, membership_link_request_branches, audit_logs. Runtime-тесты выполняются
+membership_link_requests, membership_link_request_branches, audit_logs, tenant_ceos
+и ceo_recovery_requests; users/tenants также имеют FORCE RLS. Runtime-тесты выполняются
 именно как blusser_app: тестирование под superuser не подтверждает изоляцию.
 
 Tenant predicate использует:
@@ -197,15 +200,16 @@ assignments или grants используемой actor роли. Выдава�
 
 Удаление используемой роли ограничено FK RESTRICT; сначала необходимо отдельное
 разрешённое переназначение. При деактивации роли или user, отзыве grants и изменении
-membership сохраняется хотя бы один полный активный администратор по capability
-набору из architecture.md. Проверка не использует name/code роли. Начальное
+membership сохраняется защищённый CEO из tenant_ceos с полным активным bootstrap-role.
+Проверка не использует name/code роли; его grants/member недоступны для tenant mutation. Начальное
 создание tenant_roles и grants — часть атомарного platform provisioning, а не
 глобальные seed-роли. Все записи grants принадлежат ровно одной клинике.
 
 ## Аудит
 
 Tenant SELECT audit_logs требует tenant predicate и audit.view. Platform/identity events
-с tenant_id NULL доступны только platform admin через отдельную read policy.
+с tenant_id NULL не доступны platform через tenant API. Platform видит лишь
+allowlist operational events provisioning/recovery без employee identity history.
 UPDATE и DELETE не разрешены runtime-role; права очистки остаются вне API.
 INSERT идёт через audit helper: он проверяет context, подставляет actor и tenant,
 принимает только allowlisted action/resource/metadata. Platform creation пишет
@@ -243,3 +247,66 @@ credential; такой credential доступен только Compose initiali
 Повторное применение bootstrap не сбрасывает пароли и не уничтожает данные.
 Точные grants, SQL и rollback будут проверены интеграционными тестами после
 согласования этого проекта.
+
+## Дополнения Sprint 2
+
+У membership добавляется unique(tenant_id, id, user_id); tenant_ceos ссылается на
+всю тройку. Это исключает несовпадение CEO identity и membership. tenant_roles
+получает protected-флаг; CEO role/grants/member нельзя менять обычными RBAC use cases.
+Стартовые роли Doctor/Receptionist не создаются. Protected CEO обеспечивает
+неудаляемого активного полного администратора; transfer CEO — отдельный будущий flow.
+
+Link purpose: employee или ceo. Для существующего CEO — pending tenant и bootstrap
+proposal; platform никогда не переназначает его пароль. Employee proposals требуют
+актуальных полномочий инициатора в tenant. При accept проверяется initiator_version.
+
+Recovery CEO требует двух разных platform identities и внешнего verification
+reference. В таблице только digest случайного token; в audit нет digest/секретов.
+Потребление token атомарно увеличивает credential_version и удаляет sessions; роли
+и memberships других клиник не меняются. Ordinary employee reset не принимает CEO,
+platform identities или пользователя с memberships в других клиниках.
+
+Новые функции находятся в закрытой schema governance с фиксированным search_path,
+квалифицированными объектами и точечными EXECUTE grants; runtime не получает owner
+credential, BYPASSRLS или прямой business DML. is_active_member и TenantContext
+также запрещают platform identities. Неизвестная legacy CEO identity не выводится
+автоматически из имени Clinic Admin или существующего permission набора.
+
+
+## Sprint 2: versioned cookie sessions (миграция 000005)
+
+Session schema сохраняет credential_version/auth_stage; payload Laravel зашифрован
+и base64 encoded. Внутри только server identity id/version/stage, CSRF и выбранный
+tenant, без credentials/grants. Cookie содержит зашифрованный случайный session ID.
+Runtime не имеет прямого INSERT/UPDATE sessions; узкие функции session_start/write
+проверяют identity под user lock. session_start регистрирует новый случайный id
+после password verification. Authenticated session_write только обновляет уже
+существующий id с совпадающими user/version/stage. Он никогда не вставляет
+удалённую row: даже старый запрос после logout не восстановит сессию при той же
+credential version. Anonymous upsert не может перезаписать authenticated row.
+Reset/change/recovery удаляют все sessions; смена user credential version делает
+позднее сохранение старой сессии недействительным. Имеется двухсоединительный тест
+с lock_timeout, проверяющий сериализацию session issuance/password change.
+
+session_identity возвращает только safe projection по серверным id/version при
+active identity и непросроченном temporary state. Нет общего SELECT hash или
+изменения users RLS. my_clinics возвращает только собственные активные memberships;
+select_clinic перепроверяет членство и пишет audit, а tenant operations всегда
+проверяют текущие permissions и scope. employee_directory — узкая authorized
+projection login/name/role/branches с can_view_member, без чужих tenant/credentials.
+Platform reads возвращают только clinic metadata и allowlisted operational audit.
+Все functions имеют fixed search_path, закрытого owner и точечные EXECUTE grants.
+
+После отказа SQL mutation откатывается; operation.denied пишется отдельной
+транзакцией только от актуальной identity, с server operation code без bindings.
+Успешные mutations и их audit по-прежнему атомарны. Auth lifecycle audit глобален
+и не раскрывается через platform tenant-data API. CLI platform bootstrap — owner
+операция с отдельным аудитом, недоступная runtime API.
+
+assert_branch_delegation — узкий boolean/exception guard без read projection:
+Governance вызывает его в той же транзакции после role/member/reset/link mutation,
+до commit и освобождения user/tenant locks. Для assigned_branches проверяется
+фактическое подмножество branch ids actor; equal scope names не разрешают иной
+набор филиалов. Для role edits проверяются существующие members; при link accept
+повторно используется initiating actor. Ошибка откатывает accounts/hash/sessions
+и исходный audit вместе с mutation, затем фиксируется operation.denied.

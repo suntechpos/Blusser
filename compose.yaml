@@ -22,7 +22,7 @@ x-app-env: &app-env
   DB_DATABASE: blusser
   DB_USERNAME: blusser_app
   DB_PASSWORD: ${DB_APP_PASSWORD:?Set DB_APP_PASSWORD in .env}
-  SESSION_DRIVER: database
+  SESSION_DRIVER: versioned
   SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-false}
   CACHE_STORE: file
   QUEUE_CONNECTION: sync

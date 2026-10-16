@@ -31,16 +31,16 @@ final class DatabaseSecurityTest extends FoundationTestCase
     {
         $tables = DB::select("SELECT relname FROM pg_class WHERE relnamespace='public'::regnamespace AND relrowsecurity AND relforcerowsecurity");
         $names = array_column($tables, 'relname');
-        foreach (['users', 'tenants', 'branches', 'tenant_roles', 'role_permissions', 'tenant_memberships', 'membership_branches', 'services', 'membership_link_requests', 'membership_link_request_branches', 'audit_logs'] as $table) {
+        foreach (['users', 'tenants', 'branches', 'tenant_roles', 'role_permissions', 'tenant_memberships', 'membership_branches', 'services', 'membership_link_requests', 'membership_link_request_branches', 'audit_logs', 'tenant_ceos', 'ceo_recovery_requests'] as $table) {
             $this->assertContains($table, $names);
         }
-        $functions = DB::select("SELECT p.proname, p.prosecdef, p.proconfig, r.rolname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname='public' AND p.prosecdef");
+        $functions = DB::select("SELECT p.proname, p.prosecdef, p.proconfig, r.rolname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname IN ('public','governance') AND p.prosecdef");
         $this->assertNotEmpty($functions);
         foreach ($functions as $function) {
             $this->assertSame('blusser_security', $function->rolname);
             $this->assertStringContainsString('search_path=pg_catalog', $function->proconfig);
         }
-        $this->assertSame(0, (int) DB::selectOne("SELECT count(*) AS total FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) a WHERE n.nspname='public' AND a.grantee=0 AND a.privilege_type='EXECUTE'")->total);
+        $this->assertSame(0, (int) DB::selectOne("SELECT count(*) AS total FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) a WHERE n.nspname IN ('public','governance') AND a.grantee=0 AND a.privilege_type='EXECUTE'")->total);
     }
 
     public function test_missing_context_exposes_no_tenant_data_or_users(): void
