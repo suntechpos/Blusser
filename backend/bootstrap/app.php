@@ -1,5 +1,11 @@
 <?php
 
+use App\Http\Middleware\FirstPartySession;
+use App\Http\Middleware\FullIdentity;
+use App\Http\Middleware\NoStore;
+use App\Modules\Access\Services\GovernanceDenied;
+use App\Modules\Platform\Console\CreatePlatformOperator;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -11,11 +17,33 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         api: __DIR__.'/../routes/api.php',
     )
+    ->withCommands([CreatePlatformOperator::class])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        $middleware->trimStrings(except: ['password', 'password_confirmation', 'current_password', 'temporary_password', 'token']);
+        $middleware->append(NoStore::class);
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, FirstPartySession::class);
+        $middleware->alias(['first-party' => FirstPartySession::class, 'full-identity' => FullIdentity::class]);
         $middleware->preventRequestForgery(except: []);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontReport([GovernanceDenied::class]);
+        $exceptions->dontFlash(['password', 'password_confirmation', 'current_password', 'temporary_password', 'token']);
+        $exceptions->render(function (GovernanceDenied $exception, Request $request) {
+            $status = match ($exception->reason) {
+                'credentials' => 401, 'rate_limited' => 429, 'conflict' => 409, default => 403
+            };
+
+            return response()->json(['message' => 'Operation not authorized or unavailable.'], $status);
+        });
+        $exceptions->render(fn (InvalidArgumentException $exception, Request $request) => response()->json(['message' => 'Invalid input.'], 422));
+        $exceptions->respond(function ($response) {
+            if (request()->is('api/*', 'sanctum/*')) {
+                $response->headers->set('Cache-Control', 'no-store, private');
+            }
+
+            return $response;
+        });
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
