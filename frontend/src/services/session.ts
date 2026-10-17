@@ -1,4 +1,5 @@
 import { reactive } from "vue";
+import axios from "axios";
 import {
   api,
   getCurrentUser,
@@ -58,12 +59,14 @@ api.interceptors.response.use(
 export const can = (code: string) => session.grants?.[code] !== undefined;
 export async function refreshSession() {
   const token = contextGate.capture();
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(token.signal);
   if (!token.current()) return;
   session.user = user;
   if (session.user.must_change_password || session.user.is_platform_admin)
     return;
-  const clinics = await api.get<{ data: Clinic[] }>("/api/v1/auth/clinics");
+  const clinics = await api.get<{ data: Clinic[] }>("/api/v1/auth/clinics", {
+    signal: token.signal,
+  });
   if (!token.current()) return;
   session.clinics = clinics.data.data;
   if (
@@ -77,17 +80,18 @@ export async function refreshSession() {
     await selectClinic(session.clinics[0]!.id);
   else if (session.user.active_tenant_id) await loadContext();
 }
-async function loadContext() {
-  const token = contextGate.capture();
+interface ClinicAccess {
+  grants: Record<string, string>;
+  branches: Branch[];
+}
+async function readContext(): Promise<ClinicAccess> {
   const r = await clinicRequest<{
     grants: Record<string, string>;
     branches: Branch[];
     timezone: string;
   }>("context");
-  if (!token.current()) return;
-  session.grants = r.data.grants;
-  session.branches = r.data.branches;
-  if (can("branches.view")) {
+  let branches = r.data.branches;
+  if (r.data.grants["branches.view"] !== undefined) {
     const all: Branch[] = [];
     for (let page = 1; ; page++) {
       const result = await clinicRequest<{ data: Branch[] }>("branches", {
@@ -96,28 +100,113 @@ async function loadContext() {
       all.push(...result.data.data);
       if (result.data.data.length < 50) break;
     }
-    if (token.current())
-      session.branches = all
-        .filter((b) => b.active)
-        .map((b) => ({ ...b, timezone: b.timezone ?? r.data.timezone }));
+    branches = all
+      .filter((b) => b.active)
+      .map((b) => ({ ...b, timezone: b.timezone ?? r.data.timezone }));
+  }
+  return { grants: r.data.grants, branches };
+}
+async function loadContext() {
+  const token = contextGate.capture();
+  const access = await readContext();
+  if (!token.current()) return;
+  session.grants = access.grants;
+  session.branches = access.branches;
+}
+function accessSignature(access: ClinicAccess) {
+  return JSON.stringify([
+    Object.entries(access.grants).sort(([a], [b]) => a.localeCompare(b)),
+    [...access.branches]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((b) => [b.id, b.name, b.active, b.timezone]),
+  ]);
+}
+/** Recheck authorization on focus without destroying an unchanged patient draft. */
+export async function revalidateSession() {
+  const token = contextGate.capture();
+  try {
+    const user = await getCurrentUser(token.signal);
+    if (!token.current()) return;
+    const previous = session.user;
+    if (
+      !previous ||
+      user.id !== previous.id ||
+      user.active_tenant_id !== previous.active_tenant_id ||
+      user.must_change_password !== previous.must_change_password ||
+      user.is_platform_admin !== previous.is_platform_admin
+    ) {
+      clearClinic();
+      session.checking = true;
+      try {
+        await refreshSession();
+      } finally {
+        session.checking = false;
+      }
+      return;
+    }
+    if (
+      user.must_change_password ||
+      user.is_platform_admin ||
+      !user.active_tenant_id
+    )
+      return;
+    const clinics = await api.get<{ data: Clinic[] }>("/api/v1/auth/clinics", {
+      signal: token.signal,
+    });
+    if (!token.current()) return;
+    const access = await readContext();
+    if (!token.current()) return;
+    session.user = user;
+    session.clinics = clinics.data.data;
+    if (
+      !session.grants ||
+      accessSignature(access) !==
+        accessSignature({ grants: session.grants, branches: session.branches })
+    ) {
+      const branch = session.branch;
+      clearClinic();
+      session.grants = access.grants;
+      session.branches = access.branches;
+      session.branch = access.branches.some((b) => b.id === branch)
+        ? branch
+        : "";
+    }
+    session.error = "";
+  } catch (e) {
+    if (axios.isCancel(e) || !token.current()) return;
+    clearClinic();
+    throw e;
   }
 }
 export async function selectClinic(id: string) {
   if (session.switching) return;
   clearClinic();
+  const token = contextGate.capture();
   session.switching = true;
   channel?.postMessage("changing");
   try {
-    await api.post("/api/v1/auth/active-clinic", { tenant_id: id });
-    session.user = await getCurrentUser();
+    await api.post(
+      "/api/v1/auth/active-clinic",
+      { tenant_id: id },
+      { signal: token.signal },
+    );
+    if (!token.current()) return;
+    const user = await getCurrentUser(token.signal);
+    if (!token.current()) return;
+    session.user = user;
     await loadContext();
   } catch (e) {
+    if (axios.isCancel(e) || !token.current()) return;
     clearClinic();
+    session.switching = false;
     if (session.user) session.user.active_tenant_id = null;
+    channel?.postMessage("changed");
     throw e;
   } finally {
-    session.switching = false;
-    channel?.postMessage("changed");
+    if (token.current()) {
+      session.switching = false;
+      channel?.postMessage("changed");
+    }
   }
 }
 export function selectBranch(id: string) {

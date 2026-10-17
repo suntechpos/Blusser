@@ -183,6 +183,17 @@ final class PatientsApiTest extends FoundationTestCase
         $this->assertSame(1, DB::connection('migration')->table('patients')->count());
     }
 
+    public function test_export_requires_entire_clinic_patient_view_even_when_export_permission_is_granted(): void
+    {
+        $a = $this->fixture()['a'];
+        $this->command($a);
+        $this->grant($a, 'patients.view', 'assigned_branches');
+        $jar = $this->patientSession($a);
+        $this->browser($jar, 'GET', '/api/v1/clinic/patients')->assertOk()->assertJsonPath('meta.total', 1);
+        $this->browser($jar, 'GET', '/api/v1/clinic/patients/export')->assertForbidden();
+        $this->assertSame(0, DB::connection('migration')->table('audit_logs')->where('action', 'patient.export')->count());
+    }
+
     public function test_csv_archive_capabilities_and_formula_injection(): void
     {
         $a = $this->fixture()['a'];

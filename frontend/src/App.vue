@@ -6,6 +6,7 @@ import SessionGate from "./components/operations/SessionGate.vue";
 import {
   session,
   refreshSession,
+  revalidateSession,
   expire,
   clearClinic,
   notifyLogout,
@@ -24,9 +25,18 @@ async function handleAuthenticated() {
   }
 }
 const loggingOut = ref(false);
-function regainFocus() {
-  if (session.user && !session.checking && !session.switching)
-    void handleAuthenticated();
+let rechecking = false;
+async function regainFocus() {
+  if (!session.user || session.checking || session.switching || rechecking)
+    return;
+  rechecking = true;
+  try {
+    await revalidateSession();
+  } catch (e) {
+    session.error = errorText(e);
+  } finally {
+    rechecking = false;
+  }
 }
 onMounted(() => {
   void handleAuthenticated();

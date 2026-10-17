@@ -64,6 +64,10 @@ and Patient JSON stay unchanged.
 
 ## Validation
 
+The follow-up PR #10 review, fixes and expanded test results are recorded in
+[sprint-3-stage-6-patients-review.md](sprint-3-stage-6-patients-review.md).
+The counts below describe the initial implementation commit.
+
 All database tests executed exclusively against guarded `blusser_test` using the
 runtime role for requests and the owner role only for fixture/migration work.
 No development DB migrations, seed operations or data resets were performed.

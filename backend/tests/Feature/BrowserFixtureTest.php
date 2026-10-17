@@ -22,7 +22,7 @@ final class BrowserFixtureTest extends FoundationTestCase
         $second = (string) Str::uuid();
         $db->table('branches')->insert(['id' => $second, 'tenant_id' => $a['tenant'], 'name' => 'Synthetic second branch', 'code' => 'second']);
         $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $a['tenant'], 'membership_id' => $a['membership'], 'branch_id' => $second]);
-        foreach (['reader', 'temporary', 'platform'] as $label) {
+        foreach (['reader', 'temporary', 'platform', 'scopedexport'] as $label) {
             $uid = (string) Str::uuid();
             $role = (string) Str::uuid();
             $mid = (string) Str::uuid();
@@ -34,6 +34,9 @@ final class BrowserFixtureTest extends FoundationTestCase
             $db->table('tenant_memberships')->insert(['id' => $mid, 'tenant_id' => $a['tenant'], 'user_id' => $uid, 'role_id' => $role]);
             $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $a['tenant'], 'membership_id' => $mid, 'branch_id' => $a['branch']]);
             $db->table('role_permissions')->insert(['tenant_id' => $a['tenant'], 'role_id' => $role, 'permission_id' => $db->table('permissions')->where('code', 'patients.view')->value('id'), 'scope' => 'assigned_branches']);
+            if ($label === 'scopedexport') {
+                $db->table('role_permissions')->insert(['tenant_id' => $a['tenant'], 'role_id' => $role, 'permission_id' => $db->table('permissions')->where('code', 'patients.export')->value('id'), 'scope' => 'entire_clinic']);
+            }
         }
         $this->assertSame('blusser_test', $db->selectOne('SELECT current_database() AS name')->name);
         $this->assertSame(3, $db->table('branches')->count());

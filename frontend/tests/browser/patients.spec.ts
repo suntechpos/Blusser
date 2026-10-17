@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 async function login(page: Page, name = "synthetic.a") {
   await page.goto("/#bemorlar");
   await page.getByLabel("Login", { exact: true }).fill(name);
@@ -234,6 +235,10 @@ test.describe.serial("real Sanctum / PostgreSQL Patients flows", () => {
       "Server bilan bog‘lanib bo‘lmadi",
     );
     await expect(page.locator("tbody tr")).toHaveCount(0);
+    await expect(page.locator(".patients-footer")).not.toContainText(
+      "0 ta bemor",
+    );
+    await expect(page.locator(".patients-footer")).toContainText("—");
     await page.unroute("**/api/v1/clinic/patients?*");
     await page
       .getByRole("button", { name: "Qayta urinish", exact: true })
@@ -314,7 +319,11 @@ test.describe.serial("real Sanctum / PostgreSQL Patients flows", () => {
       const response = await route.fetch();
       captured();
       await gate;
-      await route.fulfill({ response });
+      try {
+        await route.fulfill({ response });
+      } catch {
+        /* Context changes abort this superseded auth request. */
+      }
     });
     await page.reload({ waitUntil: "domcontentloaded" });
     await ready;
@@ -333,5 +342,190 @@ test.describe.serial("real Sanctum / PostgreSQL Patients flows", () => {
       "Synthetic concurrent writer",
     );
     await other.close();
+  });
+  test("unchanged session recheck preserves an unsaved patient draft", async ({
+    page,
+  }) => {
+    await login(page);
+    await page
+      .locator("tbody tr")
+      .filter({ hasText: "Synthetic concurrent writer" })
+      .getByRole("button", { name: "Tahrirlash", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await dialog
+      .getByLabel("F.I.Sh. *", { exact: true })
+      .fill("Synthetic unsaved draft");
+    const checked = page.waitForResponse((r) =>
+      r.url().endsWith("/api/v1/clinic/context"),
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await checked;
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("F.I.Sh. *", { exact: true })).toHaveValue(
+      "Synthetic unsaved draft",
+    );
+  });
+
+  test("scoped view plus export grant does not expose an unusable CSV control", async ({
+    page,
+  }) => {
+    await login(page, "synthetic.scopedexport");
+    await expect(page.locator("tbody")).toContainText(
+      "Synthetic concurrent writer",
+    );
+    await expect(
+      page.getByRole("button", { name: "Eksport", exact: true }),
+    ).toHaveCount(0);
+    expect(
+      await page.evaluate(async () => {
+        const { api } = await import("/src/services/api.ts");
+        try {
+          await api.get("/api/v1/clinic/patients/export");
+          return 200;
+        } catch (e) {
+          return e.response.status;
+        }
+      }),
+    ).toBe(403);
+  });
+  test("CSV contains only the selected clinic, search and branch", async ({
+    page,
+  }) => {
+    await login(page);
+    await expect(page.locator("tbody")).toContainText(
+      "Synthetic concurrent writer",
+    );
+    await page
+      .getByPlaceholder("F.I.Sh., bemor raqami yoki telefon...")
+      .fill("Synthetic concurrent");
+    await expect(page.locator("tbody")).toContainText(
+      "Synthetic concurrent writer",
+    );
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Eksport", exact: true }).click();
+    const csv = await readFile((await (await downloaded).path())!, "utf8");
+    expect(csv).toContain(
+      "patient_number,name,phone,date_of_birth,gender,archived_at",
+    );
+    expect(csv).toContain("Synthetic concurrent writer");
+    expect(csv).not.toContain("Synthetic UI patient B");
+    await page
+      .getByLabel("Filial filtri", { exact: true })
+      .selectOption({ label: "Synthetic second branch" });
+    await expect(page.locator("tbody")).toContainText("Bemor topilmadi");
+    const emptyDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Eksport", exact: true }).click();
+    const empty = await readFile((await (await emptyDownload).path())!, "utf8");
+    expect(empty.trim().split(/\r?\n/)).toHaveLength(1);
+  });
+  test("committed create with a lost response retries the same key without duplicates", async ({
+    page,
+  }) => {
+    await login(page);
+    await page
+      .getByRole("button", { name: "Yangi bemor", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await dialog
+      .getByLabel("F.I.Sh. *", { exact: true })
+      .fill("Synthetic uncertain create");
+    await dialog
+      .getByLabel("Tug‘ilgan sana *", { exact: true })
+      .fill("1991-02-03");
+    await dialog
+      .getByLabel("Filial", { exact: true })
+      .selectOption({ label: "Synthetic branch" });
+    const keys: string[] = [];
+    let first = true;
+    await page.route("**/api/v1/clinic/patients", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      keys.push(route.request().headers()["idempotency-key"]!);
+      if (!first) {
+        await route.continue();
+        return;
+      }
+      first = false;
+      const response = await route.fetch();
+      expect(response.status()).toBe(201);
+      await route.abort("failed");
+    });
+    await dialog.getByRole("button", { name: "Saqlash", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toContainText(
+      "Server bilan bog‘lanib bo‘lmadi",
+    );
+    await dialog.getByRole("button", { name: "Saqlash", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(keys[0]);
+    await page
+      .getByPlaceholder("F.I.Sh., bemor raqami yoki telefon...")
+      .fill("Synthetic uncertain create");
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(page.locator("tbody")).toContainText(
+      "Synthetic uncertain create",
+    );
+  });
+  test("changed authorization on focus purges patient details and drafts", async ({
+    page,
+  }) => {
+    await login(page);
+    await page
+      .locator("tbody tr")
+      .filter({ hasText: "Synthetic concurrent writer" })
+      .getByRole("button", { name: "Tahrirlash", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.route("**/api/v1/clinic/context", async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      delete data.grants["patients.view"];
+      delete data.grants["patients.update"];
+      await route.fulfill({ response, json: data });
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(page.locator("tbody tr")).toHaveCount(0);
+    await expect(page.getByRole("alert")).toContainText("ruxsat yo‘q");
+  });
+  test("logout cannot be undone by a delayed auth response", async ({
+    page,
+  }) => {
+    await login(page);
+    await expect(page.locator("tbody")).toContainText(
+      "Synthetic concurrent writer",
+    );
+    let release!: () => void, captured!: () => void, finished!: () => void;
+    const gate = new Promise<void>((r) => (release = r)),
+      ready = new Promise<void>((r) => (captured = r)),
+      settled = new Promise<void>((r) => (finished = r));
+    let first = true;
+    await page.route("**/api/v1/auth/me", async (route) => {
+      if (!first) {
+        await route.continue();
+        return;
+      }
+      first = false;
+      const response = await route.fetch();
+      captured();
+      await gate;
+      try {
+        await route.fulfill({ response });
+      } catch {
+        /* Logout aborted the superseded request. */
+      } finally {
+        finished();
+      }
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await ready;
+    await logout(page);
+    release();
+    await settled;
+    await expect(page.getByLabel("Login", { exact: true })).toBeVisible();
+    await expect(page.locator(".patients")).toHaveCount(0);
   });
 });

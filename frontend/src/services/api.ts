@@ -21,8 +21,8 @@ export async function loginUser(
   return (await api.post<AuthUser>("/api/v1/auth/login", { login, password }))
     .data;
 }
-export async function getCurrentUser(): Promise<AuthUser> {
-  return (await api.get<AuthUser>("/api/v1/auth/me")).data;
+export async function getCurrentUser(signal?: AbortSignal): Promise<AuthUser> {
+  return (await api.get<AuthUser>("/api/v1/auth/me", { signal })).data;
 }
 export async function logoutUser() {
   await api.post("/api/v1/auth/logout");
