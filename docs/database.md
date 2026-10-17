@@ -343,3 +343,14 @@ Tenant-composite and deferred consistency constraints preserve one shared
 appointment/Visit reservation; typed event FKs avoid unchecked polymorphic IDs.
 See [Stage 4](sprint-3-stage-4.md) for protected commands, actual care-based own
 visibility, archive/schedule guards, deployment and non-destructive rollback.
+
+## Sprint 3 Stage 5 — additive queue migration
+
+Migration 000010 reuses the seven Stage-4 relations; the FORCE-RLS inventory remains
+36. queue_tickets gains the approved lifecycle CHECK, internal lifecycle timestamps,
+a scoped runtime SELECT policy and list index. Runtime DML, raw counters, occupancy
+and idempotency access remain denied. Deferred ticket/Visit consistency guards and
+an extended schedule guard protect active walk-in reservations. Private fixed-path
+NOLOGIN security helpers implement synchronized writes and current authorization.
+Down restores Stage-4 privileges/shape only without Stage-5 operational evidence;
+otherwise it refuses and requires a reviewed forward fix. See sprint-3-stage-5.md.

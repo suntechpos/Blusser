@@ -1,6 +1,12 @@
 # Sprint 3 — Clinic Operations contracts
 
-Status: stage 1 only. No operational routes, migrations, grants or frontend integration are delivered here. `openapi.yaml` remains the deployed API contract; `openapi-sprint-3.yaml` is the explicitly planned contract. PHP OperationsContract supplies the permission vocabulary and transition graph, not an authorization service. Stages 2–7 require separate implementation and security verification; stage 2 requires the owner's approval.
+Status: Stages 1–5 implemented and locally validated; Queues/Reception is described
+in sprint-3-stage-5.md with executed checks in sprint-3-stage-5-validation.md.
+The following domain and stage definitions are the approved Stage-1 contract;
+its old future-tense statements are historical planning, not implementation evidence.
+openapi.yaml is the published contract; per-operation implementation markers in
+openapi-sprint-3.yaml distinguish implemented and planned operations. Stages 6–7
+remain separate acceptance work. OperationsContract supplies vocabulary, never authorization.
 
 ## Boundaries and shared conventions
 

@@ -4609,8 +4609,8 @@
     "/api/v1/clinic/queue-tickets": {
       "get": {
         "operationId": "get_queue_tickets",
-        "summary": "PLANNED: GET queue-tickets",
-        "x-implementation-status": "planned",
+        "summary": "GET queue-tickets",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "queues.view"
         ],
@@ -4688,7 +4688,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -4744,12 +4744,12 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
       },
       "post": {
         "operationId": "post_queue_tickets",
-        "summary": "PLANNED: POST queue-tickets",
-        "x-implementation-status": "planned",
+        "summary": "POST queue-tickets",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "queues.create",
           "visits.create",
@@ -4781,7 +4781,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -4831,14 +4831,14 @@
             }
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
       }
     },
     "/api/v1/clinic/queue-tickets/{ticket}": {
       "get": {
         "operationId": "get_queue_tickets_ticket",
-        "summary": "PLANNED: GET queue-tickets/{ticket}",
-        "x-implementation-status": "planned",
+        "summary": "GET queue-tickets/{ticket}",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "queues.view"
         ],
@@ -4860,7 +4860,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -4900,16 +4900,18 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
       }
     },
     "/api/v1/clinic/queue-tickets/{ticket}/call": {
       "post": {
         "operationId": "post_queue_tickets_ticket_call",
-        "summary": "PLANNED: POST queue-tickets/{ticket}/call",
-        "x-implementation-status": "planned",
+        "summary": "POST queue-tickets/{ticket}/call",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "queues.call"
+          "queues.call",
+          "queues.view",
+          "visits.view"
         ],
         "security": [
           {
@@ -4946,7 +4948,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -4997,16 +4999,23 @@
           }
         },
         "x-linked-resource-guards": [],
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view"
+          ]
+        }
       }
     },
     "/api/v1/clinic/queue-tickets/{ticket}/recall": {
       "post": {
         "operationId": "post_queue_tickets_ticket_recall",
-        "summary": "PLANNED: POST queue-tickets/{ticket}/recall",
-        "x-implementation-status": "planned",
+        "summary": "POST queue-tickets/{ticket}/recall",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "queues.recall"
+          "queues.recall",
+          "queues.view",
+          "visits.view"
         ],
         "security": [
           {
@@ -5043,7 +5052,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -5094,16 +5103,28 @@
           }
         },
         "x-linked-resource-guards": [],
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view"
+          ]
+        }
       }
     },
     "/api/v1/clinic/queue-tickets/{ticket}/start": {
       "post": {
         "operationId": "post_queue_tickets_ticket_start",
-        "summary": "PLANNED: POST queue-tickets/{ticket}/start",
-        "x-implementation-status": "planned",
+        "summary": "POST queue-tickets/{ticket}/start",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "queues.start"
+          "queues.start",
+          "queues.view",
+          "visits.view",
+          "patients.view",
+          "doctors.view",
+          "rooms.view",
+          "schedules.view",
+          "services.view"
         ],
         "security": [
           {
@@ -5140,7 +5161,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -5193,16 +5214,24 @@
         "x-linked-resource-guards": [
           "appointments.update"
         ],
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view",
+            "appointments.update"
+          ]
+        }
       }
     },
     "/api/v1/clinic/queue-tickets/{ticket}/complete": {
       "post": {
         "operationId": "post_queue_tickets_ticket_complete",
-        "summary": "PLANNED: POST queue-tickets/{ticket}/complete",
-        "x-implementation-status": "planned",
+        "summary": "POST queue-tickets/{ticket}/complete",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "queues.complete"
+          "queues.complete",
+          "queues.view",
+          "visits.view"
         ],
         "security": [
           {
@@ -5239,7 +5268,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -5292,16 +5321,24 @@
         "x-linked-resource-guards": [
           "appointments.update"
         ],
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view",
+            "appointments.update"
+          ]
+        }
       }
     },
     "/api/v1/clinic/queue-tickets/{ticket}/skip": {
       "post": {
         "operationId": "post_queue_tickets_ticket_skip",
-        "summary": "PLANNED: POST queue-tickets/{ticket}/skip",
-        "x-implementation-status": "planned",
+        "summary": "POST queue-tickets/{ticket}/skip",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "queues.skip"
+          "queues.skip",
+          "queues.view",
+          "visits.view"
         ],
         "security": [
           {
@@ -5338,7 +5375,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -5389,16 +5426,23 @@
           }
         },
         "x-linked-resource-guards": [],
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view"
+          ]
+        }
       }
     },
     "/api/v1/clinic/queue-tickets/{ticket}/cancel": {
       "post": {
         "operationId": "post_queue_tickets_ticket_cancel",
-        "summary": "PLANNED: POST queue-tickets/{ticket}/cancel",
-        "x-implementation-status": "planned",
+        "summary": "POST queue-tickets/{ticket}/cancel",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "queues.cancel"
+          "queues.cancel",
+          "queues.view",
+          "visits.view"
         ],
         "security": [
           {
@@ -5435,7 +5479,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -5488,16 +5532,25 @@
         "x-linked-resource-guards": [
           "appointments.cancel"
         ],
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view",
+            "appointments.cancel"
+          ]
+        }
       }
     },
     "/api/v1/clinic/queue-tickets/{ticket}/requeue": {
       "post": {
         "operationId": "post_queue_tickets_ticket_requeue",
-        "summary": "PLANNED: POST queue-tickets/{ticket}/requeue",
-        "x-implementation-status": "planned",
+        "summary": "POST queue-tickets/{ticket}/requeue",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "queues.requeue"
+          "queues.requeue",
+          "queues.view",
+          "visits.view",
+          "patients.view"
         ],
         "security": [
           {
@@ -5534,7 +5587,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -5585,14 +5638,19 @@
           }
         },
         "x-linked-resource-guards": [],
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view"
+          ]
+        }
       }
     },
     "/api/v1/clinic/reception/overview": {
       "get": {
         "operationId": "get_reception_overview",
-        "summary": "PLANNED: GET reception/overview",
-        "x-implementation-status": "planned",
+        "summary": "GET reception/overview",
+        "x-implementation-status": "implemented",
         "x-required-permissions": [
           "reception.view"
         ],
@@ -5632,7 +5690,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Planned response; not implemented.",
+            "description": "Stage 5 response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -5672,7 +5730,7 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Planned only. Full cookie identity and selected active clinic required. Authorize action AND resource scope before binding or mutation; no platform bypass. See sprint-3.md for atomic coupled transitions, replay and visibility rules."
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
       }
     },
     "/api/v1/clinic/capabilities": {

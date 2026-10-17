@@ -244,3 +244,12 @@ Patients registry, branch linking, reversible archive/restore and explicit CSV
 export are implemented; Stage 3–7 are not started. See
 [sprint-3-stage-2.md](sprint-3-stage-2.md). Next: review Stage 2 before separately
 authorizing Doctors/Scheduling. Frontend stays demo until Stage 6.
+
+## Sprint 3 Stage 5 — Queues / Reception
+
+Stage 1 contracts, Stage 2 Patients, Stage 3 Doctors/Scheduling and Stage 4
+Appointments/Visits are delivered. Older status notes above describe their original
+planning checkpoints. Stage 5 adds the 11 approved queue/reception operations on
+the Stage-4 schema; see [implementation](sprint-3-stage-5.md) and
+[validation](sprint-3-stage-5-validation.md). Frontend API integration remains Stage 6,
+full final acceptance Stage 7. No automatic merge or additional realtime/display scope.
