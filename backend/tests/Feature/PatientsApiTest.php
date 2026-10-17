@@ -268,7 +268,7 @@ final class PatientsApiTest extends FoundationTestCase
         $this->browser($jar, 'GET', '/api/v1/clinic/patients')->assertForbidden();
         $this->browser($jar, 'POST', '/api/v1/auth/active-clinic', ['tenant_id' => $a['tenant']])->assertNoContent();
         $this->browser($jar, 'GET', '/api/v1/clinic/patients')->assertJsonPath('data.0.id', $first);
-        $this->browser($jar, 'GET', '/api/v1/clinic/patients/'.$first.'/visits')->assertNotFound();
+        $this->browser($jar, 'GET', '/api/v1/clinic/patients/'.$first.'/visits')->assertOk()->assertJsonPath('data', [])->assertJsonPath('meta.total', 0);
     }
 
     public function test_read_database_errors_do_not_propagate_sensitive_query_bindings(): void

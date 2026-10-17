@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Appointments\Http\AppointmentController;
 use App\Modules\Identity\Http\AuthController;
 use App\Modules\Patients\Http\PatientController;
 use App\Modules\Platform\Http\ClinicController as PlatformController;
@@ -37,6 +38,17 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                     Route::put($kind.'/{id}', [SchedulingController::class, 'update'])->whereUuid('id')->defaults('resourceKind', $kind);
                 }
                 Route::get('doctors/{doctor}/availability', [SchedulingController::class, 'availability'])->whereUuid('doctor');
+                Route::get('appointments/export', [AppointmentController::class, 'export']);
+                foreach (['appointments' => 'appointment', 'visits' => 'visit'] as $kind => $parameter) {
+                    Route::get($kind, [AppointmentController::class, 'index'])->defaults('resourceKind', $kind);
+                    Route::post($kind, [AppointmentController::class, 'store'])->defaults('resourceKind', $kind);
+                    Route::get($kind.'/{'.$parameter.'}', [AppointmentController::class, 'show'])->whereUuid($parameter)->defaults('resourceKind', $kind);
+                    Route::get($kind.'/{'.$parameter.'}/history', [AppointmentController::class, 'history'])->whereUuid($parameter)->defaults('resourceKind', $kind);
+                    Route::get('patients/{patient}/'.$kind, [AppointmentController::class, 'index'])->whereUuid('patient')->defaults('resourceKind', $kind);
+                }
+                foreach (['reschedule' => 'reschedule', 'cancel' => 'cancel', 'no-show' => 'no_show', 'check-in' => 'check_in'] as $path => $operation) {
+                    Route::post('appointments/{appointment}/'.$path, [AppointmentController::class, 'mutate'])->whereUuid('appointment')->defaults('operation', $operation);
+                }
                 Route::get('patients/export', [PatientController::class, 'export']);
                 Route::get('patients', [PatientController::class, 'index']);
                 Route::post('patients', [PatientController::class, 'store']);

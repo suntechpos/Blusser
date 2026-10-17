@@ -3270,7 +3270,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope requires a live doctor profile and active scheduled/checked_in/in_progress appointment or nonterminal visit; it expires when only terminal relations remain. Archive returns 409 for nonterminal appointments/visits. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       },
       "post": {
         "operationId": "post_patients",
@@ -3362,7 +3362,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope requires a live doctor profile and active scheduled/checked_in/in_progress appointment or nonterminal visit; it expires when only terminal relations remain. Archive returns 409 for nonterminal appointments/visits. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/export": {
@@ -3513,7 +3513,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope requires a live doctor profile and active scheduled/checked_in/in_progress appointment or nonterminal visit; it expires when only terminal relations remain. Archive returns 409 for nonterminal appointments/visits. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/{patient}": {
@@ -3608,7 +3608,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope requires a live doctor profile and active scheduled/checked_in/in_progress appointment or nonterminal visit; it expires when only terminal relations remain. Archive returns 409 for nonterminal appointments/visits. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       },
       "patch": {
         "operationId": "patch_patients_patient",
@@ -3719,7 +3719,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore. PATCH requires If-Match; PostgreSQL checks the version after locking the patient row. The header participates in the idempotency request digest. An authorized identical replay may reuse its original If-Match without performing another update; changing If-Match under the same key conflicts. Patient JSON is unchanged."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope requires a live doctor profile and active scheduled/checked_in/in_progress appointment or nonterminal visit; it expires when only terminal relations remain. Archive returns 409 for nonterminal appointments/visits. ETag is the integer resource version in quotes; use it as expected_version for archive/restore. PATCH requires If-Match; PostgreSQL checks the version after locking the patient row. The header participates in the idempotency request digest. An authorized identical replay may reuse its original If-Match without performing another update; changing If-Match under the same key conflicts. Patient JSON is unchanged."
       }
     },
     "/api/v1/clinic/patients/{patient}/archive": {
@@ -3822,7 +3822,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope requires a live doctor profile and active scheduled/checked_in/in_progress appointment or nonterminal visit; it expires when only terminal relations remain. Archive returns 409 for nonterminal appointments/visits. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/{patient}/restore": {
@@ -3925,7 +3925,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope requires a live doctor profile and active scheduled/checked_in/in_progress appointment or nonterminal visit; it expires when only terminal relations remain. Archive returns 409 for nonterminal appointments/visits. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/patients/{patient}/branches": {
@@ -4029,7 +4029,7 @@
             }
           }
         },
-        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
+        "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope requires a live doctor profile and active scheduled/checked_in/in_progress appointment or nonterminal visit; it expires when only terminal relations remain. Archive returns 409 for nonterminal appointments/visits. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
     },
     "/api/v1/clinic/doctors": {
@@ -5703,10 +5703,10 @@
                 "description": "Sensitive operational response; no caching."
               },
               "X-Availability-Mode": {
-                "description": "No reservation/occupancy check before Stage 4.",
+                "description": "Current occupancy hint; no reservation is created by availability.",
                 "schema": {
                   "type": "string",
-                  "const": "schedule-only"
+                  "const": "current-occupancy-hint"
                 }
               }
             },
@@ -5756,7 +5756,7 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Schedule-only availability hints, NOT reservations. Stage 4 occupancy/appointments do not exist yet. Active doctor, membership, role, specialty, branch, service and room required. A date exception overrides the entire doctor/branch day: closed removes it; replace supplies its sole replacement window. Room compatibility is the explicit same-branch room selected in an approved schedule; service_type is descriptive, not a service ID. Duration uses doctor_service override when present, otherwise schedule slot_minutes. At most 31 local calendar days. DST ambiguous/nonexistent slot boundaries or intervals return 422. UTC Z output ordered by starts_at, room_id, ends_at. Offset pagination; no fabricated occupancy."
+        "description": "Availability hints filtered against current active doctor/room reservations, NOT bookings or a guarantee of future availability. Active doctor, membership, role, specialty, branch, service and room required. A date exception overrides the entire doctor/branch day: closed removes it; replace supplies its sole replacement window. Room compatibility is the explicit same-branch room selected in an approved schedule; service_type is descriptive, not a service ID. Duration uses doctor_service override when present, otherwise schedule slot_minutes. At most 31 local calendar days. DST ambiguous/nonexistent slot boundaries or intervals return 422. UTC Z output ordered by starts_at, room_id, ends_at. Offset pagination; booking/reschedule atomically revalidate and reserve."
       }
     },
     "/api/v1/clinic/specialties": {
@@ -6079,6 +6079,1735 @@
           }
         },
         "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. POST/PUT extension approved by project owner. No implicit employee grants. Specialty response retains Stage-1 id/name fields."
+      }
+    },
+    "/api/v1/clinic/appointments": {
+      "get": {
+        "operationId": "get_appointments",
+        "summary": "GET /api/v1/clinic/appointments",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Appointment"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered. Booking timestamps accept UTC instants or the actual branch offset; invalid local offset labels and ambiguous/gap slots are rejected. Action permission never substitutes for the independently required view/reference permissions."
+      },
+      "post": {
+        "operationId": "post_appointments",
+        "summary": "POST /api/v1/clinic/appointments",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.create",
+          "appointments.view",
+          "patients.view",
+          "doctors.view",
+          "rooms.view",
+          "services.view",
+          "schedules.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered. Idempotency-Key required. Replays reauthorize current grants and resource visibility; changed payload conflicts. Mutations require existing resource view authorization; booking/reschedule revalidate patient and reference-data permissions. expected_version is checked after the appointment row lock; stale version/state returns 409. Check-in/walk-in atomically creates one Visit and waiting ticket; check-in reuses the original reservation. Late check-in requires explicit reschedule first. Walk-in queues without occupancy until Stage 5 start. Booking timestamps accept UTC instants or the actual branch offset; invalid local offset labels and ambiguous/gap slots are rejected. Action permission never substitutes for the independently required view/reference permissions."
+      }
+    },
+    "/api/v1/clinic/appointments/export": {
+      "get": {
+        "operationId": "get_appointments_export",
+        "summary": "GET /api/v1/clinic/appointments/export",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.export",
+          "appointments.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered."
+      }
+    },
+    "/api/v1/clinic/appointments/{appointment}": {
+      "get": {
+        "operationId": "get_appointments_appointment",
+        "summary": "GET /api/v1/clinic/appointments/{appointment}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered."
+      }
+    },
+    "/api/v1/clinic/appointments/{appointment}/reschedule": {
+      "post": {
+        "operationId": "post_appointments_appointment_reschedule",
+        "summary": "POST /api/v1/clinic/appointments/{appointment}/reschedule",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.update",
+          "appointments.view",
+          "patients.view",
+          "doctors.view",
+          "rooms.view",
+          "services.view",
+          "schedules.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered. Idempotency-Key required. Replays reauthorize current grants and resource visibility; changed payload conflicts. Mutations require existing resource view authorization; booking/reschedule revalidate patient and reference-data permissions. expected_version is checked after the appointment row lock; stale version/state returns 409. Check-in/walk-in atomically creates one Visit and waiting ticket; check-in reuses the original reservation. Late check-in requires explicit reschedule first. Walk-in queues without occupancy until Stage 5 start. Booking timestamps accept UTC instants or the actual branch offset; invalid local offset labels and ambiguous/gap slots are rejected. Action permission never substitutes for the independently required view/reference permissions."
+      }
+    },
+    "/api/v1/clinic/appointments/{appointment}/cancel": {
+      "post": {
+        "operationId": "post_appointments_appointment_cancel",
+        "summary": "POST /api/v1/clinic/appointments/{appointment}/cancel",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.cancel",
+          "appointments.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered. Idempotency-Key required. Replays reauthorize current grants and resource visibility; changed payload conflicts. Mutations require existing resource view authorization; booking/reschedule revalidate patient and reference-data permissions. expected_version is checked after the appointment row lock; stale version/state returns 409. Check-in/walk-in atomically creates one Visit and waiting ticket; check-in reuses the original reservation. Late check-in requires explicit reschedule first. Walk-in queues without occupancy until Stage 5 start. Booking timestamps accept UTC instants or the actual branch offset; invalid local offset labels and ambiguous/gap slots are rejected. Action permission never substitutes for the independently required view/reference permissions."
+      }
+    },
+    "/api/v1/clinic/appointments/{appointment}/no-show": {
+      "post": {
+        "operationId": "post_appointments_appointment_no_show",
+        "summary": "POST /api/v1/clinic/appointments/{appointment}/no-show",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.no_show",
+          "appointments.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered. Idempotency-Key required. Replays reauthorize current grants and resource visibility; changed payload conflicts. Mutations require existing resource view authorization; booking/reschedule revalidate patient and reference-data permissions. expected_version is checked after the appointment row lock; stale version/state returns 409. Check-in/walk-in atomically creates one Visit and waiting ticket; check-in reuses the original reservation. Late check-in requires explicit reschedule first. Walk-in queues without occupancy until Stage 5 start. Booking timestamps accept UTC instants or the actual branch offset; invalid local offset labels and ambiguous/gap slots are rejected. Action permission never substitutes for the independently required view/reference permissions."
+      }
+    },
+    "/api/v1/clinic/appointments/{appointment}/check-in": {
+      "post": {
+        "operationId": "post_appointments_appointment_check_in",
+        "summary": "POST /api/v1/clinic/appointments/{appointment}/check-in",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.check_in",
+          "appointments.view",
+          "patients.view",
+          "visits.create",
+          "queues.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered. Idempotency-Key required. Replays reauthorize current grants and resource visibility; changed payload conflicts. Mutations require existing resource view authorization; booking/reschedule revalidate patient and reference-data permissions. expected_version is checked after the appointment row lock; stale version/state returns 409. Check-in/walk-in atomically creates one Visit and waiting ticket; check-in reuses the original reservation. Late check-in requires explicit reschedule first. Walk-in queues without occupancy until Stage 5 start. Booking timestamps accept UTC instants or the actual branch offset; invalid local offset labels and ambiguous/gap slots are rejected. Action permission never substitutes for the independently required view/reference permissions."
+      }
+    },
+    "/api/v1/clinic/appointments/{appointment}/history": {
+      "get": {
+        "operationId": "get_appointments_appointment_history",
+        "summary": "GET /api/v1/clinic/appointments/{appointment}/history",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "appointments.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered."
+      }
+    },
+    "/api/v1/clinic/patients/{patient}/appointments": {
+      "get": {
+        "operationId": "get_patients_patient_appointments",
+        "summary": "GET /api/v1/clinic/patients/{patient}/appointments",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.view",
+          "appointments.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Appointment"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered."
+      }
+    },
+    "/api/v1/clinic/patients/{patient}/visits": {
+      "get": {
+        "operationId": "get_patients_patient_visits",
+        "summary": "GET /api/v1/clinic/patients/{patient}/visits",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "patients.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patient",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Visit"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered."
+      }
+    },
+    "/api/v1/clinic/visits": {
+      "get": {
+        "operationId": "get_visits",
+        "summary": "GET /api/v1/clinic/visits",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Visit"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered. Booking timestamps accept UTC instants or the actual branch offset; invalid local offset labels and ambiguous/gap slots are rejected. Action permission never substitutes for the independently required view/reference permissions."
+      },
+      "post": {
+        "operationId": "post_visits",
+        "summary": "POST /api/v1/clinic/visits",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "visits.create",
+          "patients.view",
+          "queues.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalkInInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered. Idempotency-Key required. Replays reauthorize current grants and resource visibility; changed payload conflicts. Mutations require existing resource view authorization; booking/reschedule revalidate patient and reference-data permissions. expected_version is checked after the appointment row lock; stale version/state returns 409. Check-in/walk-in atomically creates one Visit and waiting ticket; check-in reuses the original reservation. Late check-in requires explicit reschedule first. Walk-in queues without occupancy until Stage 5 start. Booking timestamps accept UTC instants or the actual branch offset; invalid local offset labels and ambiguous/gap slots are rejected. Action permission never substitutes for the independently required view/reference permissions."
+      }
+    },
+    "/api/v1/clinic/visits/{visit}": {
+      "get": {
+        "operationId": "get_visits_visit",
+        "summary": "GET /api/v1/clinic/visits/{visit}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Visit"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered."
+      }
+    },
+    "/api/v1/clinic/visits/{visit}/history": {
+      "get": {
+        "operationId": "get_visits_visit_history",
+        "summary": "GET /api/v1/clinic/visits/{visit}/history",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized transactional clinic operation.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Event"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered."
       }
     }
   },
@@ -7582,6 +9311,370 @@
           "branch_ids",
           "service_ids",
           "active"
+        ]
+      },
+      "Event": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string"
+          },
+          "from_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to_status": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "to_status",
+          "occurred_at"
+        ]
+      },
+      "Visit": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "arrived",
+              "queued",
+              "called",
+              "in_progress",
+              "completed",
+              "skipped",
+              "cancelled"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "doctor_id",
+          "branch_id",
+          "status",
+          "version"
+        ]
+      },
+      "WalkInInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "service_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "patient_id",
+          "doctor_id",
+          "branch_id",
+          "service_id"
+        ]
+      },
+      "Attendance": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "visit": {
+            "$ref": "#/components/schemas/Visit"
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/QueueTicket"
+          },
+          "appointment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Appointment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "visit",
+          "ticket",
+          "appointment"
+        ]
+      },
+      "Appointment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "service_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "checked_in",
+              "in_progress",
+              "completed",
+              "cancelled",
+              "no_show"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "late": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "doctor_id",
+          "branch_id",
+          "service_id",
+          "room_id",
+          "starts_at",
+          "ends_at",
+          "status",
+          "version"
+        ]
+      },
+      "QueueTicket": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "called",
+              "in_progress",
+              "completed",
+              "skipped",
+              "cancelled"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "visit_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "walk_in"
+            ]
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "doctor_id",
+          "branch_id",
+          "status",
+          "version",
+          "visit_id",
+          "number",
+          "kind",
+          "local_date"
+        ]
+      },
+      "RescheduleInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "doctor_id",
+          "branch_id",
+          "room_id",
+          "starts_at",
+          "ends_at",
+          "expected_version"
+        ]
+      },
+      "AppointmentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "patient_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "service_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "patient_id",
+          "doctor_id",
+          "branch_id",
+          "service_id",
+          "room_id",
+          "starts_at",
+          "ends_at"
         ]
       }
     },

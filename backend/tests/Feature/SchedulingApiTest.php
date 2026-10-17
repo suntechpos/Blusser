@@ -136,7 +136,7 @@ final class SchedulingApiTest extends FoundationTestCase
         $this->browser($jar, 'PUT', '/api/v1/clinic/rooms/'.$room['id'], $roomData, key: (string) Str::uuid())->assertOk();
         $this->browser($jar, 'PUT', '/api/v1/clinic/schedules/'.$schedule['id'], [...$rule, 'slot_minutes' => 60], key: (string) Str::uuid())->assertOk();
         $url = '/api/v1/clinic/doctors/'.$doctor['id'].'/availability?'.http_build_query($this->filters($a));
-        $this->browser($jar, 'GET', $url)->assertOk()->assertHeader('X-Availability-Mode', 'schedule-only')->assertJsonPath('meta.total', 8)->assertJsonPath('data.0.starts_at', '2030-01-07T04:00:00Z');
+        $this->browser($jar, 'GET', $url)->assertOk()->assertHeader('X-Availability-Mode', 'current-occupancy-hint')->assertJsonPath('meta.total', 8)->assertJsonPath('data.0.starts_at', '2030-01-07T04:00:00Z');
         $exceptionData = ['doctor_id' => $doctor['id'], 'branch_id' => $a['branch'], 'local_date' => '2030-01-07', 'kind' => 'closed', 'replacement' => null];
         $e = $this->browser($jar, 'POST', '/api/v1/clinic/schedule-exceptions', $exceptionData, key: (string) Str::uuid())->assertCreated()->json();
         $this->browser($jar, 'GET', '/api/v1/clinic/schedule-exceptions/'.$e['id'])->assertOk();
@@ -377,15 +377,17 @@ final class SchedulingApiTest extends FoundationTestCase
     {
         $a = $this->fixture()['a'];
         $db = DB::connection('migration');
-        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]));
         $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
         $this->assertSame('Asia/Tashkent', $db->table('tenants')->where('id', $a['tenant'])->value('timezone'));
         $this->reference($a);
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]);
             $this->fail('No destructive rollback.');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('forward migration', $e->getMessage());
+        } finally {
+            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
         }
         $this->assertSame(1, $db->table('doctor_profiles')->count());
     }

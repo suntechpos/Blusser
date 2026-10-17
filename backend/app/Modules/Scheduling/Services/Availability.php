@@ -9,7 +9,7 @@ use DateTimeZone;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/** Read-only schedule suggestions. No booking/occupancy exists before Stage 4. */
+/** Read-only availability hints, including current occupancy; never a reservation. */
 final class Availability
 {
     public function get(User $actor, string $tenant, string $doctor, array $filters): array
@@ -87,7 +87,7 @@ final class Availability
                     if ($hi->getTimestamp() - $lo->getTimestamp() !== $minutes * 60) {
                         throw ValidationException::withMessages(['from' => 'A requested schedule interval crosses an ambiguous or nonexistent local time.']);
                     }
-                    if ($lo >= $from && $hi <= $to) {
+                    if ($lo >= $from && $hi <= $to && DB::selectOne('SELECT governance.booking_slot_free(?,?,?,?) AS allowed', [$doctor, $window->room_id, $lo->format('c'), $hi->format('c')])->allowed) {
                         $slots[] = ['doctor_id' => $doctor, 'branch_id' => $filters['branch_id'], 'room_id' => $window->room_id, 'starts_at' => $lo->format('Y-m-d\TH:i:s\Z'), 'ends_at' => $hi->format('Y-m-d\TH:i:s\Z')];
                     }
                 }
