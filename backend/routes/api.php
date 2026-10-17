@@ -5,6 +5,7 @@ use App\Modules\Identity\Http\AuthController;
 use App\Modules\Patients\Http\PatientController;
 use App\Modules\Platform\Http\ClinicController as PlatformController;
 use App\Modules\Platform\Http\HealthController;
+use App\Modules\Queues\Http\QueueController;
 use App\Modules\Scheduling\Http\SchedulingController;
 use App\Modules\Tenancy\Http\ClinicController;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +39,13 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                     Route::put($kind.'/{id}', [SchedulingController::class, 'update'])->whereUuid('id')->defaults('resourceKind', $kind);
                 }
                 Route::get('doctors/{doctor}/availability', [SchedulingController::class, 'availability'])->whereUuid('doctor');
+                Route::get('queue-tickets', [QueueController::class, 'index']);
+                Route::post('queue-tickets', [QueueController::class, 'store']);
+                Route::get('queue-tickets/{ticket}', [QueueController::class, 'show'])->whereUuid('ticket');
+                foreach (['call', 'recall', 'start', 'complete', 'skip', 'cancel', 'requeue'] as $operation) {
+                    Route::post('queue-tickets/{ticket}/'.$operation, [QueueController::class, 'mutate'])->whereUuid('ticket')->defaults('operation', $operation);
+                }
+                Route::get('reception/overview', [QueueController::class, 'overview']);
                 Route::get('appointments/export', [AppointmentController::class, 'export']);
                 foreach (['appointments' => 'appointment', 'visits' => 'visit'] as $kind => $parameter) {
                     Route::get($kind, [AppointmentController::class, 'index'])->defaults('resourceKind', $kind);

@@ -7809,6 +7809,1133 @@
         },
         "description": "Implemented Stage 4. Full first-party Sanctum identity and active clinic required. Tenant RLS and current action/scope/credential checks apply. Hidden UUIDs return generic 404. Lists use stable starts_at/id for appointments and created_at/id for visits; q searches resource UUID. Date filter ranges are bounded to 366 days. Histories additionally constrain each event by its original doctor/branch scope. No public Queue API is delivered."
       }
+    },
+    "/api/v1/clinic/queue-tickets": {
+      "get": {
+        "operationId": "get_queue_tickets",
+        "summary": "GET queue-tickets",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/QueueTicket"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
+      },
+      "post": {
+        "operationId": "post_queue_tickets",
+        "summary": "POST queue-tickets",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.create",
+          "visits.create",
+          "patients.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalkInInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}": {
+      "get": {
+        "operationId": "get_queue_tickets_ticket",
+        "summary": "GET queue-tickets/{ticket}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueTicket"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/call": {
+      "post": {
+        "operationId": "post_queue_tickets_ticket_call",
+        "summary": "POST queue-tickets/{ticket}/call",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.call",
+          "queues.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "x-linked-resource-guards": [],
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view"
+          ]
+        }
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/recall": {
+      "post": {
+        "operationId": "post_queue_tickets_ticket_recall",
+        "summary": "POST queue-tickets/{ticket}/recall",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.recall",
+          "queues.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "x-linked-resource-guards": [],
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view"
+          ]
+        }
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/start": {
+      "post": {
+        "operationId": "post_queue_tickets_ticket_start",
+        "summary": "POST queue-tickets/{ticket}/start",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.start",
+          "queues.view",
+          "visits.view",
+          "patients.view",
+          "doctors.view",
+          "rooms.view",
+          "schedules.view",
+          "services.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartInput"
+              }
+            }
+          }
+        },
+        "x-linked-resource-guards": [
+          "appointments.update"
+        ],
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view",
+            "appointments.update"
+          ]
+        }
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/complete": {
+      "post": {
+        "operationId": "post_queue_tickets_ticket_complete",
+        "summary": "POST queue-tickets/{ticket}/complete",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.complete",
+          "queues.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "x-linked-resource-guards": [
+          "appointments.update"
+        ],
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view",
+            "appointments.update"
+          ]
+        }
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/skip": {
+      "post": {
+        "operationId": "post_queue_tickets_ticket_skip",
+        "summary": "POST queue-tickets/{ticket}/skip",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.skip",
+          "queues.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "x-linked-resource-guards": [],
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view"
+          ]
+        }
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/cancel": {
+      "post": {
+        "operationId": "post_queue_tickets_ticket_cancel",
+        "summary": "POST queue-tickets/{ticket}/cancel",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.cancel",
+          "queues.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        },
+        "x-linked-resource-guards": [
+          "appointments.cancel"
+        ],
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view",
+            "appointments.cancel"
+          ]
+        }
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/requeue": {
+      "post": {
+        "operationId": "post_queue_tickets_ticket_requeue",
+        "summary": "POST queue-tickets/{ticket}/requeue",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.requeue",
+          "queues.view",
+          "visits.view",
+          "patients.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attendance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartInput"
+              }
+            }
+          }
+        },
+        "x-linked-resource-guards": [],
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "x-conditional-required-permissions": {
+          "linked_appointment": [
+            "appointments.view"
+          ]
+        }
+      }
+    },
+    "/api/v1/clinic/reception/overview": {
+      "get": {
+        "operationId": "get_reception_overview",
+        "summary": "GET reception/overview",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "reception.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "local_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stage 5 response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceptionOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
+      }
     }
   },
   "components": {
@@ -9675,6 +10802,105 @@
           "room_id",
           "starts_at",
           "ends_at"
+        ]
+      },
+      "StartInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "expected_version",
+          "room_id",
+          "starts_at",
+          "ends_at"
+        ]
+      },
+      "ReceptionOverview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "local_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Appointment"
+            }
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Visit"
+            }
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueTicket"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "scheduled": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "arrived": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "waiting": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "called": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "in_progress": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "late": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": []
+          }
+        },
+        "required": [
+          "local_date",
+          "timezone",
+          "counts"
         ]
       }
     },

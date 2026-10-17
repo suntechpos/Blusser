@@ -388,3 +388,14 @@ minimal queue foundation creates only internal waiting tickets/counters; no publ
 Queue actions are enabled. Real active care relations now gate patient own scope,
 and active attendance blocks archive. Availability incorporates current occupancy
 while remaining a hint. Platform identities receive no clinical bypass.
+
+## Sprint 3 Stage 5 — queue lifecycle
+
+The Queues module exposes the approved 11 Queue/Reception operations. Existing
+Identity/Tenancy/Access and Stage-4 booking boundaries remain authoritative.
+Ticket, Visit and linked Appointment changes, occupancy, append-only events,
+audit and idempotency are atomic behind a narrow queue_command.
+Reception overview intersects reception.view with every source view scope and
+omits unauthorized sections/counts. No frontend or realtime transport is added.
+See [Stage 5](sprint-3-stage-5.md) and its validation report for implementation
+and deployment boundaries.

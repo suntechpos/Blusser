@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Modules\Access\Services\GovernanceDenied;
 use App\Modules\Appointments\Services\Appointments;
 use App\Modules\Patients\Services\Patients;
+use App\Modules\Queues\Services\Queues;
 use App\Modules\Scheduling\Services\Availability;
 use App\Modules\Scheduling\Services\Scheduling;
 use Illuminate\Support\Facades\Artisan;
@@ -266,7 +267,9 @@ final class AppointmentsApiTest extends FoundationTestCase
         $this->command($a, 'walk_in', data: $this->walk($a));
         $this->denied(fn () => $patients->command($actor, $a['tenant'], 'archive', $p, ['expected_version' => 2], (string) Str::uuid()), 'conflict');
         $db = DB::connection('migration');
-        $db->table('visits')->update(['status' => 'completed']);
+        foreach ($db->table('queue_tickets')->get() as $ticket) {
+            app(Queues::class)->command($actor, $a['tenant'], 'cancel', $ticket->id, ['expected_version' => $ticket->version], (string) Str::uuid());
+        }
         $this->grant($a, 'patients.view', 'own');
         $this->assertSame(0, $patients->listing($actor, $a['tenant'], [])['meta']['total']);
         $this->grant($a, 'patients.view', 'entire_clinic');
@@ -310,7 +313,7 @@ final class AppointmentsApiTest extends FoundationTestCase
         $bb = $this->command($b);
         $att = $this->command($a, 'check_in', $aa['id'], ['expected_version' => 1]);
         app(Scheduling::class)->context($this->actor($a['user']), $a['tenant'], function () use ($b) {
-            foreach (['appointments', 'visits', 'operation_events'] as $t) {
+            foreach (['appointments', 'visits', 'operation_events', 'queue_tickets'] as $t) {
                 $this->assertSame(0, DB::table($t)->where('tenant_id', $b['tenant'])->count());
             }
             $this->assertSame(1, DB::table('appointments')->count());
@@ -322,7 +325,7 @@ final class AppointmentsApiTest extends FoundationTestCase
                 $this->assertFalse(DB::selectOne('SELECT has_table_privilege(current_user,?,?) AS allowed', [$table, $priv])->allowed);
             }
         }
-        foreach (['resource_reservations', 'queue_tickets', 'queue_counters', 'operation_idempotency'] as $t) {
+        foreach (['resource_reservations', 'queue_counters', 'operation_idempotency'] as $t) {
             $this->assertSqlState('42501', fn () => DB::table($t)->get());
         }
         $this->assertSqlState('42501', fn () => DB::select("SELECT governance.booking_slot_valid(?,?,?,?,'2030-01-07T04:00:00Z','2030-01-07T04:30:00Z',true)", [$a['doctor']['id'], $a['branch'], $a['service'], $a['room']['id']]));
@@ -429,17 +432,19 @@ final class AppointmentsApiTest extends FoundationTestCase
     {
         $ids = $this->fixture();
         $db = DB::connection('migration');
-        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]));
         $this->assertNull($db->selectOne("SELECT to_regclass('public.appointments') AS name")->name);
         $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
         $this->assertSame(2, (int) $db->selectOne("SELECT count(*) AS n FROM pg_constraint WHERE conrelid='public.resource_reservations'::regclass AND contype='x'")->n);
         $a = $this->reference($ids['a']);
         $this->command($a);
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]);
             $this->fail('No destructive down.');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('forward migration', $e->getMessage());
+        } finally {
+            Artisan::call('migrate', ['--database' => 'migration', '--force' => true]);
         }
         $this->assertSame(1, $db->table('appointments')->count());
     }
@@ -680,7 +685,7 @@ WORKER;
         $this->command($a, 'cancel', $first['id'], ['expected_version' => 1]);
         $this->assertSame(1, app(Patients::class)->listing($actor, $a['tenant'], [])['meta']['total']);
         $this->assertSame(1, $svc->listing($actor, $a['tenant'], 'visits', [])['meta']['total']);
-        $db->table('visits')->where('id', $att['visit']['id'])->update(['status' => 'completed']);
+        app(Queues::class)->command($actor, $a['tenant'], 'cancel', $att['ticket']['id'], ['expected_version' => 1], (string) Str::uuid());
         $this->assertSame(0, app(Patients::class)->listing($actor, $a['tenant'], [])['meta']['total']);
         $db->table('membership_branches')->where('membership_id', $a['membership'])->delete();
         $this->assertSame(0, $svc->listing($actor, $a['tenant'], 'appointments', [])['meta']['total']);
