@@ -5,12 +5,24 @@ namespace App\Modules\Queues\Services;
 use App\Modules\Access\Permissions;
 use App\Modules\Access\Services\Governance;
 use App\Modules\Identity\Models\User;
-use App\Modules\Scheduling\Services\Scheduling;
+use App\Modules\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Closure;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class Queues
 {
+    private function read(User $actor, string $tenant, Closure $callback): mixed
+    {
+        try {
+            return app(TenantContext::class)->run($actor, $tenant, $callback, consistentSnapshot: true);
+        } catch (QueryException) {
+            throw new HttpException(503, 'Queue operation unavailable.');
+        }
+    }
+
     public function command(User $actor, string $tenant, string $action, ?string $id, array $payload, string $key): array
     {
         return json_decode(app(Governance::class)->call('queue_command', [$action, $id, json_encode($payload, JSON_THROW_ON_ERROR), $key], $actor, $tenant), true, flags: JSON_THROW_ON_ERROR);
@@ -18,7 +30,7 @@ final class Queues
 
     public function listing(User $actor, string $tenant, array $filters): array
     {
-        return app(Scheduling::class)->context($actor, $tenant, function () use ($filters) {
+        return $this->read($actor, $tenant, function () use ($filters) {
             abort_if(app(Permissions::class)->scope('queues.view') === null, 403);
             $q = DB::table('queue_tickets')->orderBy('created_at')->orderBy('id');
             foreach (['branch_id', 'status'] as $k) {
@@ -50,7 +62,7 @@ final class Queues
 
     public function show(User $actor, string $tenant, string $id): array
     {
-        return app(Scheduling::class)->context($actor, $tenant, function () use ($id) {
+        return $this->read($actor, $tenant, function () use ($id) {
             abort_if(app(Permissions::class)->scope('queues.view') === null, 403);
             abort_unless(DB::table('queue_tickets')->where('id', $id)->exists(), 404);
 
@@ -65,7 +77,7 @@ final class Queues
 
     public function overview(User $actor, string $tenant, array $filters): array
     {
-        return app(Scheduling::class)->context($actor, $tenant, function () use ($filters) {
+        return $this->read($actor, $tenant, function () use ($filters) {
             $scope = app(Permissions::class)->scope('reception.view')?->value;
             abort_unless(in_array($scope, ['assigned_branches', 'entire_clinic'], true), 403);
             $zone = DB::table('tenants')->where('id', DB::raw('public.context_tenant()'))->value('timezone');

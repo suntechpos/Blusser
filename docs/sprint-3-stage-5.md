@@ -98,6 +98,13 @@ selected branch timezone, otherwise tenant timezone. Each row is selected by its
 own branch timezone (tenant fallback); tickets use their immutable allocation date.
 The response timezone indicates the selected branch or tenant reference timezone.
 
+Queue list/detail and overview use a transaction-local REPEATABLE READ, READ ONLY
+snapshot, established before identity and permission reads. A response therefore
+cannot mix counts/projections or Visit/ticket states from different commits. RLS
+and effective grants are evaluated in that same snapshot; revocations apply on
+the next request. Commit/rollback restores ordinary connection modes and clears
+tenant settings. Mutation transactions and lock order are unchanged.
+
 reception.view is an additional ceiling: assigned_branches intersects actor's
 current assignments even when a source view grants entire_clinic. Source RLS still
 applies, including own. Unauthorized sections **and their counts** are omitted,

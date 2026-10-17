@@ -12,7 +12,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 /** Internal boundary: actor must come from server-side authentication, never request input. */
 final class TenantContext
 {
-    public function run(User $actor, string $tenantId, Closure $operation): mixed
+    public function run(User $actor, string $tenantId, Closure $operation, bool $consistentSnapshot = false): mixed
     {
         $connection = DB::connection('pgsql');
         if ($connection->transactionLevel() !== 0) {
@@ -22,7 +22,12 @@ final class TenantContext
             throw new NotFoundHttpException;
         }
 
-        return $connection->transaction(function () use ($connection, $actor, $tenantId, $operation) {
+        return $connection->transaction(function () use ($connection, $actor, $tenantId, $operation, $consistentSnapshot) {
+            if ($consistentSnapshot) {
+                // Must precede identity/scope reads. Transaction-local: never changes
+                // the default isolation or write boundary on a reused connection.
+                $connection->statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+            }
             $connection->select("SELECT set_config('app.user_id', ?, true), set_config('app.tenant_id', '', true)", [(string) $actor->getKey()]);
             $identity = $connection->table('users')->select('active', 'is_platform_admin', 'must_change_password', 'credential_version')->where('id', $actor->getKey())->first();
             if (! $identity || ! $identity->active || $identity->is_platform_admin || $identity->must_change_password || (int) $identity->credential_version !== $actor->credential_version) {

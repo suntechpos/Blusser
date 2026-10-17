@@ -680,4 +680,75 @@ WORKER;
         $this->assertSame(1, $db->table('resource_reservations')->count());
         $this->assertSame(1, $db->table('operation_events')->where('action', 'start')->whereNotNull('ticket_id')->count());
     }
+
+    public function test_queue_list_is_consistent_when_branch_access_is_revoked_between_queries(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $ticket = $this->queue($a)['ticket']['id'];
+        $fired = false;
+        DB::listen(function ($event) use ($a, &$fired) {
+            if ($fired || $event->connectionName !== 'pgsql' || ! str_contains($event->sql, 'from "queue_tickets"')) {
+                return;
+            }
+            $fired = true;
+            // A separate committed owner fixture emulates a concurrent RBAC change.
+            $this->grant($a, 'queues.view', 'assigned_branches');
+            DB::connection('migration')->table('membership_branches')->where('membership_id', $a['membership'])->delete();
+        });
+        $svc = app(Queues::class);
+        $actor = $this->actor($a['user']);
+        $out = $svc->listing($actor, $a['tenant'], []);
+        $this->assertTrue($fired);
+        $this->assertSame(1, $out['meta']['total']);
+        $this->assertSame([$ticket], array_column($out['data'], 'id'));
+        $this->assertSame(0, $svc->listing($actor, $a['tenant'], [])['meta']['total']);
+        $this->assertSame('read committed', DB::selectOne('SHOW transaction_isolation')->transaction_isolation);
+    }
+
+    public function test_overview_uses_one_snapshot_when_a_queue_call_commits_between_sections(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $att = $this->queue($a);
+        $fired = false;
+        DB::listen(function ($event) use ($a, $att, &$fired) {
+            if ($fired || $event->connectionName !== 'pgsql' || ! str_contains($event->sql, 'governance.booking_projection')) {
+                return;
+            }
+            $fired = true;
+            $code = <<<'WORKER'
+require 'vendor/autoload.php';$app=require 'bootstrap/app.php';$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();$i=json_decode(stream_get_contents(STDIN),true);$actor=(new App\Modules\Identity\Models\User)->forceFill(['id'=>$i['user'],'credential_version'=>1]);app(App\Modules\Queues\Services\Queues::class)->command($actor,$i['tenant'],'call',$i['ticket'],['expected_version'=>1],$i['key']);
+WORKER;
+            $p = new Process([PHP_BINARY, '-r', $code], base_path(), ['APP_ENV' => 'testing']);
+            $p->setInput(json_encode(['user' => $a['user'], 'tenant' => $a['tenant'], 'ticket' => $att['ticket']['id'], 'key' => (string) Str::uuid()]));
+            $p->setTimeout(15);
+            $p->run();
+            $this->assertSame(0, $p->getExitCode(), $p->getErrorOutput());
+        });
+        $svc = app(Queues::class);
+        $actor = $this->actor($a['user']);
+        $out = $svc->overview($actor, $a['tenant'], []);
+        $this->assertTrue($fired);
+        $this->assertSame('queued', $out['visits'][0]['status']);
+        $this->assertSame('waiting', $out['tickets'][0]['status']);
+        $this->assertSame(1, ((array) $out['counts'])['waiting']);
+        $next = $svc->overview($actor, $a['tenant'], []);
+        $this->assertSame('called', $next['visits'][0]['status']);
+        $this->assertSame('called', $next['tickets'][0]['status']);
+    }
+
+    public function test_hidden_ticket_rolls_back_snapshot_modes_and_tenant_context_before_next_command(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $att = $this->queue($a);
+        try {
+            app(Queues::class)->show($this->actor($a['user']), $a['tenant'], (string) Str::uuid());
+            $this->fail('Hidden ticket must fail closed.');
+        } catch (NotFoundHttpException) {
+            $this->assertSame(0, DB::connection()->transactionLevel());
+        }
+        $this->assertSame('read committed', DB::selectOne('SHOW transaction_isolation')->transaction_isolation);
+        $this->assertSame('off', DB::selectOne('SHOW transaction_read_only')->transaction_read_only);
+        $this->assertSame(0, DB::table('queue_tickets')->count());
+        $this->assertSame('called', $this->queue($a, 'call', $att['ticket']['id'], ['expected_version' => 1])['ticket']['status']);
+    }
 }

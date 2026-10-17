@@ -127,3 +127,17 @@ can be retried; no token/secret values should be supplied in chat.
 - `docs/sprint-3-stage-5-validation.md`
 - `docs/sprint-3-stage-5.md`
 - `docs/sprint-3.md`
+
+## PR #9 review follow-up
+
+See [review](sprint-3-stage-5-review.md). The reviewed base is 9cfca0a; the review
+adds three concurrent-read/rollback regressions and a transaction-local read-only
+snapshot boundary for queue list/detail/overview. No schema or write rules changed.
+
+Final review image: sha256:7021d76021c33a1f97f333ea6bb295802245b41670e1f5b4abc4a0e1ecc2cfcd.
+Full suite **152 passed, 8388 assertions**, 133.46 seconds; Pint **96 files PASS**;
+Composer strict/platform PASS. Command exited 0 under normal image www-data and
+blusser_app runtime role, test database blusser_test only. All three changed backend
+files matched the image by SHA-256. No frontend or OpenAPI contract changes.
+The earlier API-access limitation remains, but public checks HTML can be read;
+base PR #9 foundation run 39028589503 was verified succeeded via that page.
