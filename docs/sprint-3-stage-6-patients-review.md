@@ -30,6 +30,8 @@ existing context abort signal and check their generation before applying results
 A superseded authentication response cannot restore a logged-out/previous context
 or expire the new context through an old cancelled 401/419. Context projection
 reads are assembled before applying grants/branches, avoiding partial updates.
+If revalidation discovers a server-side clinic change, subsequent context-load
+failures retain their error message and cannot leave previous-clinic data visible.
 
 ## Reviewed invariants
 
@@ -61,10 +63,11 @@ reads are assembled before applying grants/branches, avoiding partial updates.
   and all existing real PostgreSQL security/concurrency/migration regressions.
 - Pint: **100 files PASS**. Composer strict validation and platform checks: PASS.
 - Frontend unit tests: **4 passed**. TypeScript and Vite production build: PASS.
-- Real Sanctum/PostgreSQL Chromium browser suite: **14 passed**, 22.3 seconds,
+- Real Sanctum/PostgreSQL Chromium browser suite: **15 passed**, 25.1 seconds,
   no skipped tests. The previous eight scenarios plus draft preservation, combined
   export scopes, CSV contents/filters, uncertain-create replay, permission
-  invalidation and delayed-auth-after-logout were exercised.
+  invalidation, delayed-auth-after-logout and a failed context refresh after a
+  server-side clinic change were exercised.
 - The initial PR commit e26e6ea's GitHub run **39033128106 passed** (6m 1s).
   The follow-up commit triggers another PR run; its final status must be checked
   remotely and reported separately, never inferred from local green checks.

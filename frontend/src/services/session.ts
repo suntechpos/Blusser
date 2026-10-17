@@ -123,7 +123,7 @@ function accessSignature(access: ClinicAccess) {
 }
 /** Recheck authorization on focus without destroying an unchanged patient draft. */
 export async function revalidateSession() {
-  const token = contextGate.capture();
+  let token = contextGate.capture();
   try {
     const user = await getCurrentUser(token.signal);
     if (!token.current()) return;
@@ -136,6 +136,7 @@ export async function revalidateSession() {
       user.is_platform_admin !== previous.is_platform_admin
     ) {
       clearClinic();
+      token = contextGate.capture();
       session.checking = true;
       try {
         await refreshSession();

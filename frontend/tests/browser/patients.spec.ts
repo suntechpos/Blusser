@@ -528,4 +528,35 @@ test.describe.serial("real Sanctum / PostgreSQL Patients flows", () => {
     await expect(page.getByLabel("Login", { exact: true })).toBeVisible();
     await expect(page.locator(".patients")).toHaveCount(0);
   });
+  test("a failed context refresh after a server-side clinic change reports the failure", async ({
+    page,
+  }) => {
+    await login(page);
+    await expect(page.locator("tbody")).toContainText(
+      "Synthetic concurrent writer",
+    );
+    await page.evaluate(async () => {
+      const { api } = await import("/src/services/api.ts");
+      const { data } = await api.get("/api/v1/auth/clinics");
+      const clinic = data.data.find((c) => c.name === "Synthetic Clinic b");
+      await api.post("/api/v1/auth/active-clinic", { tenant_id: clinic.id });
+    });
+    await page.route("**/api/v1/clinic/context", (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: '{"message":"Unavailable"}',
+      }),
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: "Server bilan bog‘lanib bo‘lmadi" }),
+    ).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(0);
+    await expect(page.locator(".patients")).not.toContainText(
+      "Synthetic concurrent writer",
+    );
+  });
 });
