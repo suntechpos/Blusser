@@ -8936,6 +8936,81 @@
         },
         "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived."
       }
+    },
+    "/api/v1/clinic/context": {
+      "get": {
+        "operationId": "getClinicSelfContext",
+        "summary": "Current actor effective clinic capabilities",
+        "x-implementation-status": "implemented",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Patient operation response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicSelfContext"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Patient read unavailable; no SQL bindings or sensitive details returned.",
+            "headers": {
+              "Cache-Control": {
+                "description": "No caching.",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Read-only active membership self projection. No role-name inference or role catalog. Current tenant comes from session. Grants are current public.permission_scope results only; branches include only active self-assigned branches. Platform/full-identity guards and FORCE RLS apply. No input fields or query filters. Snapshot-consistent; revoked grants/memberships apply on the next request."
+      }
     }
   },
   "components": {
@@ -10901,6 +10976,64 @@
           "local_date",
           "timezone",
           "counts"
+        ]
+      },
+      "ClinicSelfContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "membership_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "grants": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "own",
+                "assigned_branches",
+                "entire_clinic"
+              ]
+            }
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "timezone": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "active",
+                "timezone"
+              ]
+            }
+          }
+        },
+        "required": [
+          "membership_id",
+          "timezone",
+          "grants",
+          "branches"
         ]
       }
     },

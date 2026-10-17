@@ -10,3 +10,5 @@
 /backend/.phpunit.result.cache
 /backend/.phpunit.cache/
 !/backend/.env.testing
+/frontend/test-results/
+/frontend/playwright-report/

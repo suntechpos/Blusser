@@ -1,50 +1,215 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Search, Plus, Users, Download, Eye, Pencil, MoreHorizontal, ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
-type Patient = { id:string; name:string; phone:string; dob:string; gender:'Ayol'|'Erkak'; last:string; visits:number; status:'Faol'|'Nazoratda'|'Yangi'; branch:string }
-const patients = ref<Patient[]>([
-{ id:'P-00124',name:'Aliyeva Mohira',phone:'+998 90 123 45 67',dob:'1992-03-14',gender:'Ayol',last:'2026-10-15',visits:12,status:'Faol',branch:'Markaziy' },
-{ id:'P-00126',name:'Qodirov Aziz',phone:'+998 91 234 56 78',dob:'1988-07-22',gender:'Erkak',last:'2026-10-14',visits:8,status:'Nazoratda',branch:'Markaziy' },
-{ id:'P-00127',name:'Ismoilova Nilufar',phone:'+998 93 456 78 90',dob:'1995-11-03',gender:'Ayol',last:'2026-10-10',visits:5,status:'Faol',branch:'Chilonzor' },
-{ id:'P-00128',name:'Matchonov Siroj',phone:'+998 90 987 65 43',dob:'1978-01-19',gender:'Erkak',last:'2026-10-05',visits:20,status:'Faol',branch:'Markaziy' },
-{ id:'P-00129',name:'Toshboyev Akmal',phone:'+998 91 111 22 33',dob:'1985-06-30',gender:'Erkak',last:'2026-10-12',visits:7,status:'Yangi',branch:'Yunusobod' },
-{ id:'P-00130',name:'Yo‘ldosheva Xulkar',phone:'+998 93 222 33 44',dob:'1990-12-08',gender:'Ayol',last:'2026-10-01',visits:4,status:'Nazoratda',branch:'Chilonzor' },
-{ id:'P-00131',name:'Karimov Rustam',phone:'+998 90 333 44 55',dob:'1982-09-17',gender:'Erkak',last:'2026-09-28',visits:15,status:'Faol',branch:'Markaziy' },
-{ id:'P-00132',name:'Saidova Barno',phone:'+998 91 555 66 77',dob:'1998-04-25',gender:'Ayol',last:'2026-10-08',visits:3,status:'Yangi',branch:'Yunusobod' }
-])
-const search=ref(''), gender=ref(''), status=ref(''), branch=ref(''), visitRange=ref(''), tab=ref('Barcha bemorlar'), page=ref(1), size=ref(10)
-const selected=ref<Patient|null>(null), mode=ref<'view'|'edit'|'create'>('view'), notice=ref('')
-const form=ref({name:'',phone:'',dob:'',gender:'Ayol' as 'Ayol'|'Erkak',branch:'Markaziy'})
-const tabs=['Barcha bemorlar','Yangi','Faol','Nazoratda']
-const count=(t:string)=>t==='Barcha bemorlar'?patients.value.length:patients.value.filter(p=>p.status===t).length
-const days=(date:string)=>date?Math.floor((new Date('2026-10-16T12:00:00').getTime()-new Date(date+'T12:00:00').getTime())/86400000):null
-const age=(dob:string)=>{const d=new Date(dob+'T00:00:00');let a=2026-d.getFullYear();if(d.getMonth()>9||(d.getMonth()===9&&d.getDate()>16))a--;return a}
-const filtered=computed(()=>patients.value.filter(p=>{
- const q=search.value.toLowerCase().trim(), d=days(p.last)
- return (!q||[p.name,p.id,p.phone].some(x=>x.toLowerCase().includes(q)))&&(!gender.value||p.gender===gender.value)&&(!status.value||p.status===status.value)&&(!branch.value||p.branch===branch.value)&&(tab.value==='Barcha bemorlar'||p.status===tab.value)&&(!visitRange.value||(d!==null&&(visitRange.value==='7'?d<=7:visitRange.value==='30'?d<=30:d>30)))
-}))
-const totalPages=computed(()=>Math.max(1,Math.ceil(filtered.value.length/size.value)))
-const currentPage=computed(()=>Math.min(page.value,totalPages.value))
-const visible=computed(()=>filtered.value.slice((currentPage.value-1)*size.value,currentPage.value*size.value))
-function create(){selected.value=null;mode.value='create';form.value={name:'',phone:'',dob:'',gender:'Ayol',branch:'Markaziy'}}
-function edit(p:Patient){selected.value=p;mode.value='edit';form.value={name:p.name,phone:p.phone,dob:p.dob,gender:p.gender,branch:p.branch}}
-function close(){selected.value=null;mode.value='view'}
-function save(){if(!form.value.name.trim()||!form.value.phone.trim()||!form.value.dob){notice.value='Majburiy maydonlarni to‘ldiring.';return}
- if(mode.value==='edit'&&selected.value) Object.assign(selected.value,form.value)
- else {const n=Math.max(132,...patients.value.map(p=>Number(p.id.slice(2))))+1;patients.value.unshift({...form.value,id:'P-'+String(n).padStart(5,'0'),last:'',visits:0,status:'Yangi'})}
- notice.value=mode.value==='edit'?'Bemor yangilandi (demo).':'Bemor qo‘shildi (demo).';page.value=1;close()}
-function exportCsv(){const rows=[['ID','F.I.Sh.','Telefon','Tug‘ilgan sana','Jinsi','Oxirgi tashrif','Tashriflar','Holat','Filial'],...filtered.value.map(p=>[p.id,p.name,p.phone,p.dob,p.gender,p.last,String(p.visits),p.status,p.branch])];const content='\uFEFF'+rows.map(r=>r.map(v=>'"'+v.replace(/"/g,'""')+'"').join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='bemorlar.csv';a.click();URL.revokeObjectURL(url)}
+import { computed, ref, watch } from "vue";
+import axios from "axios";
+import {
+  Search,
+  Plus,
+  Users,
+  Download,
+  Eye,
+  Pencil,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from "lucide-vue-next";
+import ApiState from "../components/operations/ApiState.vue";
+import { useClinicList } from "../composables/useClinicList";
+import { clinicRequest, errorText, downloadBlob } from "../services/api";
+import { can, session, selectBranch } from "../services/session";
+import type { Patient as RecordPatient } from "../services/operations";
+type Patient = RecordPatient & {
+  dob: string;
+  last: string;
+  visits: string;
+  status: string;
+  branch: string;
+};
+const search = ref(""),
+  gender = ref(""),
+  status = ref(""),
+  visitRange = ref(""),
+  tab = ref("Barcha bemorlar"),
+  size = ref(10);
+const branch = computed({ get: () => session.branch, set: selectBranch });
+const list = useClinicList<RecordPatient>(
+  "patients",
+  () => ({
+    ...(search.value.trim() ? { q: search.value.trim() } : {}),
+    per_page: size.value,
+    status: tab.value === "Faol" ? "active" : "all",
+  }),
+  () => can("patients.view"),
+);
+const { page, loading, error, load, total } = list;
+function present(p: RecordPatient): Patient {
+  return {
+    ...p,
+    dob: p.date_of_birth,
+    gender:
+      p.gender === "female" ? "Ayol" : p.gender === "male" ? "Erkak" : "—",
+    last: "",
+    visits: "—",
+    status: p.archived_at ? "Arxiv" : "Faol",
+    branch: p.branch_ids
+      .map((id) => session.branches.find((b) => b.id === id)?.name ?? id)
+      .join(", "),
+  };
+}
+const patients = computed(() => list.rows.value.map(present));
+const visible = patients,
+  currentPage = page,
+  totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
+const pageNumbers = computed(() =>
+  Array.from(
+    { length: Math.min(7, totalPages.value) },
+    (_, i) => Math.max(1, Math.min(page.value - 3, totalPages.value - 6)) + i,
+  ),
+);
+const selected = ref<Patient | null>(null),
+  mode = ref<"view" | "edit" | "create">("view"),
+  notice = ref(""),
+  saving = ref(false),
+  etag = ref(""),
+  detailLoading = ref(false);
+const form = ref({ name: "", phone: "", dob: "", gender: "Ayol", branch: "" });
+const tabs = ["Barcha bemorlar", "Yangi", "Faol", "Nazoratda"];
+const count = (t: string) =>
+  t === tab.value && !loading.value && !error.value ? total.value : "—";
+const age = (s: string) => {
+  const d = new Date(s),
+    n = new Date();
+  return (
+    n.getFullYear() -
+    d.getFullYear() -
+    (n.getMonth() < d.getMonth() ||
+    (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())
+      ? 1
+      : 0)
+  );
+};
+let detailSequence = 0;
+function create() {
+  detailSequence++;
+  detailLoading.value = false;
+  selected.value = null;
+  mode.value = "create";
+  form.value = {
+    name: "",
+    phone: "",
+    dob: "",
+    gender: "Ayol",
+    branch:
+      session.branch ||
+      (session.branches.length === 1 ? session.branches[0]!.id : ""),
+  };
+  notice.value = "";
+}
+async function open(p: Patient, next: "view" | "edit") {
+  const sequence = ++detailSequence;
+  detailLoading.value = true;
+  notice.value = "";
+  selected.value = null;
+  mode.value = "view";
+  try {
+    const r = await clinicRequest<RecordPatient>("patients/" + p.id);
+    if (sequence !== detailSequence) return;
+    etag.value = String(r.headers.etag ?? "");
+    selected.value = present(r.data);
+    mode.value = next;
+    form.value = {
+      name: r.data.name,
+      phone: r.data.phone ?? "",
+      dob: r.data.date_of_birth,
+      gender:
+        r.data.gender === "male"
+          ? "Erkak"
+          : r.data.gender === "female"
+            ? "Ayol"
+            : "—",
+      branch: r.data.branch_ids[0] ?? "",
+    };
+  } catch (e) {
+    if (sequence === detailSequence && !axios.isCancel(e))
+      notice.value = errorText(e);
+  } finally {
+    if (sequence === detailSequence) detailLoading.value = false;
+  }
+}
+const edit = (p: Patient) => open(p, "edit");
+function close() {
+  detailSequence++;
+  detailLoading.value = false;
+  selected.value = null;
+  mode.value = "view";
+  etag.value = "";
+  form.value = { name: "", phone: "", dob: "", gender: "Ayol", branch: "" };
+}
+async function save() {
+  if (saving.value) return;
+  saving.value = true;
+  notice.value = "";
+  try {
+    const payload = {
+      name: form.value.name,
+      phone: form.value.phone || null,
+      date_of_birth: form.value.dob,
+      gender:
+        form.value.gender === "Ayol"
+          ? "female"
+          : form.value.gender === "Erkak"
+            ? "male"
+            : "unspecified",
+    };
+    if (mode.value === "edit" && selected.value) {
+      if (!etag.value) throw Error("Versiya olinmadi. Bemorni qayta oching.");
+      await clinicRequest("patients/" + selected.value.id, {
+        method: "PATCH",
+        body: payload,
+        etag: etag.value,
+      });
+    } else
+      await clinicRequest("patients", {
+        method: "POST",
+        body: { ...payload, branch_id: form.value.branch },
+      });
+    notice.value = "Ma’lumot saqlandi.";
+    close();
+    await load();
+  } catch (e) {
+    if (!axios.isCancel(e)) notice.value = errorText(e);
+  } finally {
+    saving.value = false;
+  }
+}
+async function exportCsv() {
+  try {
+    const r = await clinicRequest<Blob>("patients/export", {
+      download: true,
+      params: {
+        ...(search.value.trim() ? { q: search.value.trim() } : {}),
+        status: tab.value === "Faol" ? "active" : "all",
+        ...(session.branch ? { branch_id: session.branch } : {}),
+      },
+    });
+    downloadBlob(r.data, "bemorlar.csv");
+  } catch (e) {
+    if (!axios.isCancel(e)) notice.value = errorText(e);
+  }
+}
+watch([search, tab, size], () => {
+  page.value = 1;
+});
 </script>
-
 <template>
-<section class="patients">
- <header class="patients-header"><div><h1>Bemorlar</h1><p>Barcha bemorlar ro‘yxati va asosiy ma’lumotlari</p></div><div class="patients-head-actions"><div class="patients-total"><Users :size="23"/><span>Jami bemorlar:<strong>{{patients.length}}</strong></span></div><button class="patients-primary" @click="create"><Plus :size="20"/> Yangi bemor</button></div></header>
- <div v-if="notice" class="patients-notice">{{notice}} <button @click="notice=''" aria-label="Yopish"><X :size="16"/></button></div>
- <div class="patients-filterbar"><label class="patients-search"><Search :size="19"/><input v-model="search" @input="page=1" placeholder="Bemorni qidirish (F.I.Sh., ID yoki telefon)..."/></label><label class="patients-filter"><small>Jins</small><select v-model="gender" @change="page=1"><option value="">Barchasi</option><option>Ayol</option><option>Erkak</option></select></label><label class="patients-filter"><small>Holat</small><select v-model="status" @change="page=1"><option value="">Barchasi</option><option>Faol</option><option>Nazoratda</option><option>Yangi</option></select></label><label class="patients-filter"><small>Oxirgi tashrif</small><select v-model="visitRange" @change="page=1"><option value="">Barchasi</option><option value="7">So‘nggi 7 kun</option><option value="30">So‘nggi 30 kun</option><option value="old">30 kundan oldin</option></select></label><label class="patients-filter"><small>Filial</small><select v-model="branch" @change="page=1"><option value="">Barchasi</option><option>Markaziy</option><option>Chilonzor</option><option>Yunusobod</option></select></label><button class="patients-export" @click="exportCsv"><Download :size="18"/> Eksport</button></div>
- <div class="patients-panel"><nav class="patients-tabs"><button v-for="t in tabs" :key="t" :class="{active:tab===t}" @click="tab=t;page=1">{{t}} <span>{{count(t)}}</span></button></nav>
- <div class="patients-table-wrap"><table><thead><tr><th>#</th><th>ID</th><th>F.I.Sh.</th><th>Telefon</th><th>Tug‘ilgan sana</th><th>Jinsi</th><th>Oxirgi tashrif</th><th>Tashriflar soni</th><th>Holati</th><th>Amallar</th></tr></thead><tbody><tr v-for="(p,i) in visible" :key="p.id"><td>{{(currentPage-1)*size+i+1}}</td><td class="patients-muted">{{p.id}}</td><td><div class="patients-person"><span class="patients-avatar">{{p.name.split(' ').map(s=>s[0]).join('').slice(0,2)}}</span><div><strong>{{p.name}}</strong><small>{{p.id}}</small></div></div></td><td class="patients-muted">{{p.phone}}</td><td>{{p.dob}}<small class="patients-sub">({{age(p.dob)}} yosh)</small></td><td><span class="patients-gender" :class="p.gender">{{p.gender}}</span></td><td>{{p.last||'—'}}<small class="patients-sub">{{days(p.last)===null?'Hali tashrif yo‘q':days(p.last)===0?'Bugun':`${days(p.last)} kun oldin`}}</small></td><td>{{p.visits}}</td><td><span class="patients-status" :class="p.status">● {{p.status}}</span></td><td><div class="patients-actions"><button class="view" @click="selected=p;mode='view'"><Eye :size="14"/> Ko‘rish</button><button @click="edit(p)"><Pencil :size="14"/> Tahrirlash</button><button class="dots" aria-label="Batafsil" @click="selected=p;mode='view'"><MoreHorizontal :size="18"/></button></div></td></tr><tr v-if="!visible.length"><td colspan="10" class="patients-empty">Bemor topilmadi.</td></tr></tbody></table></div>
- <footer class="patients-footer"><div>Sahifada: <select v-model.number="size" @change="page=1"><option :value="5">5</option><option :value="10">10</option><option :value="20">20</option></select><span>{{filtered.length?(currentPage-1)*size+1:0}}–{{Math.min(currentPage*size,filtered.length)}} dan {{filtered.length}} ta bemor</span></div><div class="patients-pages"><button :disabled="currentPage===1" @click="page--"><ChevronLeft :size="16"/> Oldingi</button><button v-for="i in totalPages" :key="i" :class="{active:i===currentPage}" @click="page=i">{{i}}</button><button :disabled="currentPage===totalPages" @click="page++">Keyingi <ChevronRight :size="16"/></button></div></footer></div>
- <div v-if="selected||mode==='create'" class="patients-overlay" @click.self="close"><div class="patients-modal" role="dialog" aria-modal="true"><header><h2>{{mode==='create'?'Yangi bemor':mode==='edit'?'Bemorni tahrirlash':'Bemor ma’lumotlari'}}</h2><button @click="close" aria-label="Yopish"><X :size="20"/></button></header><form v-if="mode!=='view'" @submit.prevent="save"><label>F.I.Sh. *<input v-model="form.name" required/></label><label>Telefon *<input v-model="form.phone" required/></label><label>Tug‘ilgan sana *<input v-model="form.dob" type="date" required/></label><label>Jinsi<select v-model="form.gender"><option>Ayol</option><option>Erkak</option></select></label><label>Filial<select v-model="form.branch"><option>Markaziy</option><option>Chilonzor</option><option>Yunusobod</option></select></label><div class="patients-modal-footer"><button type="button" @click="close">Bekor qilish</button><button class="patients-primary" type="submit">Saqlash</button></div></form><div v-else-if="selected" class="patients-details"><p><b>ID:</b> {{selected.id}}</p><p><b>F.I.Sh.:</b> {{selected.name}}</p><p><b>Telefon:</b> {{selected.phone}}</p><p><b>Tug‘ilgan sana:</b> {{selected.dob}}</p><p><b>Jinsi:</b> {{selected.gender}}</p><p><b>Oxirgi tashrif:</b> {{selected.last||'—'}}</p><p><b>Tashriflar:</b> {{selected.visits}}</p><p><b>Holati:</b> {{selected.status}}</p><p><b>Filial:</b> {{selected.branch}}</p><button class="patients-primary" @click="edit(selected)">Tahrirlash</button></div></div></div>
+<section class="patients"><ApiState :loading="loading||detailLoading" :error="error" @retry="load"/>
+ <header class="patients-header"><div><h1>Bemorlar</h1><p>Barcha bemorlar ro‘yxati va asosiy ma’lumotlari</p></div><div class="patients-head-actions"><div class="patients-total"><Users :size="23"/><span>Jami bemorlar:<strong>{{loading||error?'—':total}}</strong></span></div><button class="patients-primary" v-if="can('patients.create')" @click="create"><Plus :size="20"/> Yangi bemor</button></div></header>
+ <div v-if="notice" class="patients-notice" role="status">{{notice}} <button @click="notice=''" aria-label="Yopish"><X :size="16"/></button></div>
+ <div class="patients-filterbar"><label class="patients-search"><Search :size="19"/><input v-model="search" maxlength="100" @input="page=1" placeholder="F.I.Sh., bemor raqami yoki telefon..."/></label><label class="patients-filter"><small>Jins</small><select disabled title="API filtri mavjud emas" v-model="gender" @change="page=1"><option value="">Barchasi</option><option>Ayol</option><option>Erkak</option></select></label><label class="patients-filter"><small>Holat</small><select disabled title="API filtri mavjud emas" v-model="status" @change="page=1"><option value="">Barchasi</option><option>Faol</option><option disabled>Nazoratda — API mavjud emas</option><option disabled>Yangi — API mavjud emas</option></select></label><label class="patients-filter"><small>Oxirgi tashrif</small><select disabled title="API filtri mavjud emas" v-model="visitRange" @change="page=1"><option value="">Barchasi</option><option value="7">So‘nggi 7 kun</option><option value="30">So‘nggi 30 kun</option><option value="old">30 kundan oldin</option></select></label><label class="patients-filter"><small>Filial</small><select aria-label="Filial filtri" v-model="branch" @change="page=1"><option value="">Barchasi</option><option v-for="b in session.branches" :key="b.id" :value="b.id">{{b.name}}</option></select></label><button class="patients-export" v-if="can('patients.export')" @click="exportCsv"><Download :size="18"/> Eksport</button></div>
+ <div class="patients-panel"><nav class="patients-tabs"><button v-for="t in tabs" :key="t" :class="{active:tab===t}" :disabled="['Yangi','Nazoratda'].includes(t)" :title="['Yangi','Nazoratda'].includes(t)?'Bu holat API’da mavjud emas':''" @click="tab=t;page=1">{{t}} <span>{{count(t)}}</span></button></nav>
+ <div class="patients-table-wrap"><table><thead><tr><th>#</th><th>ID</th><th>F.I.Sh.</th><th>Telefon</th><th>Tug‘ilgan sana</th><th>Jinsi</th><th>Oxirgi tashrif</th><th>Tashriflar soni</th><th>Holati</th><th>Amallar</th></tr></thead><tbody><tr v-for="(p,i) in visible" :key="p.id"><td>{{(currentPage-1)*size+i+1}}</td><td class="patients-muted">{{p.patient_number}}</td><td><div class="patients-person"><span class="patients-avatar">{{p.name.split(' ').map(s=>s[0]).join('').slice(0,2)}}</span><div><strong>{{p.name}}</strong><small>{{p.patient_number}}</small></div></div></td><td class="patients-muted">{{p.phone||'—'}}</td><td>{{p.dob}}<small v-if="p.dob" class="patients-sub">({{age(p.dob)}} yosh)</small></td><td><span class="patients-gender" :class="p.gender">{{p.gender}}</span></td><td>{{p.last||'—'}}<small class="patients-sub">Tashrif statistikasi API’da yo‘q</small></td><td>{{p.visits}}</td><td><span class="patients-status" :class="p.status">● {{p.status}}</span></td><td><div class="patients-actions"><button class="view" @click="open(p,'view')"><Eye :size="14"/> Ko‘rish</button><button v-if="can('patients.update')&&!p.archived_at" @click="edit(p)"><Pencil :size="14"/> Tahrirlash</button><button class="dots" aria-label="Batafsil" @click="open(p,'view')"><MoreHorizontal :size="18"/></button></div></td></tr><tr v-if="!loading&&!error&&!visible.length"><td colspan="10" class="patients-empty">Bemor topilmadi.</td></tr></tbody></table></div>
+ <footer class="patients-footer"><div>Sahifada: <select v-model.number="size" @change="page=1"><option :value="5">5</option><option :value="10">10</option><option :value="20">20</option></select><span>{{total?(currentPage-1)*size+1:0}}–{{Math.min(currentPage*size,total)}} dan {{total}} ta bemor</span></div><div class="patients-pages"><button :disabled="loading||currentPage===1" @click="page--"><ChevronLeft :size="16"/> Oldingi</button><button v-for="i in pageNumbers" :key="i" :class="{active:i===currentPage}" @click="page=i">{{i}}</button><button :disabled="loading||currentPage>=totalPages" @click="page++">Keyingi <ChevronRight :size="16"/></button></div></footer></div>
+ <div v-if="selected||mode==='create'" class="patients-overlay" @click.self="!saving&&close()"><div class="patients-modal" role="dialog" aria-modal="true"><header><h2>{{mode==='create'?'Yangi bemor':mode==='edit'?'Bemorni tahrirlash':'Bemor ma’lumotlari'}}</h2><button :disabled="saving" @click="close" aria-label="Yopish"><X :size="20"/></button></header><p v-if="notice" class="patients-notice" role="alert">{{notice}}</p><form v-if="mode!=='view'" @submit.prevent="save"><label>F.I.Sh. *<input v-model="form.name" maxlength="255" required/></label><label>Telefon<input v-model="form.phone" maxlength="32"/></label><label>Tug‘ilgan sana *<input v-model="form.dob" type="date" required/></label><label>Jinsi<select v-model="form.gender"><option>Ayol</option><option>Erkak</option><option value="—">Ko‘rsatilmagan</option></select></label><label v-if="mode==='create'">Filial<select aria-label="Filial" required v-model="form.branch"><option value="">Filialni tanlang</option><option v-for="b in session.branches" :key="b.id" :value="b.id">{{b.name}}</option></select></label><div class="patients-modal-footer"><button :disabled="saving" type="button" @click="close">Bekor qilish</button><button :disabled="saving" class="patients-primary" type="submit">Saqlash</button></div></form><div v-else-if="selected" class="patients-details"><p><b>ID:</b> {{selected.patient_number}}</p><p><b>F.I.Sh.:</b> {{selected.name}}</p><p><b>Telefon:</b> {{selected.phone}}</p><p><b>Tug‘ilgan sana:</b> {{selected.dob}}</p><p><b>Jinsi:</b> {{selected.gender}}</p><p><b>Oxirgi tashrif:</b> {{selected.last||'—'}}</p><p><b>Tashriflar:</b> {{selected.visits}}</p><p><b>Holati:</b> {{selected.status}}</p><p><b>Filial:</b> {{selected.branch}}</p><button class="patients-primary" v-if="can('patients.update')&&!selected.archived_at" @click="edit(selected)">Tahrirlash</button></div></div></div>
 </section>
 </template>
 

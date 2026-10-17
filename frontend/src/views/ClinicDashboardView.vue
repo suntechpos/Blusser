@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {session,selectClinic} from '../services/session'
+import {errorText} from '../services/api'
 import NavbatlarView from "./NavbatlarView.vue"
 import TabloBoshqaruviView from "./TabloBoshqaruviView.vue"
 import QabullarView from "./QabullarView.vue"
@@ -13,9 +15,12 @@ import {
   BriefcaseMedical, LogOut, BedDouble
 } from 'lucide-vue-next'
 
-/** Demo UI only: NO patient data, clinic API or tenant access is used here. */
+/** Shared authenticated shell. Only Patients is connected; other pages retain the demo banner. */
 const emit = defineEmits<{ logout: [] }>()
-const activeItem = ref('Bosh sahifa')
+const activeItem = ref(window.location.hash === '#bemorlar' ? 'Bemorlar' : 'Bosh sahifa')
+function navigate(label:string){activeItem.value=label;window.location.hash=label==='Bemorlar'?'bemorlar':''}
+const activeClinic=computed(()=>session.clinics.find(c=>c.id===session.user?.active_tenant_id))
+async function changeClinic(e:Event){try{await selectClinic((e.target as HTMLSelectElement).value)}catch(error){session.error=errorText(error)}}
 const period = ref('Bugun, 15 oktabr 2026')
 const branch = ref('Barcha filiallar')
 const sidebarOpen = ref(true)
@@ -27,8 +32,9 @@ function closeProfileOutside(event: MouseEvent) {
     profileOpen.value = false
   }
 }
-onMounted(() => document.addEventListener('click', closeProfileOutside))
-onUnmounted(() => document.removeEventListener('click', closeProfileOutside))
+function syncHash(){if(window.location.hash==='#bemorlar')activeItem.value='Bemorlar';else if(activeItem.value==='Bemorlar')activeItem.value='Bosh sahifa'}
+onMounted(()=>{document.addEventListener('click',closeProfileOutside);window.addEventListener('hashchange',syncHash)})
+onUnmounted(()=>{document.removeEventListener('click',closeProfileOutside);window.removeEventListener('hashchange',syncHash)})
 
 const groups = [
   { label: '', items: [{ label: 'Bosh sahifa', icon: Home }] },
@@ -86,7 +92,7 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
       <nav class="clinic-menu" aria-label="Klinika bo‘limlari">
         <div v-for="(group, g) in groups" :key="g" class="clinic-nav-group">
           <div v-if="group.label" class="clinic-group-label">{{ group.label }}</div>
-          <button v-for="item in group.items" :key="item.label" type="button" class="clinic-nav-item" :class="{ selected: activeItem === item.label }" @click="activeItem = item.label">
+          <button v-for="item in group.items" :key="item.label" type="button" class="clinic-nav-item" :class="{ selected: activeItem === item.label }" @click="navigate(item.label)">
             <component :is="item.icon" :size="20" :stroke-width="2" /><span>{{ item.label }}</span>
           </button>
         </div>
@@ -95,30 +101,30 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
     <div class="clinic-workspace">
       <header class="clinic-topbar">
         <button class="clinic-icon-btn" aria-label="Menyuni ochish/yopish" @click="sidebarOpen = !sidebarOpen"><Menu :size="23" /></button>
-        <button class="clinic-selector"><Building2 :size="20" /> Shifo Med Klinikasi <ChevronDown :size="17" /></button>
+        <label class="clinic-selector"><Building2 :size="20"/><select style="background:transparent;border:0;font:inherit;color:inherit;max-width:220px" aria-label="Faol klinika" :value="session.user?.active_tenant_id" :disabled="session.switching" @change="changeClinic($event)"><option v-for="c in session.clinics" :key="c.id" :value="c.id">{{c.name}}</option></select></label>
         <div class="clinic-search"><Search :size="19" /><span>Bemor qidirish (F.I.Sh. yoki telefon)...</span><kbd>Ctrl + K</kbd></div>
-        <button class="clinic-icon-btn clinic-notify" aria-label="Bildirishnomalar"><Bell :size="21" /><span>3</span></button>
+        <button class="clinic-icon-btn clinic-notify" aria-label="Bildirishnomalar" title="Bildirishnomalar API’ga ulanmagan"><Bell :size="21" /><span v-if="activeItem!=='Bemorlar'">3</span></button>
         <div class="clinic-profile-wrap" ref="profileRef">
           <button type="button" class="clinic-user clinic-profile-trigger"
             :aria-expanded="profileOpen" aria-label="Profil menyusi"
             @click="profileOpen = !profileOpen">
-            <span class="clinic-avatar">GK</span>
+            <span class="clinic-avatar">{{session.user?.login.slice(0,2).toUpperCase()}}</span>
             <span class="clinic-profile-name">
-              <strong>Gulnoza Karimova</strong>
-              <small>Administrator</small>
+              <strong>{{session.user?.login}}</strong>
+              <small>{{activeClinic?.role}}</small>
             </span>
             <ChevronDown :size="16" />
           </button>
           <div v-if="profileOpen" class="clinic-profile-menu">
             <div class="clinic-profile-title">
-              <strong>Gulnoza Karimova</strong>
-              <small>Administrator · Shifo Med Klinikasi</small>
+              <strong>{{session.user?.login}}</strong>
+              <small>{{activeClinic?.role}} · {{activeClinic?.name}}</small>
             </div>
             <div class="clinic-profile-row">
-              <span>Lavozim</span><strong>Administrator</strong>
+              <span>Lavozim</span><strong>{{activeClinic?.role}}</strong>
             </div>
             <div class="clinic-profile-row">
-              <span>Klinika</span><strong>Shifo Med Klinikasi</strong>
+              <span>Klinika</span><strong>{{activeClinic?.name}}</strong>
             </div>
             <button type="button" class="clinic-profile-exit"
               @click="profileOpen = false; emit('logout')">
@@ -127,8 +133,8 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
           </div>
         </div>
       </header>
-      <main class="clinic-main">
-        <div class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
+      <main class="clinic-main" :key="session.epoch">
+        <div v-if="activeItem!=='Bemorlar'" class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
         <template v-if="activeItem === 'Bosh sahifa'">
           <div class="clinic-page-head"><div><h1>Xush kelibsiz, Gulnoza!</h1><p>Bugungi klinika faoliyati haqida umumiy ma’lumot</p></div><div class="clinic-filters"><button><CalendarDays :size="18" />{{ period }}<ChevronDown :size="16" /></button><button><MapPin :size="19" />{{ branch }}<ChevronDown :size="16" /></button></div></div>
           <section class="clinic-stats"><div v-for="(m,i) in metrics" :key="m.label" class="clinic-stat" :class="m.cls"><span class="clinic-stat-icon"><component :is="m.icon" :size="28" /></span><div class="clinic-stat-detail"><span class="clinic-stat-label">{{ m.label }}</span><div class="clinic-stat-value">{{ m.value }}<small v-if="i===4"> so‘m</small> <em v-if="m.change">↑ {{ m.change }}</em><small v-if="i===3"> bemor</small></div><span class="clinic-stat-note">{{ m.note }}</span></div></div></section>

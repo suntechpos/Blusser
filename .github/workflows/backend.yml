@@ -28,9 +28,29 @@ jobs:
           docker compose run --rm test vendor/bin/pint --test
           docker compose run --rm test composer validate --strict
           docker compose run --rm test composer check-platform-reqs
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend typecheck, unit tests and production build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build
+      - name: Prepare synthetic browser fixtures in blusser_test only
+        run: |
+          docker compose run --rm test php artisan test --filter=BrowserFixtureTest
+          printf 'services:\n  backend:\n    environment:\n      DB_DATABASE: blusser_test\n' > /tmp/blusser-browser.yaml
+          docker compose -f compose.yaml -f /tmp/blusser-browser.yaml up -d --wait backend
+      - name: Browser regression with real Sanctum sessions
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:browser
       - name: HTTP smoke
         run: |
-          docker compose up -d --wait backend
           curl --fail --silent http://localhost:8000/api/v1/health
       - name: Clean disposable CI database
         if: always()
