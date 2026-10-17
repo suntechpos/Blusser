@@ -333,3 +333,13 @@ scheduling_idempotency and append-only scheduling_changes. Tenant-composite
 relationships include branch in room references. Runtime has no direct DML.
 See [Stage 3](sprint-3-stage-3.md) for live eligibility, protected commands,
 transaction lock order, deployment/backfill and non-destructive rollback.
+
+## Sprint 3 stage 4 — bookings and actual attendance
+
+Migration 000009 adds appointments, visits, resource_reservations, queue_tickets,
+queue_counters, operation_events and operation_idempotency, all with FORCE RLS.
+btree_gist in a dedicated schema enforces active doctor/room [) interval exclusions.
+Tenant-composite and deferred consistency constraints preserve one shared
+appointment/Visit reservation; typed event FKs avoid unchecked polymorphic IDs.
+See [Stage 4](sprint-3-stage-4.md) for protected commands, actual care-based own
+visibility, archive/schedule guards, deployment and non-destructive rollback.

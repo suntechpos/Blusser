@@ -38,7 +38,7 @@ final class SchedulingController
         $filters = $this->filters($request, true);
 
         return response()->json(app(Availability::class)->get($request->user(), $this->tenant($request), $request->route('doctor'), $filters))
-            ->header('X-Availability-Mode', 'schedule-only');
+            ->header('X-Availability-Mode', 'current-occupancy-hint');
     }
 
     private function write(Request $request, string $action, int $status)

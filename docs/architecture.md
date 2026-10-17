@@ -379,3 +379,12 @@ room and schedule reference APIs. Approved extensions: existing-clinic timezone
 backfill to Asia/Tashkent and specialties POST/PUT using doctors.create/update.
 Availability is explicitly schedule-only until Stage 4; patient own scope stays
 fail-closed. No clinical grants or platform bypass are introduced.
+
+## Sprint 3 stage 4 — Appointments and Visits
+
+[Stage 4 delivery](sprint-3-stage-4.md) adds exclusion-protected shared occupancy,
+versioned appointments, separate Visits and typed event history. The owner-approved
+minimal queue foundation creates only internal waiting tickets/counters; no public
+Queue actions are enabled. Real active care relations now gate patient own scope,
+and active attendance blocks archive. Availability incorporates current occupancy
+while remaining a hint. Platform identities receive no clinical bypass.

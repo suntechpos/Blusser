@@ -31,7 +31,7 @@ final class TenantContext
             if (! $connection->selectOne('SELECT public.is_active_member(?::uuid) AS allowed', [$tenantId])->allowed) {
                 throw new NotFoundHttpException;
             }
-            $connection->select("SELECT set_config('app.tenant_id', ?, true)", [$tenantId]);
+            $connection->select("SELECT set_config('app.tenant_id', ?, true), set_config('app.credential_version', ?, true)", [$tenantId, (string) $actor->credential_version]);
 
             return $operation();
         });
