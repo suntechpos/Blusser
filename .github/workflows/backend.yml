@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
+      - name: Test local provisioning helper
+        run: python3 -m unittest discover -s scripts/tests -v
       - name: Generate ephemeral local credentials
         run: ./scripts/init-local-env
       - name: Build backend

@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Local-only provisioning via real Sanctum APIs; credentials/cookies stay in memory."""
+import argparse
+import getpass
+import http.cookiejar
+import json
+import re
+import secrets
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+import warnings
+
+
+class SetupError(Exception):
+    pass
+
+
+def local_url(value):
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        port = parsed.port
+        if (parsed.scheme not in ("http", "https")
+                or parsed.hostname not in ("localhost", "127.0.0.1", "::1")
+                or parsed.username is not None or parsed.password is not None
+                or parsed.path not in ("", "/") or parsed.query or parsed.fragment
+                or port == 0):
+            raise ValueError
+    except ValueError:
+        raise SetupError("Faqat localhost/loopback manzilini credentials va pathsiz kiriting.") from None
+    return value.rstrip("/")
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None  # Never forward cookies, CSRF or credential payloads to a redirect.
+
+
+class Api:
+    def __init__(self, base, origin):
+        self.base, self.origin = local_url(base), local_url(origin)
+        a, b = urllib.parse.urlsplit(self.base), urllib.parse.urlsplit(self.origin)
+        if (a.scheme, a.hostname) != (b.scheme, b.hostname):
+            raise SetupError("API va frontend Origin uchun bir xil sxema/hostname ishlating.")
+        self.cookies = http.cookiejar.CookieJar()  # No disk cookie jar or state file.
+        self.opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), NoRedirect(),
+            urllib.request.HTTPCookieProcessor(self.cookies))
+        self.authenticated = False
+
+    def request(self, method, path, data=None, expected=200):
+        headers = {"Accept": "application/json", "Origin": self.origin}
+        if method != "GET":
+            token = next((c.value for c in self.cookies
+                          if c.name == "XSRF-TOKEN" and not c.is_expired()), None)
+            if token is None:
+                raise SetupError("CSRF cookie yo‘q. Local HTTP cookie sozlamalarini tekshiring.")
+            headers["X-XSRF-TOKEN"] = urllib.parse.unquote(token)
+            headers["Content-Type"] = "application/json"
+        payload = json.dumps(data).encode() if data is not None else None
+        req = urllib.request.Request(self.base + path, data=payload, headers=headers, method=method)
+        try:
+            with self.opener.open(req, timeout=30) as response:
+                if response.status != expected:
+                    raise SetupError("API kutilmagan HTTP status qaytardi.")
+                raw = response.read(1024 * 1024 + 1)
+        except urllib.error.HTTPError as error:
+            code = error.code
+            error.close()  # Never print response bodies: validation may reflect input.
+            hints = {401: "Kirish rad etildi yoki sessiya tugadi.",
+                     403: "Ruxsat yo‘q; platform/CEO vakolatlarini tekshiring.",
+                     404: "Resurs yoki API topilmadi.", 409: "Login/slug/kod konflikti.",
+                     419: "CSRF yoki sessiya mos kelmadi.",
+                     422: "Kiritilgan maydonlar yoki parol talablarini tekshiring.",
+                     429: "Urinishlar cheklangan; biroz kuting."}
+            raise SetupError(f"HTTP {code}: " + hints.get(code, "API so‘rovi bajarilmadi.")) from None
+        except (urllib.error.URLError, TimeoutError, OSError):
+            raise SetupError("API bilan aloqa uzildi. Yozish avtomatik takrorlanmadi; natija noma’lum bo‘lishi mumkin.") from None
+        if expected == 204:
+            return None
+        try:
+            if len(raw) > 1024 * 1024:
+                raise ValueError
+            result = json.loads(raw)
+            if not isinstance(result, dict):
+                raise ValueError
+            return result
+        except (ValueError, UnicodeError):
+            raise SetupError("API javobi kutilgan JSON formatida emas.") from None
+
+    def login(self, login, password):
+        self.request("GET", "/sanctum/csrf-cookie", expected=204)
+        user = self.request("POST", "/api/v1/auth/login", {"login": login, "password": password})
+        self.authenticated = True
+        return user
+
+    def rows(self, path):
+        for page in range(1, 100001):
+            rows = self.request("GET", path + "?" + urllib.parse.urlencode({"page": page}))["data"]
+            if not isinstance(rows, list):
+                raise SetupError("API ro‘yxat formati noto‘g‘ri.")
+            yield from rows
+            if len(rows) < 50:
+                return
+        raise SetupError("API sahifalash chegarasiga yetildi.")
+
+    def close(self):
+        try:
+            if self.authenticated:
+                self.request("POST", "/api/v1/auth/logout", {}, expected=204)
+        except SetupError:
+            print("Eslatma: skript sessiyasini serverda yopish tasdiqlanmadi; cookie xotiradan o‘chirildi.", file=sys.stderr)
+        finally:
+            self.cookies.clear()
+            self.authenticated = False
+
+
+def text(label, default=None, pattern=None, limit=255):
+    while True:
+        value = input(label + (f" [{default}]" if default else "") + ": ").strip() or default or ""
+        if value and len(value) <= limit and (pattern is None or re.fullmatch(pattern, value)):
+            return value
+        print("Qiymat formati/uzunligini tekshiring.")
+
+
+def password(label, confirm=False):
+    while True:
+        # Fail closed instead of getpass's normal visible-input fallback.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", getpass.GetPassWarning)
+            try:
+                value = getpass.getpass(label + ": ")
+                repeated = getpass.getpass("Tasdiqlang: ") if confirm else value
+            except getpass.GetPassWarning:
+                raise SetupError("Yashirin kiritish ishlamadi. Skriptni interaktiv WSL terminalida bajaring.") from None
+        if 12 <= len(value) <= 128 and secrets.compare_digest(value.encode(), repeated.encode()):
+            return value
+        print("Parol 12–128 belgi bo‘lsin va tasdiq bilan mos kelsin.")
+
+
+def run(base, origin):
+    platform, ceo = Api(base, origin), Api(base, origin)
+    try:
+        print("Faqat lokal muhit. Parollar va cookie’lar faylga yozilmaydi.")
+        platform_login = text("Platform admin logini", limit=64)
+        current = password("Platform admin paroli")
+        user = platform.login(platform_login, current)
+        del current
+        if user.get("is_platform_admin") is not True or user.get("must_change_password") is not False:
+            raise SetupError("To‘liq platform admin kerak. Zarur bo‘lsa avval majburiy parol almashtirishni bajaring.")
+        slug = text("Klinika slug", "blusser-local", r"[a-z0-9]+(?:-[a-z0-9]+)*", 100)
+        clinic = next((c for c in platform.rows("/api/v1/platform/clinics") if c.get("slug") == slug), None)
+        temporary = None
+        if clinic is None:
+            name = text("Klinika nomi", "Blusser Local Clinic")
+            ceo_login = text("Yangi, alohida CEO logini", pattern=r"[a-zA-Z0-9._-]{3,64}", limit=64).lower()
+            if ceo_login == platform_login.strip().lower():
+                raise SetupError("CEO logini platform loginidan alohida bo‘lishi kerak.")
+            temporary = password("CEO uchun vaqtinchalik parol", confirm=True)
+            result = platform.request("POST", "/api/v1/platform/clinics", {
+                "name": name, "slug": slug, "ceo_login": ceo_login,
+                "temporary_password": temporary}, expected=201)
+            tenant_id = str(uuid.UUID(result["tenant_id"]))
+            print("Klinika provisioning natijasi:", tenant_id)
+            if result.get("pending_consent") is not False:
+                raise SetupError("Login mavjud: klinika pending consent holatida. Parol o‘zgarmadi; mavjud consent jarayonini yakunlang.")
+        else:
+            if clinic.get("status") != "active":
+                raise SetupError("Bu slug’dagi klinika active emas. Consent/recovery jarayonini tekshiring.")
+            tenant_id = str(uuid.UUID(clinic["id"]))
+            print("Mavjud klinika qayta ishlatiladi:", tenant_id)
+            ceo_login = text("Ushbu klinikaning CEO logini", pattern=r"[a-zA-Z0-9._-]{3,64}", limit=64).lower()
+        platform.close()
+        current = temporary if temporary is not None else password("CEO joriy paroli")
+        temporary = None
+        user = ceo.login(ceo_login, current)
+        if user.get("is_platform_admin") is not False:
+            raise SetupError("Klinika uchun platform akkaunti ishlatilmaydi.")
+        if user.get("must_change_password") is True:
+            print("CEO birinchi kirish: majburiy parol almashtirish.")
+            permanent = password("CEO yangi doimiy paroli", confirm=True)
+            if secrets.compare_digest(current.encode(), permanent.encode()):
+                raise SetupError("Yangi parol vaqtinchalik paroldan farq qilishi kerak.")
+            user = ceo.request("POST", "/api/v1/auth/password", {
+                "current_password": current, "password": permanent, "password_confirmation": permanent})
+            del permanent
+        del current
+        if user.get("must_change_password") is not False:
+            raise SetupError("Majburiy parol almashtirish yakunlanmagan.")
+        clinics = ceo.request("GET", "/api/v1/auth/clinics")["data"]
+        if not any(c.get("id") == tenant_id for c in clinics):
+            raise SetupError("CEO’ning tanlangan klinikaga faol membership’i yo‘q.")
+        ceo.request("POST", "/api/v1/auth/active-clinic", {"tenant_id": tenant_id}, expected=204)
+        if ceo.request("GET", "/api/v1/auth/me").get("active_tenant_id") != tenant_id:
+            raise SetupError("Server faol klinikani tasdiqlamadi.")
+        context = ceo.request("GET", "/api/v1/clinic/context")
+        member_id = str(uuid.UUID(context["membership_id"]))
+        member = ceo.request("GET", "/api/v1/clinic/employees/" + member_id)
+        role = ceo.request("GET", "/api/v1/clinic/roles/" + str(uuid.UUID(member["role_id"])))
+        if role.get("code") != "ceo" or role.get("protected") is not True or member.get("user_id") != user.get("id"):
+            raise SetupError("Himoyalangan dastlabki CEO membership’i tasdiqlanmadi.")
+        code = text("Asosiy filial kodi", "main", limit=64)
+        branch = next((b for b in ceo.rows("/api/v1/clinic/branches") if b.get("code") == code), None)
+        if branch is None:
+            name = text("Asosiy filial nomi", "Asosiy filial")
+            result = ceo.request("POST", "/api/v1/clinic/branches", {"name": name, "code": code}, expected=201)
+            branch = ceo.request("GET", "/api/v1/clinic/branches/" + str(uuid.UUID(result["id"])))
+        if branch.get("active") is not True:
+            raise SetupError("Shu kodli filial faol emas; skript uni qayta faollashtirmaydi.")
+        ceo.request("GET", "/api/v1/clinic/patients?per_page=1")
+        print("Tayyor. Klinika:", tenant_id, "Filial:", str(uuid.UUID(branch["id"])))
+        print("Brauzerda platform akkauntidan chiqing, CEO va doimiy parol bilan kiring, /#bemorlar’ni oching.")
+    finally:
+        platform.close()
+        ceo.close()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--base-url", default="http://localhost:8000")
+    parser.add_argument("--origin", default="http://localhost:5173")
+    args, unknown = parser.parse_known_args(argv)
+    if unknown:
+        print("Noma’lum argument. Login/parollar faqat terminal promptida kiritiladi.", file=sys.stderr)
+        return 2
+    try:
+        run(args.base_url, args.origin)
+        return 0
+    except (SetupError, KeyboardInterrupt, EOFError):
+        error = sys.exc_info()[1]
+        print(str(error) if isinstance(error, SetupError) else "Terminal amali to‘xtatildi.", file=sys.stderr)
+        print("Yozishlar avtomatik takrorlanmaydi. Qisman bajarilgan bo‘lsa, ayni slug/filial kodi bilan qayta tekshiring.", file=sys.stderr)
+        return 1
+    except Exception:
+        # No traceback containing locals/request payloads in an operator terminal.
+        print("Kutilmagan API formati yoki ichki xato. Sirlarni chiqarmasdan to‘xtatildi.", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
