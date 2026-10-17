@@ -56,6 +56,27 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+  pgadmin:
+    image: dpage/pgadmin4:9.18@sha256:c332c5f6dfba995d9ebc4af261d93506d6876085d712eaaa3defc8dd1a3f26de
+    profiles: [admin]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      # Empty keeps existing Compose commands usable; pgAdmin rejects an empty password.
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-}
+      PGADMIN_DISABLE_POSTFIX: "1"
+    ports:
+      - "127.0.0.1:5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1/misc/ping', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
   migrate:
     <<: *backend
     profiles: [tools]
@@ -76,3 +97,4 @@ services:
     command: [php, artisan, test]
 volumes:
   postgres_data:
+  pgadmin_data:

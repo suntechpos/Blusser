@@ -42,6 +42,8 @@ APP_KEY — `base64:` плюс 32 случайных байта в base64. Не 
 БД не публикует порт на хост, backend доступен только на 127.0.0.1:8000.
 Изменить порт можно через BACKEND_PORT. Secure cookie отключена только для
 локального HTTP; для HTTPS укажите SESSION_SECURE_COOKIE=true.
+Локальный pgAdmin доступен отдельным профилем только на `127.0.0.1:5050`;
+настройка и подключение — [docs/local-pgadmin.md](docs/local-pgadmin.md).
 `artisan serve` и image с dev-зависимостями предназначены для локальной разработки,
 не для production deployment. Production TLS/web server и backup — следующий этап.
 
