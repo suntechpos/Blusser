@@ -33,12 +33,8 @@ async function submitLogin() {
   error.value = ''
 
   try {
-    const user = await loginUser(username.value.trim(), password.value)
+    await loginUser(username.value.trim(), password.value)
     password.value = ''
-    if (user.must_change_password) {
-      error.value = 'Parolni almashtirish talab qilinadi.'
-      return
-    }
 
     error.value = ''
     emit('authenticated')

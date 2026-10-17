@@ -8,6 +8,7 @@ use App\Modules\Platform\Http\HealthController;
 use App\Modules\Queues\Http\QueueController;
 use App\Modules\Scheduling\Http\SchedulingController;
 use App\Modules\Tenancy\Http\ClinicController;
+use App\Modules\Tenancy\Http\ContextController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/v1/health', HealthController::class);
@@ -65,6 +66,7 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                 Route::post('patients/{patient}/branches', [PatientController::class, 'link'])->whereUuid('patient');
                 Route::post('patients/{patient}/archive', [PatientController::class, 'archive'])->whereUuid('patient');
                 Route::post('patients/{patient}/restore', [PatientController::class, 'restore'])->whereUuid('patient');
+                Route::get('context', ContextController::class);
                 Route::get('permissions', [ClinicController::class, 'permissions']);
                 Route::get('roles', [ClinicController::class, 'roles']);
                 Route::get('roles/{role}', [ClinicController::class, 'roles']);

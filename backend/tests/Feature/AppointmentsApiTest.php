@@ -432,14 +432,14 @@ final class AppointmentsApiTest extends FoundationTestCase
     {
         $ids = $this->fixture();
         $db = DB::connection('migration');
-        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]));
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 3, '--force' => true]));
         $this->assertNull($db->selectOne("SELECT to_regclass('public.appointments') AS name")->name);
         $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
         $this->assertSame(2, (int) $db->selectOne("SELECT count(*) AS n FROM pg_constraint WHERE conrelid='public.resource_reservations'::regclass AND contype='x'")->n);
         $a = $this->reference($ids['a']);
         $this->command($a);
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 3, '--force' => true]);
             $this->fail('No destructive down.');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('forward migration', $e->getMessage());
