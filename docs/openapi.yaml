@@ -4031,6 +4031,2055 @@
         },
         "description": "Implemented Stage 2. Full first-party identity, selected active clinic and fresh resource visibility required. Patient own scope fails closed until real doctor/care dependencies exist. ETag is the integer resource version in quotes; use it as expected_version for archive/restore."
       }
+    },
+    "/api/v1/clinic/doctors": {
+      "get": {
+        "operationId": "get_doctors",
+        "summary": "GET /api/v1/clinic/doctors",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Doctor"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Membership identity is immutable. Branches must be current active membership assignments. Removing a branch referenced by schedule history returns 409. Creating a profile never grants patient access."
+      },
+      "post": {
+        "operationId": "post_doctors",
+        "summary": "POST /api/v1/clinic/doctors",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Doctor"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Membership identity is immutable. Branches must be current active membership assignments. Removing a branch referenced by schedule history returns 409. Creating a profile never grants patient access."
+      }
+    },
+    "/api/v1/clinic/doctors/{id}": {
+      "get": {
+        "operationId": "get_doctors_id",
+        "summary": "GET /api/v1/clinic/doctors/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Doctor"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Membership identity is immutable. Branches must be current active membership assignments. Removing a branch referenced by schedule history returns 409. Creating a profile never grants patient access."
+      },
+      "put": {
+        "operationId": "put_doctors_id",
+        "summary": "PUT /api/v1/clinic/doctors/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Doctor"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Membership identity is immutable. Branches must be current active membership assignments. Removing a branch referenced by schedule history returns 409. Creating a profile never grants patient access."
+      }
+    },
+    "/api/v1/clinic/rooms": {
+      "get": {
+        "operationId": "get_rooms",
+        "summary": "GET /api/v1/clinic/rooms",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "rooms.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Room"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Branch identity is immutable. Changes to active/availability/service_type conflict with current/future schedules. Room number is unique per branch."
+      },
+      "post": {
+        "operationId": "post_rooms",
+        "summary": "POST /api/v1/clinic/rooms",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "rooms.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Branch identity is immutable. Changes to active/availability/service_type conflict with current/future schedules. Room number is unique per branch."
+      }
+    },
+    "/api/v1/clinic/rooms/{id}": {
+      "get": {
+        "operationId": "get_rooms_id",
+        "summary": "GET /api/v1/clinic/rooms/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "rooms.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Branch identity is immutable. Changes to active/availability/service_type conflict with current/future schedules. Room number is unique per branch."
+      },
+      "put": {
+        "operationId": "put_rooms_id",
+        "summary": "PUT /api/v1/clinic/rooms/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "rooms.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Branch identity is immutable. Changes to active/availability/service_type conflict with current/future schedules. Room number is unique per branch."
+      }
+    },
+    "/api/v1/clinic/schedules": {
+      "get": {
+        "operationId": "get_schedules",
+        "summary": "GET /api/v1/clinic/schedules",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Schedule"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Doctor and branch identity is immutable. Updates retain prior schedule and breaks in append-only history. Overlapping doctor/room windows return 409; breaks are bounded non-overlapping half-open intervals."
+      },
+      "post": {
+        "operationId": "post_schedules",
+        "summary": "POST /api/v1/clinic/schedules",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Doctor and branch identity is immutable. Updates retain prior schedule and breaks in append-only history. Overlapping doctor/room windows return 409; breaks are bounded non-overlapping half-open intervals."
+      }
+    },
+    "/api/v1/clinic/schedules/{id}": {
+      "get": {
+        "operationId": "get_schedules_id",
+        "summary": "GET /api/v1/clinic/schedules/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Doctor and branch identity is immutable. Updates retain prior schedule and breaks in append-only history. Overlapping doctor/room windows return 409; breaks are bounded non-overlapping half-open intervals."
+      },
+      "put": {
+        "operationId": "put_schedules_id",
+        "summary": "PUT /api/v1/clinic/schedules/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Doctor and branch identity is immutable. Updates retain prior schedule and breaks in append-only history. Overlapping doctor/room windows return 409; breaks are bounded non-overlapping half-open intervals."
+      }
+    },
+    "/api/v1/clinic/schedule-exceptions": {
+      "get": {
+        "operationId": "get_schedule_exceptions",
+        "summary": "GET /api/v1/clinic/schedule-exceptions",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ScheduleException"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Exception identity doctor/branch/date is immutable. Replacement doctor/branch/weekday/effective dates must cover that date. Replacement response canonicalizes effective dates to that date."
+      },
+      "post": {
+        "operationId": "post_schedule_exceptions",
+        "summary": "POST /api/v1/clinic/schedule-exceptions",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleException"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExceptionInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Exception identity doctor/branch/date is immutable. Replacement doctor/branch/weekday/effective dates must cover that date. Replacement response canonicalizes effective dates to that date."
+      }
+    },
+    "/api/v1/clinic/schedule-exceptions/{id}": {
+      "get": {
+        "operationId": "get_schedule_exceptions_id",
+        "summary": "GET /api/v1/clinic/schedule-exceptions/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleException"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Exception identity doctor/branch/date is immutable. Replacement doctor/branch/weekday/effective dates must cover that date. Replacement response canonicalizes effective dates to that date."
+      },
+      "put": {
+        "operationId": "put_schedule_exceptions_id",
+        "summary": "PUT /api/v1/clinic/schedule-exceptions/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleException"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExceptionInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. Exception identity doctor/branch/date is immutable. Replacement doctor/branch/weekday/effective dates must cover that date. Replacement response canonicalizes effective dates to that date."
+      }
+    },
+    "/api/v1/clinic/doctors/{doctor}/availability": {
+      "get": {
+        "operationId": "get_doctors_doctor_availability",
+        "summary": "GET /api/v1/clinic/doctors/{doctor}/availability",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "schedules.view",
+          "doctors.view",
+          "rooms.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "doctor",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": true
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": true
+          },
+          {
+            "name": "service_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              },
+              "X-Availability-Mode": {
+                "description": "No reservation/occupancy check before Stage 4.",
+                "schema": {
+                  "type": "string",
+                  "const": "schedule-only"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Availability"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Schedule-only availability hints, NOT reservations. Stage 4 occupancy/appointments do not exist yet. Active doctor, membership, role, specialty, branch, service and room required. A date exception overrides the entire doctor/branch day: closed removes it; replace supplies its sole replacement window. Room compatibility is the explicit same-branch room selected in an approved schedule; service_type is descriptive, not a service ID. Duration uses doctor_service override when present, otherwise schedule slot_minutes. At most 31 local calendar days. DST ambiguous/nonexistent slot boundaries or intervals return 422. UTC Z output ordered by starts_at, room_id, ends_at. Offset pagination; no fabricated occupancy."
+      }
+    },
+    "/api/v1/clinic/specialties": {
+      "get": {
+        "operationId": "get_specialties",
+        "summary": "GET /api/v1/clinic/specialties",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Specialty"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. POST/PUT extension approved by project owner. No implicit employee grants. Specialty response retains Stage-1 id/name fields."
+      },
+      "post": {
+        "operationId": "post_specialties",
+        "summary": "POST /api/v1/clinic/specialties",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Specialty"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialtyInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. POST/PUT extension approved by project owner. No implicit employee grants. Specialty response retains Stage-1 id/name fields."
+      }
+    },
+    "/api/v1/clinic/specialties/{id}": {
+      "put": {
+        "operationId": "put_specialties_id",
+        "summary": "PUT /api/v1/clinic/specialties/{id}",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Specialty"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialtyInput"
+              }
+            }
+          }
+        },
+        "description": "Implemented Stage 3. Full cookie identity and selected clinic required. Tenant RLS and live branch grants apply. Mutations require entire_clinic action and view permissions, strict payloads and Idempotency-Key. Replays reauthorize current actor; changed payload returns 409. POST/PUT extension approved by project owner. No implicit employee grants. Specialty response retains Stage-1 id/name fields."
+      }
     }
   },
   "components": {
@@ -5039,6 +7088,500 @@
         },
         "required": [
           "branch_id"
+        ]
+      },
+      "SpecialtyInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "active"
+        ]
+      },
+      "Specialty": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "Availability": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "doctor_id",
+          "branch_id",
+          "room_id",
+          "starts_at",
+          "ends_at"
+        ]
+      },
+      "ExceptionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "closed",
+              "replace"
+            ]
+          },
+          "replacement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduleInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "doctor_id",
+          "branch_id",
+          "local_date",
+          "kind",
+          "replacement"
+        ]
+      },
+      "ScheduleInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "weekday": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "local_start": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "local_end": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "slot_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 480
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "effective_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "breaks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "local_start": {
+                  "type": "string"
+                },
+                "local_end": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "local_start",
+                "local_end"
+              ]
+            }
+          }
+        },
+        "required": [
+          "doctor_id",
+          "branch_id",
+          "room_id",
+          "weekday",
+          "local_start",
+          "local_end",
+          "slot_minutes",
+          "effective_from",
+          "breaks"
+        ]
+      },
+      "ScheduleException": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "closed",
+              "replace"
+            ]
+          },
+          "replacement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduleInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "doctor_id",
+          "branch_id",
+          "local_date",
+          "kind",
+          "replacement"
+        ]
+      },
+      "Schedule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "weekday": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "local_start": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "local_end": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "slot_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 480
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "effective_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "breaks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "local_start": {
+                  "type": "string"
+                },
+                "local_end": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "local_start",
+                "local_end"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "doctor_id",
+          "branch_id",
+          "room_id",
+          "weekday",
+          "local_start",
+          "local_end",
+          "slot_minutes",
+          "effective_from",
+          "breaks"
+        ]
+      },
+      "RoomInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "service_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          }
+        },
+        "required": [
+          "branch_id",
+          "number",
+          "service_type",
+          "active",
+          "availability"
+        ]
+      },
+      "Room": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "service_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "branch_id",
+          "number",
+          "service_type",
+          "active",
+          "availability"
+        ]
+      },
+      "DoctorInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "membership_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "specialty_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Only branches visible to current actor."
+          },
+          "service_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "membership_id",
+          "specialty_id",
+          "branch_ids",
+          "service_ids",
+          "active"
+        ]
+      },
+      "Doctor": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "membership_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "specialty_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Only branches visible to current actor."
+          },
+          "service_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "membership_id",
+          "specialty_id",
+          "branch_ids",
+          "service_ids",
+          "active"
         ]
       }
     },

@@ -371,3 +371,11 @@ branch-scoped projections and controlled writes. Doctor own scope remains
 fail-closed until actual care relations exist. Approved optimistic concurrency
 clarification: Patient JSON unchanged; ETag exposes expected_version for archive/
 restore. Later operational modules and frontend integration are still deferred.
+
+## Sprint 3 stage 3 — Doctors and scheduling
+
+[Stage 3 delivery](sprint-3-stage-3.md) adds live membership/branch-scoped doctor,
+room and schedule reference APIs. Approved extensions: existing-clinic timezone
+backfill to Asia/Tashkent and specialties POST/PUT using doctors.create/update.
+Availability is explicitly schedule-only until Stage 4; patient own scope stays
+fail-closed. No clinical grants or platform bypass are introduced.

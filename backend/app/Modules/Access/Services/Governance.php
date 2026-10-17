@@ -11,7 +11,7 @@ use LogicException;
 
 final class Governance
 {
-    private const FUNCTIONS = ['identity_lookup', 'rate_reserve', 'rate_finish', 'password_change', 'provision', 'role_save', 'role_delete', 'branch_create', 'employee_create', 'employee_assign', 'employee_reset', 'link_request', 'pending_links', 'link_accept', 'recovery_open', 'recovery_approve', 'recovery_consume', 'login_exists', 'auth_failure', 'session_identity', 'session_start', 'session_write', 'session_logout', 'my_clinics', 'select_clinic', 'employee_directory', 'platform_clinics', 'platform_audit', 'link_reject', 'operation_denied', 'patient_command', 'patient_export_audit'];
+    private const FUNCTIONS = ['identity_lookup', 'rate_reserve', 'rate_finish', 'password_change', 'provision', 'role_save', 'role_delete', 'branch_create', 'employee_create', 'employee_assign', 'employee_reset', 'link_request', 'pending_links', 'link_accept', 'recovery_open', 'recovery_approve', 'recovery_consume', 'login_exists', 'auth_failure', 'session_identity', 'session_start', 'session_write', 'session_logout', 'my_clinics', 'select_clinic', 'employee_directory', 'platform_clinics', 'platform_audit', 'link_reject', 'operation_denied', 'patient_command', 'patient_export_audit', 'scheduling_command'];
 
     public function call(string $function, #[\SensitiveParameter] array $parameters = [], ?User $actor = null, ?string $tenant = null, bool $reauthenticated = false): mixed
     {
@@ -38,7 +38,7 @@ final class Governance
                 return $value;
             });
         } catch (QueryException $exception) {
-            if ((($exception->errorInfo[0] ?? '') === '42501' || ($function === 'patient_command' && ($exception->errorInfo[0] ?? '') === 'P0002')) && $actor !== null && $function !== 'operation_denied') {
+            if ((($exception->errorInfo[0] ?? '') === '42501' || (in_array($function, ['patient_command', 'scheduling_command'], true) && ($exception->errorInfo[0] ?? '') === 'P0002')) && $actor !== null && $function !== 'operation_denied') {
                 // Original mutation has rolled back. Log only server-defined operation,
                 // never parameters, searched identities, hashes or password bodies.
                 try {
@@ -46,9 +46,11 @@ final class Governance
                 } catch (GovernanceDenied) { /* Invalid/revoked identities cannot author audit events. */
                 }
             }
-            if ($function === 'patient_command') {
+            if (in_array($function, ['patient_command', 'scheduling_command'], true)) {
                 throw new GovernanceDenied(match ($exception->errorInfo[0] ?? '') {
                     'P0002' => 'not_found', '23505' => 'conflict',
+                    '23503' => $function === 'scheduling_command' ? 'conflict' : 'forbidden',
+                    '22003' => $function === 'scheduling_command' ? 'invalid_input' : 'forbidden',
                     '22023', '22P02', '22007', '22008', '23502', '23514' => 'invalid_input',
                     default => 'forbidden',
                 });

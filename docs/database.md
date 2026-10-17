@@ -323,3 +323,13 @@ Migration 000006 adds patients/patient_branches, locked tenant patient counters,
 PII-free idempotency references and permission/grant provenance. See
 [sprint-3-stage-2.md](sprint-3-stage-2.md) for actual RLS/command boundaries and
 non-destructive rollback refusal rules. No doctor, appointment or visit table exists.
+
+## Sprint 3 stage 3 — additive scheduling schema
+
+Migration 000008 adds tenant/branch IANA timezone configuration and 11 FORCE-RLS
+relations: specialties, doctor_profiles, doctor_services, doctor_branches, rooms,
+schedule_rules, schedule_breaks, schedule_exceptions, schedule_exception_breaks,
+scheduling_idempotency and append-only scheduling_changes. Tenant-composite
+relationships include branch in room references. Runtime has no direct DML.
+See [Stage 3](sprint-3-stage-3.md) for live eligibility, protected commands,
+transaction lock order, deployment/backfill and non-destructive rollback.
