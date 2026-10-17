@@ -44,6 +44,8 @@ APP_KEY — `base64:` плюс 32 случайных байта в base64. Не 
 локального HTTP; для HTTPS укажите SESSION_SECURE_COOKIE=true.
 Локальный pgAdmin доступен отдельным профилем только на `127.0.0.1:5050`;
 настройка и подключение — [docs/local-pgadmin.md](docs/local-pgadmin.md).
+Swagger UI для существующего OpenAPI доступен отдельным профилем `docs` на
+`127.0.0.1:8081`: [docs/local-swagger.md](docs/local-swagger.md).
 `artisan serve` и image с dev-зависимостями предназначены для локальной разработки,
 не для production deployment. Production TLS/web server и backup — следующий этап.
 
