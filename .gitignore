@@ -12,3 +12,4 @@
 !/backend/.env.testing
 /frontend/test-results/
 /frontend/playwright-report/
+/scripts/tests/__pycache__/
