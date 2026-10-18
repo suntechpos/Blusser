@@ -56,6 +56,47 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+  swagger:
+    image: swaggerapi/swagger-ui:latest@sha256:b26661cd754a7efbb2e1aab419ffb5603320d8f35f0bd086d1d7506e23934d23
+    profiles: [docs]
+    environment:
+      SWAGGER_JSON: /spec/openapi.yaml
+      SUPPORTED_SUBMIT_METHODS: "[]"
+      TRY_IT_OUT_ENABLED: "false"
+      PERSIST_AUTHORIZATION: "false"
+      VALIDATOR_URL: "none"
+      CORS: "false"
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - ./docs/openapi.yaml:/spec/openapi.yaml:ro
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 6
+  pgadmin:
+    image: dpage/pgadmin4:9.18@sha256:c332c5f6dfba995d9ebc4af261d93506d6876085d712eaaa3defc8dd1a3f26de
+    profiles: [admin]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      # Empty keeps existing Compose commands usable; pgAdmin rejects an empty password.
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-}
+      PGADMIN_DISABLE_POSTFIX: "1"
+    ports:
+      - "127.0.0.1:5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1/misc/ping', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
   migrate:
     <<: *backend
     profiles: [tools]
@@ -76,3 +117,4 @@ services:
     command: [php, artisan, test]
 volumes:
   postgres_data:
+  pgadmin_data:
