@@ -8,15 +8,17 @@ import {
   Clock3,
   Plus,
   Eye,
-  Download,
-  Printer,
 } from "lucide-vue-next";
 import DateField from "../components/employees/DateField.vue";
+import PrescriptionDialog from "../components/doctor/PrescriptionDialog.vue";
+import FinishDialog from "../components/doctor/FinishDialog.vue";
+import ReferralDetailsDialog from "../components/doctor/ReferralDetailsDialog.vue";
 import ReferralDialog from "../components/doctor/ReferralDialog.vue";
 import HistoryPanel from "../components/doctor/HistoryPanel.vue";
 import RecordsPanel from "../components/doctor/RecordsPanel.vue";
-import { fileAction, printDemo } from "../components/doctor/mockFiles";
+
 import "../components/employees/employees.css";
+import { demoFile } from "../components/doctor/mockFiles";
 import {
   DEMO_DAY,
   DOCTOR,
@@ -33,6 +35,7 @@ import {
   type ResultRow,
   type DocumentRow,
   type Referral,
+  type Prescription,
 } from "../mocks/doctorWorkspace";
 import { today, dateLabel } from "../mocks/employees";
 const queue = ref(createDoctorQueue()),
@@ -80,6 +83,35 @@ const completedCount = computed(
       .length,
 );
 const drafts = reactive<Record<string, Draft>>({});
+const prescriptions = reactive<Record<string, Prescription[]>>({});
+const prescriptionOpen = ref(false),
+  finishOpen = ref(false);
+const editingPrescription = ref<Prescription>();
+const referralDetail = ref<Referral | null>(null),
+  referralCreated = ref(false);
+const currentPrescriptions = computed(() =>
+  selected.value ? prescriptions[doctorKey(selected.value)] || [] : [],
+);
+function savePrescription(p: Prescription) {
+  if (!selected.value || selected.value.status === "completed") return;
+  const list = prescriptions[doctorKey(selected.value)]!;
+  const index = list.findIndex((x) => x.id === p.id);
+  if (index < 0) list.push(p);
+  else list[index] = p;
+  prescriptionOpen.value = false;
+  notice.value = "Retsept faqat frontend xotirasida saqlandi.";
+}
+function finish(status: "completed" | "awaiting_results") {
+  if (!selected.value) return;
+  saveDraft();
+  selected.value.status = status;
+  finishOpen.value = false;
+  notice.value =
+    status === "completed"
+      ? "Lokal qabul yakunlandi. Yozuvlar faqat ko‘rish uchun."
+      : "Qabul natija kutishga qoldirildi. Uni Kutilmoqda ro‘yxatidan davom ettirish mumkin.";
+  if (status === "completed") queueTab.value = "completed";
+}
 const referrals = reactive<Record<string, Referral[]>>({});
 type PatientRecords = {
   history: HistoryVisit[];
@@ -91,6 +123,7 @@ function prepare(e: Encounter) {
   const key = doctorKey(e);
   drafts[key] ??= emptyDraft();
   referrals[key] ??= [];
+  prescriptions[key] ??= [];
   records[e.patientId] ??=
     e.patientId === "P-00124"
       ? {
@@ -101,6 +134,11 @@ function prepare(e: Encounter) {
       : { history: [], results: [], documents: [] };
 }
 prepare(queue.value[0]!);
+void Promise.all(
+  records["P-00124"]!.documents.map(async (d) => {
+    d.blob = await demoFile(d.name, d.format);
+  }),
+);
 const draft = computed(() =>
   selected.value ? drafts[doctorKey(selected.value)]! : null,
 );
@@ -120,6 +158,9 @@ function choose(e: Encounter) {
   selectedId.value = e.id;
   notice.value = "";
   referralOpen.value = false;
+  prescriptionOpen.value = false;
+  finishOpen.value = false;
+  referralDetail.value = null;
 }
 function queueKind(value: string) {
   queueTab.value = value;
@@ -161,6 +202,11 @@ function saveDraft() {
 }
 function saveReferral(r: Referral) {
   if (!selected.value || r.encounterKey !== doctorKey(selected.value)) return;
+  r.id = `Y-${String(125 + Object.values(referrals).flat().length).padStart(5, "0")}`;
+  r.createdTime = new Intl.DateTimeFormat("uz", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
   referrals[r.encounterKey]!.push(r);
   if (r.location === "internal") {
     const s = SERVICES.find((x) => x.id === r.service)!;
@@ -173,28 +219,39 @@ function saveReferral(r: Referral) {
       status: "Buyurilgan",
       external: false,
       referral: r.id,
+      encounter: selected.value.id,
     });
   }
   referralOpen.value = false;
+  if (r.location === "external") {
+    referralCreated.value = true;
+    referralDetail.value = r;
+  }
   notice.value =
     "Demo yo‘llanma lokal ro‘yxatga qo‘shildi. Haqiqiy buyurtma yuborilmadi.";
 }
-function referralFile(r: Referral, action: "view" | "download" | "print") {
-  const title = SERVICES.find((s) => s.id === r.service)?.name || "Yo‘llanma";
-  if (action === "print") {
-    if (
-      !printDemo(title, [
-        selected.value?.name || "",
-        r.location === "external" ? "Tashqi yo‘llanma" : "Ichki yo‘llanma",
-        title,
-        r.note,
-      ])
-    )
-      notice.value = "Chop etish oynasiga brauzer ruxsat bermadi.";
-  } else
-    void fileAction(title, "PDF", action).catch(
-      () => (notice.value = "Demo faylni yaratib bo‘lmadi."),
-    );
+function uploadDocument(d: DocumentRow, external: boolean) {
+  if (!patientRecords.value) return;
+  patientRecords.value.documents.unshift(d);
+  if (external) {
+    const r = Object.values(referrals)
+      .flat()
+      .find((r) => r.id === d.referral);
+    patientRecords.value.results.unshift({
+      id: crypto.randomUUID(),
+      name: d.name,
+      date: d.date,
+      type: (r?.type || "Diagnostika") as ResultRow["type"],
+      doctor: DOCTOR.name,
+      status: "Tayyor",
+      external: true,
+      referral: d.referral || "",
+      documentId: d.id,
+      encounter: d.encounter,
+    });
+  }
+  notice.value =
+    "Fayl faqat frontend xotirasiga qo‘shildi. Serverga yuklanmadi.";
 }
 const statusLabel = (e: Encounter) =>
   ({
@@ -203,6 +260,7 @@ const statusLabel = (e: Encounter) =>
     walk_in: "Jonli navbat",
     called: "Chaqirildi",
     completed: "Yakunlangan",
+    awaiting_results: "Natija kutilmoqda",
   })[e.status];
 </script>
 <template>
@@ -401,22 +459,140 @@ const statusLabel = (e: Encounter) =>
                 rows="2"
               />
             </label>
+          </fieldset>
+          <section v-if="currentReferrals.length" class="dw-referrals">
+            <h3>
+              Yo‘llanmalar
+              <span class="dw-badge blue"
+                >{{ currentReferrals.length }} ta</span
+              >
+            </h3>
+            <div class="dw-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Yo‘llanma</th>
+                    <th>Xizmat</th>
+                    <th>Qayerda</th>
+                    <th>Holati</th>
+                    <th>Amal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="r in currentReferrals" :key="r.id">
+                    <td>{{ r.id }}</td>
+                    <td>
+                      {{ SERVICES.find((s) => s.id === r.service)?.name }}
+                    </td>
+                    <td>
+                      {{
+                        r.location === "external"
+                          ? "Boshqa klinikada"
+                          : "Bizning klinikada"
+                      }}<small>{{
+                        r.location === "external"
+                          ? r.clinic || "Klinika tanlanmagan"
+                          : r.branch
+                      }}</small>
+                    </td>
+                    <td>
+                      <span
+                        class="dw-badge"
+                        :class="r.location === 'external' ? 'yellow' : 'blue'"
+                        >{{
+                          patientRecords.results.some(
+                            (x) => x.referral === r.id && x.status === "Tayyor",
+                          )
+                            ? "Tayyor"
+                            : r.location === "external"
+                              ? "Natija kutilmoqda"
+                              : "Buyurilgan"
+                        }}</span
+                      >
+                    </td>
+                    <td>
+                      <button
+                        class="dw-link"
+                        @click="
+                          referralCreated = false;
+                          referralDetail = r;
+                        "
+                      >
+                        <Eye :size="18" />Ko‘rish
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section
+            v-if="currentPrescriptions.length"
+            class="dw-referrals dw-prescriptions"
+          >
+            <h3>Retseptlar</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Retsept</th>
+                  <th>Sana</th>
+                  <th>Dorilar soni</th>
+                  <th>Amal</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in currentPrescriptions" :key="p.id">
+                  <td>{{ p.id }}</td>
+                  <td>{{ dateLabel(p.date) }}</td>
+                  <td>{{ p.medicines.length }}</td>
+                  <td>
+                    <button
+                      v-if="selected.status !== 'completed'"
+                      class="dw-link"
+                      @click="
+                        editingPrescription = p;
+                        prescriptionOpen = true;
+                      "
+                    >
+                      Tahrirlash</button
+                    ><span v-else>{{
+                      p.medicines
+                        .map(
+                          (m) =>
+                            m.name +
+                            " · " +
+                            m.dose +
+                            " " +
+                            m.unit +
+                            " · " +
+                            m.frequency +
+                            " · " +
+                            m.duration,
+                        )
+                        .join("; ")
+                    }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+          <fieldset :disabled="selected.status === 'completed'">
             <div class="dw-current-actions">
               <button class="e-button dw-small" @click="referralOpen = true">
                 <Plus :size="20" />Yo‘llanma</button
               ><button
                 class="e-button dw-small"
-                @click="notice = 'Retsept yozish oynasi hali tasdiqlanmagan.'"
+                @click="
+                  editingPrescription = undefined;
+                  prescriptionOpen = true;
+                "
               >
                 <Plus :size="20" />Retsept</button
               ><span /><button class="e-button dw-small" @click="saveDraft">
                 Qoralamani saqlash</button
               ><button
                 class="e-button primary dw-small"
-                @click="
-                  notice =
-                    'Qabulni yakunlash oynasi hali tasdiqlanmagan. Qabul holati o‘zgarmadi.'
-                "
+                @click="finishOpen = true"
               >
                 Qabulni yakunlash
               </button>
@@ -425,66 +601,6 @@ const statusLabel = (e: Encounter) =>
           <p v-if="selected.status === 'completed'" class="dw-footnote">
             <Eye :size="17" />Yakunlangan qabul — faqat ko‘rish uchun.
           </p>
-          <section v-if="currentReferrals.length" class="dw-referrals">
-            <h3>Yo‘llanmalar</h3>
-            <div class="dw-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Xizmat</th>
-                    <th>Turi</th>
-                    <th>Holati</th>
-                    <th>Amal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="r in currentReferrals" :key="r.id">
-                    <td>
-                      {{ SERVICES.find((s) => s.id === r.service)?.name }}
-                    </td>
-                    <td>
-                      {{ r.type }}
-                      <span
-                        v-if="r.location === 'external'"
-                        class="dw-badge purple"
-                        >Tashqi</span
-                      >
-                    </td>
-                    <td>
-                      {{
-                        r.location === "external"
-                          ? "Natija kutilmoqda"
-                          : "Buyurilgan"
-                      }}
-                    </td>
-                    <td>
-                      <div class="dw-doc-actions">
-                        <button
-                          class="e-icon"
-                          aria-label="Yo‘llanma demo PDF ko‘rish"
-                          @click="referralFile(r, 'view')"
-                        >
-                          <Eye :size="17" /></button
-                        ><button
-                          class="e-icon"
-                          aria-label="Yo‘llanma demo PDF yuklab olish"
-                          @click="referralFile(r, 'download')"
-                        >
-                          <Download :size="17" /></button
-                        ><button
-                          class="e-icon"
-                          aria-label="Yo‘llanmani chop etish"
-                          @click="referralFile(r, 'print')"
-                        >
-                          <Printer :size="17" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
         </article>
         <HistoryPanel
           v-else-if="tab === 'Tashriflar tarixi'"
@@ -499,6 +615,15 @@ const statusLabel = (e: Encounter) =>
           :encounter="selected"
           :results="patientRecords.results"
           :documents="patientRecords.documents"
+          :encounters="queue.filter((e) => e.patientId === selected!.patientId)"
+          :referrals="
+            Object.values(referrals)
+              .flat()
+              .filter((r) =>
+                r.encounterKey.startsWith(selected!.patientId + ':'),
+              )
+          "
+          @uploaded="uploadDocument"
           @notice="notice = $event"
         />
       </div>
@@ -506,6 +631,40 @@ const statusLabel = (e: Encounter) =>
         Bemorni tanlang yoki boshqa sanani belgilang.
       </article>
     </div>
+    <PrescriptionDialog
+      v-if="prescriptionOpen && selected"
+      :encounter="selected"
+      :prescription="editingPrescription"
+      @close="prescriptionOpen = false"
+      @save="savePrescription"
+    />
+    <FinishDialog
+      v-if="finishOpen && selected && draft && patientRecords"
+      :encounter="selected"
+      :draft="draft"
+      :prescriptions="currentPrescriptions"
+      :results="patientRecords.results"
+      :referrals="currentReferrals"
+      @close="finishOpen = false"
+      @finish="finish"
+    />
+    <ReferralDetailsDialog
+      v-if="referralDetail && selected"
+      :encounter="selected"
+      :referral="referralDetail"
+      :created="referralCreated"
+      :status="
+        patientRecords?.results.some(
+          (x) => x.referral === referralDetail!.id && x.status === 'Tayyor',
+        )
+          ? 'Tayyor'
+          : undefined
+      "
+      @close="
+        referralDetail = null;
+        referralCreated = false;
+      "
+    />
     <ReferralDialog
       v-if="referralOpen && selected"
       :encounter="selected"

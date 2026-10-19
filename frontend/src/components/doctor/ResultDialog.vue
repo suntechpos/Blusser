@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { defineAsyncComponent, ref, onMounted } from "vue";
+const DocumentViewer = defineAsyncComponent(
+  () => import("./DocumentViewer.vue"),
+);
+import { demoFile } from "./mockFiles";
 import {
   CalendarDays,
   UsersRound,
@@ -22,7 +27,23 @@ import {
 import { fileAction, printDemo } from "./mockFiles";
 const props = defineProps<{ encounter: Encounter; result: ResultRow }>();
 const emit = defineEmits<{ close: []; notice: [string] }>();
+const viewer = ref<{ name: string; date: string; blob?: Blob } | null>(null);
+const attachments = ref<
+  { name: string; format: string; size: string; blob?: Blob }[]
+>(UZI_DETAILS.attachments.map((f) => ({ ...f })));
+onMounted(() => {
+  void Promise.all(
+    attachments.value.map(async (f) => {
+      f.blob = await demoFile(f.name, f.format);
+    }),
+  );
+});
 function action(name: string, format: string, kind: "view" | "download") {
+  if (kind === "view") {
+    const f = attachments.value.find((f) => f.name === name);
+    viewer.value = { name, date: props.result.date, blob: f?.blob };
+    return;
+  }
   void fileAction(name, format, kind).catch(() =>
     emit("notice", "Demo faylni yaratib bo‘lmadi."),
   );
@@ -100,11 +121,7 @@ function print() {
     </section>
     <section class="dw-result-files">
       <h3>Biriktirilgan fayllar</h3>
-      <div
-        v-for="file in UZI_DETAILS.attachments"
-        :key="file.name"
-        class="dw-result-file"
-      >
+      <div v-for="file in attachments" :key="file.name" class="dw-result-file">
         <component
           :is="file.format === 'PDF' ? FileText : Image"
           :size="30"
@@ -132,6 +149,12 @@ function print() {
         {{ dateLabel(result.date) }}, {{ UZI_DETAILS.confirmedTime }}</span
       >
     </p>
+    <DocumentViewer
+      v-if="viewer"
+      :encounter="encounter"
+      :file="viewer"
+      @close="viewer = null"
+    />
     <footer>
       <span class="dw-footnote"
         ><LockKeyhole :size="20" />Natija faqat ko‘rish uchun</span

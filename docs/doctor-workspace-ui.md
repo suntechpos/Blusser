@@ -1,108 +1,137 @@
 # Shifokor kabineti — lokal frontend namoyishi
 
-Ishchi branch: `feature/doctor-workspace-ui`, mavjud
-`feature/departments-rooms-ui` holatidan yaratildi. Commit/push/merge yo‘q.
+Branch: `feature/doctor-workspace-ui`. Ushbu davomiy ishda commit/push/merge bajarilmadi.
+Backend, migratsiyalar, Docker, autentifikatsiya/session, permission, API servislar,
+ClinicDashboardView, haqiqiy Bemorlar sahifasi va boshqa modullar o‘zgartirilmadi.
 
-## Dizayn manbalari
+## Dizayn va chegaralar
 
-Asosiy sahifa, tashriflar tarixi, tashrif tafsilotlari, UZI natijasi hamda
-ichki/tashqi yo‘llanma maketlari: 1672×941. Tekshiruv natijalari va Hujjatlar
-ichki kontenti uchun berilgan rasmlar: 1536×1024. Ularning boshqa sidebar/header
-ko‘rinishi takrorlanmagan: barcha tablar mavjud ClinicDashboardView shell’ida
-ishlaydi. Eski, qayerda o‘tkazilishi tanlovisiz yo‘llanma maketi ishlatilmagan.
+Yangi 9 ta reference rasm ichki modallar va yo‘llanmalar jadvali uchun ishlatildi.
+Asosiy viewport 1672×941; alternativ laboratoriya reference’i 1536×1024.
+Mavjud sidebar, header, logo, navbat paneli va bemor kartasi saqlandi.
+Reference’dagi boshqa sidebar yoki bemor ismi ko‘chirilmadi: barcha modallar
+joriy tanlangan sintetik bemordan ma’lumot oladi.
+Mavjud lokal Inter, lucide-vue-next va DateField ishlatilgan. Yangi UI/font
+kutubxonasi yo‘q. Barcha yangi CSS `.dw-ui` bilan chegaralangan.
 
-Mavjud lokal Inter, lucide-vue-next, EmployeeDialog va DateField qayta
-ishlatilgan. Yangi kutubxona, font yoki dependency qo‘shilmagan. Doctor CSS
-faqat `.dw-ui` ostiga tegishli. Shell’dagi o‘zgarish faqat yangi sahifani
-mavjud menyu/hash orqali ochish va shu sahifa uchun demo banner shartidir.
+PDF sahifalarini haqiqatan render qilish, fayldan sahifa sonini olish va chop
+etish uchun bitta dependency — `pdfjs-dist` qo‘shildi. UI dependency’si emas.
+Renderer va viewer alohida lazy chunk; worker lokal bundle’dan olinadi.
+PDF’dan JavaScript yoki klinik ma’lumot ajratib olinmaydi (`isEvalSupported: false`).
 
-## Bajarilgan imkoniyatlar
+## Yangi imkoniyatlar
 
-- Sana/Bugun, navbat tablari/hisoblari/qidiruvi, tanlangan bemor va lokal
-  keyingi bemorni chaqirish. Allergen haqida ma’lumot yo‘qligi allergiya
-  yo‘qligi deb talqin qilinmaydi.
-- Bugungi qabul formasi. Qoralama `patientId:encounterId` bo‘yicha ajratilgan,
-  tab yoki bemor almashganda xotirada qoladi. Boshqa qabulga ko‘chirilmaydi.
-  Yakunlangan demo qabul faqat o‘qish rejimida ochiladi.
-- Tashriflar tarixi: eng yangi birinchi, sana/shifokor/mutaxassislik filtrlari,
-  soniga mos pagination, o‘qish rejimidagi tafsilotlar va chop etish.
-- Tekshiruv natijalari: qidiruv, sana/tur/holat, Buyurilgan/Jarayonda/Tayyor,
-  tashqi natija belgisi, faqat tayyor yozuvlarda ko‘rish, haqiqiy soniga mos
-  pagination. Bir xil tur uchun takroriy filtr qo‘shilmagan.
-- Tasdiqlangan UZI modali: bemor/tekshiruv konteksti, tavsif/xulosa,
-  namunaviy PDF/JPG fayllar, tasdiqlovchi va vaqt, ko‘rish/yuklab olish/chop etish.
-- Hujjatlar: filtrlar va fayl ma’lumotlari, brauzerning standart viewer’i,
-  yuklab olish, chop etish. Amallar haqiqiy ochiladigan sintetik PDF/JPG
-  bloblarini yaratadi; haqiqiy tibbiy fayllarni olmaydi.
-- Yo‘llanma: ichki/tashqi, xizmat turi, xizmatga/filialga mos mutaxassislar,
-  majburiy maydonlar, yashirin qiymatlarni saqlamaslik, ixtiyoriy tashqi klinika.
-  Ichki yo‘llanma natijalar mock ro‘yxatiga Buyurilgan qilib qo‘shiladi.
-  Tashqi yo‘llanma Tashqi / Natija kutilmoqda belgisi bilan ajratiladi.
-- Yo‘llanmalar jadvali: xizmat/tur/holat/amal. Uning qo‘shimcha rasmi o‘rnida
-  qayta yuborilgan rasmda jadval ko‘rinmagan; matnda berilgan ustunlar va
-  shu bo‘limning mavjud jadval uslubi ishlatilgan.
-- Modallar Escape/X/bekor qilish, fokus aylanishi va qaytarilishi bilan ishlaydi;
-  mobil viewport ichida qoladi, keng jadvallar alohida scroll qiladi.
+- **Retsept:** bir nechta dori, raqamlash/o‘chirish, yangi blokka fokus, erkin
+  dori nomi/tartib, majburiy maydonlar, bitta retseptga saqlash va ochiq qabulda
+  qayta tahrirlash. Doza yoki davolash tartibi avtomatik belgilanmaydi.
+- **Laboratoriya:** faqat natijalar tabi ustida, har bir tahlilning o‘z qiymatlari,
+  birliklari va me’yorlari; yuqori/past belgilar. Me’yor bo‘lmasa “Baholanmagan”.
+  UZI modali saqlandi va laboratoriyadan ajratildi. Filtr/pagination yopilganda qoladi.
+- **Upload:** PDF/JPG/PNG, 20 MB, tanlash/drop, olib tashlash, majburiy metadata,
+  faqat shu bemorning qabul/yo‘llanmalari. Qabul almashganda mos bo‘lmagan
+  yo‘llanma tozalanadi. Tashqi natija amali kontekstni oldindan tanlaydi.
+- **Viewer:** haqiqiy tanlangan Blob, PDF sahifa soni, oldingi/keyingi, zoom/fit;
+  rasmlarda PDF pagination yo‘q. Xatoli/mavjud bo‘lmagan fayl uchun aniq xabar.
+  UZI/laboratoriya ichidan ochilganda yopish o‘sha modalga qaytaradi.
+- **Yakunlash:** shikoyat, ko‘rik, tashxis va tavsiyalar tekshiruvi; retsept yoki
+  yo‘llanma majburiy emas. Kutilayotgan natijalar o‘z holati va soat belgisi bilan.
+  Natija kutishga qoldirilgan qabul Kutilmoqda ro‘yxatida davom ettiriladi.
+  Yakunlangan qabul Yakunlangan ro‘yxatiga o‘tadi, yozuvlar o‘qish rejimida.
+- **Yo‘llanmalar:** Tavsiyalar ostidagi jadval: raqam, xizmat, qayerda, holat, ko‘rish.
+  Ichki/tashqi tafsilotlar, mutaxassis tanlanmagan/klinika belgilanmagan holati.
+  Tashqi yo‘llanma yaratishdan keyin shu tafsilot oynasi bir martalik yashil xabar
+  bilan ochiladi; ro‘yxatdan keyin ochilganda xabar yo‘q. PDF/chop etish ishlaydi.
+- X/Escape, fokus trap va qaytarish, saqlanmagan formani bekor qilish tasdig‘i,
+  scroll body va ko‘rinib turadigan retsept footer’i, submit double-click himoyasi.
 
-## Muhim chegaralar
-
-Barcha yangi ma’lumotlar faqat shu bo‘lim frontend xotirasida. Reload yoki
-bo‘limdan chiqishda qayta tiklanadi. Boshqa modullar store/mocklari o‘zgarmagan.
-Yangi API so‘rovi, endpoint, DB yozuvi, migratsiya yoki Docker o‘zgarishi yo‘q.
-Haqiqiy auth/session/permission kodiga tegilmagan; login mock qilinmagan.
-Brauzer avtomatik testlaridagi sessiya fixture’lari faqat test faylida.
-
-Namoyish yo‘llanmasi qabulni yakunlamaydi, sana/vaqt band qilmaydi, to‘lov
-amalini bajarmaydi va haqiqiy bo‘limga buyurtma/bildirishnoma yubormaydi.
-PDF/JPG fayllarining ichida DEMO belgisi bor. Jadvaldagi hajmlar maketning
-sintetik metadata qiymatlari; yuklanadigan demo payload kichikroq bo‘lishi mumkin.
-Chop etish va viewer brauzer imkoniyatlaridan foydalanadi; foydalanuvchi
-brauzeridagi popup/print ruxsatlari amal qiladi.
-
-Tasdiqlanmagan jarayonlar uchun katta yangi oyna yaratilmadi:
-
-- Retsept yozish va qabulni yakunlash: qisqa izoh, qabul holati o‘zgarmaydi.
-- Laboratoriya natijasi tafsilotlari: qisqa izoh; qon tahlili uchun UZI modali
-  ishlatilmaydi.
-- Hujjat yuklash va tashqi natija qo‘shish: qisqa izoh, haqiqiy upload yo‘q.
-- Bemor kartasi uchun yangi modal: shu bosqichda yo‘q; haqiqiy Bemorlar API’siga
-  demo patient ID bilan murojaat qilinmaydi.
-- Tashqi yo‘llanmaning muvaffaqiyat/ko‘rish modali va alohida PDF viewer:
-  yaratilmagan; standart brauzer fayl amallari ishlatiladi.
+Retsept/qoralama/yo‘llanmalar `patientId:encounterId` bo‘yicha ajratilgan.
+Hujjatlar/natijalar bemor bo‘yicha, bog‘liq qabul/yo‘llanma metadata bilan saqlanadi.
+Yuklangan fayl bitta Blob: tashqi natijadagi `documentId` shu hujjatga havola.
+Viewer URL’lari unmountda, download URL’lari qisqa taymerda tozalanadi.
 
 ## Tekshiruvlar
 
-Frontend katalogidan:
+Frontend katalogida:
 
 ```sh
 npm run typecheck
 npm test
 npm run build
 PW_CHROMIUM_PATH=/usr/bin/chromium PW_BASE_URL=http://127.0.0.1:5173 \
-  npx playwright test tests/browser/doctor-workspace.spec.ts \
-  tests/browser/employees.spec.ts tests/browser/departments-rooms.spec.ts
+  npm run test:browser -- doctor-workspace.spec.ts doctor-workflows.spec.ts \
+  employees.spec.ts departments-rooms.spec.ts
 ```
 
-- TypeScript, mavjud unit testlar (2 fayl) va production build o‘tdi.
-- Chromium: 22/22 test (8 yangi, 8 Employees, 6 Departments/Rooms) o‘tdi.
-- Bemor/qabul qoralama izolyatsiyasi, navbat/sana, filtr/pagination, ichki/tashqi
-  yo‘llanma, read-only tarix/UZI, print oynasi, PDF xref va PDF/JPG fayl
-  baytlari, fokus/mobil holat hamda qo‘shimcha API so‘rovi yo‘qligi tekshirildi.
-- To‘rtta tabda bemor kartasi/navbat DOM’i va geometriyasi bir xil.
-- Eski 7 sahifa bir xil test sessiyasi bilan oldingi HEAD nusxasi va joriy
-  branchdagi ikkita vaqtinchalik Vite serverda tekshirildi: navigatsiya va
-  runtime exception tekshiruvlari o‘tdi; screenshotlar pikselma-piksel solishtirildi.
-- Backend, Docker, umumiy CSS, auth/services, App va oldingi sahifa/modul
-  fayllari HEAD bilan bir xil. `git diff --check` va yangi fayllar Prettier
-  tekshiruvi bajarildi. Alohida lint script mavjud emas.
-- Haqiqiy backend login/Patients integratsiya testi qayta bajarilmadi:
-  `127.0.0.1:8000/api/v1/health` ulanishi rad etildi (curl exit 7, HTTP 000).
-  Shu sabab real backend regressiyasi o‘tdi degan da’vo yo‘q. DB’ga ulanilmadi.
+- TypeScript va production build o‘tdi.
+- `npm test`: 2 test fayli o‘tdi, 0 failure.
+- Chromium: 30/30 o‘tdi (8 yangi workflow, 8 Doctor regressiya, 8 Employees,
+  6 Departments/Rooms). Oxirgi upload/date/validatsiya tuzatishidan keyin yangi
+  8 workflow testi qayta o‘tdi.
+- Retsept validation/add/remove/edit/discard/fokus/izolyatsiya, laboratoriya va
+  UZI farqi, noma’lum me’yor, nested viewer, upload format/hajm/cancel, tashqi
+  faylga bitta havola, corrupt PDF, reload, completion/wait/readonly tekshirildi.
+- Ikki sahifali haqiqiy lokal PDF: sahifa soni fayldan, navigatsiya, zoom/fit,
+  yuklab olingan baytlar original bilan aynan bir xil; print oynasida ikkala
+  sahifa render qilingan. Bo‘sh yoki soxta muvaffaqiyat tugmasi yo‘q.
+- Qo‘shimcha API so‘rovi yuborilmasligi tekshirildi. Login/logout/CSRF uchun
+  mavjud browser fixture regressiyasi o‘tdi; production auth kodida fake login yo‘q.
+- Oldingi 7 sahifa (Bosh sahifa, Registratura, Bemorlar, Qabullar, Navbatlar,
+  Xodimlar, Bo‘limlar va Xonalar) HEAD va joriy nusxada bir xil test fixture bilan
+  ochildi: runtime xato yo‘q, screenshotlar piksel darajasida bir xil.
+- Reference o‘lchamlarida 11 yangi screenshot olindi; ko‘rib chiqilib laboratoriya
+  qatorlari, modal balandligi, upload inputlari va footer joylashuvi tuzatildi.
+- `git diff --check` va o‘zgargan frontend fayllarining Prettier tekshiruvi o‘tdi.
 
-Lokal ochish: mavjud haqiqiy klinika sessiyasida `/#shifokor-kabineti`.
-Frontend start: frontend katalogida `npm run dev`.
+Haqiqiy backend login/Patients integratsiya testi bajarilmadi:
+`127.0.0.1:8000/api/v1/health` ulanishi rad etildi (curl exit 7, HTTP 000).
+DB testlari/yozuvlari bajarilmadi. Haqiqiy backend regressiyasi o‘tdi degan da’vo yo‘q.
 
-## Screenshotlar
+## Qolgan chegaralar
+
+**Refresh yoki bu bo‘limdan chiqishdan keyin lokal mock o‘zgarishlar va yuklangan
+fayllar yo‘qoladi. Serverga upload yoki bazaga yozish yo‘q.**
+Bu klinik amaliyot/retsept berish tizimi emas, sintetik frontend namoyishi.
+Eski demo fayllarning jadvaldagi hajmi reference metadata; yangi yuklangan fayl
+hajmi haqiqiy Blob hajmidan olinadi. Sintetik PDF oddiy namuna hujjatdir;
+standart PDF fonti qo‘llamaydigan belgilar Latin yozuviga soddalashtiriladi.
+PDF/rasmdan laboratoriya jadvali avtomatik chiqarilmaydi.
+Bemor kartasiga haqiqiy API/demo ID bilan murojaat qo‘shilmadi.
+Print oynasini yakuniy chiqarish/saqlash brauzerning print dialogi va popup
+ruxsatlariga bog‘liq. Backend ruxsatlari bu mock UI tomonidan almashtirilmaydi.
+
+## O‘zgargan fayllar
+
+- `frontend/src/views/DoctorWorkspaceView.vue` — yangi amallar va lokal holat.
+- `frontend/src/components/doctor/`: WorkspaceDialog, PatientStrip,
+  PrescriptionDialog, LabResultDialog, UploadDialog, DocumentViewer,
+  FinishDialog, ReferralDetailsDialog, localFiles — yangi fayllar.
+- Shu katalogdagi RecordsPanel, ReferralDialog, ResultDialog, mockFiles va
+  doctor.css — mavjud komponentlar davom ettirildi.
+- `frontend/src/mocks/doctorWorkspace.ts` — yangi mock turlari va laboratoriya natijalari.
+- `frontend/package.json`, `frontend/package-lock.json` — faqat PDF renderer dependency’si.
+- `frontend/tests/browser/doctor-workflows.spec.ts` — 8 yangi test.
+- `frontend/tests/browser/doctor-workspace.spec.ts` — yangi funksiyalarga mos regressiya.
+- Ushbu hisobot va `docs/screenshots/doctor-workflows/` — 11 yangi screenshot.
+
+## Yangi screenshotlar
+
+| Holat | Screenshot |
+|---|---|
+| Bitta dori | [12-prescription-single](screenshots/doctor-workflows/12-prescription-single.png) |
+| Ko‘p dori | [13-prescription-multiple](screenshots/doctor-workflows/13-prescription-multiple.png) |
+| Laboratoriya | [14-laboratory](screenshots/doctor-workflows/14-laboratory.png) |
+| Laboratoriya 1536×1024 | [15-laboratory-source-viewport](screenshots/doctor-workflows/15-laboratory-source-viewport.png) |
+| Upload | [16-upload](screenshots/doctor-workflows/16-upload.png) |
+| PDF viewer | [17-document-viewer](screenshots/doctor-workflows/17-document-viewer.png) |
+| Yakunlash tekshiruvi | [18-finish](screenshots/doctor-workflows/18-finish.png) |
+| Yo‘llanmalar | [19-referrals-list](screenshots/doctor-workflows/19-referrals-list.png) |
+| Yangi tashqi yo‘llanma | [20-referral-created](screenshots/doctor-workflows/20-referral-created.png) |
+| Qayta ochilgan tafsilot | [21-referral-detail](screenshots/doctor-workflows/21-referral-detail.png) |
+| Yuklangan ikki sahifali PDF | [22-uploaded-two-page-pdf](screenshots/doctor-workflows/22-uploaded-two-page-pdf.png) |
+
+Barchasi 1672×941, faqat 15-rasm 1536×1024. Dastlabki screenshotlar o‘chirilmagan.
+
+## Dastlabki bosqich screenshotlari (saqlangan)
 
 1672×941, to‘rtta tab uchun bir xil umumiy shell:
 
