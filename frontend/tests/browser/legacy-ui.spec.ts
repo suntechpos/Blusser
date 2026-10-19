@@ -259,10 +259,12 @@ test("Tablo selected preview equals modal; sound, settings, copy, TV and confirm
     .click();
   await expect(page.locator(".tb-big-tv-codes")).toContainText(ticket);
   await expect(page.locator(".tb-big-tv-codes")).toContainText("201");
-  await page.getByRole("button", { name: "Kodni nusxalash" }).click();
-  await expect
-    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe("619284");
+  await test.step("copy code and read system clipboard", async () => {
+    await page.getByRole("button", { name: "Kodni nusxalash" }).click();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe("619284");
+  });
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Yopish", exact: true })
@@ -288,17 +290,35 @@ test("Tablo selected preview equals modal; sound, settings, copy, TV and confirm
     .click();
   await page.getByRole("button", { name: "Saqlash", exact: true }).click();
   await expect(page.locator(".tb-mini-main")).toContainText("202");
-  await page
-    .getByRole("button", { name: "TV ko‘rinishini ochish", exact: true })
-    .click();
-  await expect(page.locator(".tb-big-tv-codes")).toContainText("202");
-  await page.evaluate(async () => {
-    if (document.fullscreenElement) await document.exitFullscreen();
+  await test.step("open TV preview", async () => {
+    await page
+      .getByRole("button", { name: "TV ko‘rinishini ochish", exact: true })
+      .click();
+    await expect(page.locator(".tb-big-tv-codes")).toContainText("202");
+    // Vue renders the preview before requestFullscreen() finishes. The header's
+    // close button is outside the fullscreen TV, so wait for entry before exit.
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document.fullscreenElement?.classList.contains("tb-big-tv") ??
+            false,
+        ),
+      )
+      .toBe(true);
   });
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Yopish", exact: true })
-    .click();
+  await test.step("exit fullscreen and close preview", async () => {
+    await page.evaluate(async () => {
+      await document.exitFullscreen();
+    });
+    await expect
+      .poll(() => page.evaluate(() => document.fullscreenElement === null))
+      .toBe(true);
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Yopish", exact: true })
+      .click();
+  });
   page.once("dialog", (d) => d.dismiss());
   await page
     .locator("tr")
@@ -346,4 +366,41 @@ test("narrow pages scroll tables locally, shell stays in viewport and logout/log
   await expect(
     page.getByRole("button", { name: "Bosh sahifa", exact: true }),
   ).toBeVisible();
+});
+
+test("Tablo waits for delayed native fullscreen entry before closing preview", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const requestFullscreen = Element.prototype.requestFullscreen;
+    Element.prototype.requestFullscreen = async function (options) {
+      // Render the modal first, as on a busy CI runner, then use the real API.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      return requestFullscreen.call(this, options);
+    };
+  });
+  await legacySession(page);
+  await openLegacy(page, "Tablo boshqaruvi");
+  await page
+    .getByRole("button", { name: "TV ko‘rinishini ochish", exact: true })
+    .click();
+  await expect(page.locator(".tb-big-tv-codes")).toContainText("101");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.fullscreenElement?.classList.contains("tb-big-tv") ?? false,
+      ),
+    )
+    .toBe(true);
+  await page.evaluate(() => document.exitFullscreen());
+  await expect
+    .poll(() => page.evaluate(() => document.fullscreenElement === null))
+    .toBe(true);
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Yopish", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator("tbody tr")).toHaveCount(3);
 });
