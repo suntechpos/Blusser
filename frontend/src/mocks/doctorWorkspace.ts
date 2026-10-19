@@ -19,7 +19,13 @@ export interface Encounter {
   ticket: string;
   date: string;
   startedAt: string;
-  status: "in_progress" | "waiting" | "walk_in" | "called" | "completed";
+  status:
+    | "in_progress"
+    | "waiting"
+    | "walk_in"
+    | "called"
+    | "awaiting_results"
+    | "completed";
   color: string;
   allergy: string | null;
 }
@@ -36,7 +42,11 @@ export interface DocumentRow {
   id: string;
   name: string;
   type: string;
-  format: "PDF" | "JPG";
+  format: "PDF" | "JPG" | "PNG";
+  blob?: Blob;
+  referral?: string;
+  clinic?: string;
+  note?: string;
   size: string;
   date: string;
   author: string;
@@ -67,8 +77,11 @@ export interface ResultRow {
   status: "Buyurilgan" | "Jarayonda" | "Tayyor";
   external: boolean;
   referral: string;
+  documentId?: string;
+  encounter?: string;
 }
 export interface Referral {
+  createdTime?: string;
   id: string;
   encounterKey: string;
   location: "internal" | "external";
@@ -336,6 +349,7 @@ export function createResults(): ResultRow[] {
     doctor: i === 5 ? "—" : i === 4 ? "Dilshod Aliyev" : DOCTOR.name,
     external: i === 5,
     referral: i === 1 ? "Y-00124" : "",
+    encounter: i < 4 ? "Q-1" : "",
   }));
 }
 export function referralErrors(r: Referral) {
@@ -380,4 +394,138 @@ export const UZI_DETAILS = {
     { name: "UZI xulosasi.pdf", format: "PDF", size: "245 KB" },
     { name: "UZI tasvirlari.jpg", format: "JPG", size: "1.2 MB" },
   ],
+};
+
+export interface Medicine {
+  name: string;
+  form: string;
+  strength: string;
+  dose: string;
+  unit: string;
+  route: string;
+  frequency: string;
+  duration: string;
+  instruction: string;
+}
+export interface Prescription {
+  id: string;
+  date: string;
+  medicines: Medicine[];
+  note: string;
+}
+export const blankMedicine = (): Medicine => ({
+  name: "",
+  form: "",
+  strength: "",
+  dose: "",
+  unit: "",
+  route: "",
+  frequency: "",
+  duration: "",
+  instruction: "",
+});
+export const MEDICINE_NAMES = ["Namunaviy preparat A", "Namunaviy preparat B"];
+export function prescriptionErrors(medicines: Medicine[]) {
+  return medicines.map((m) =>
+    Object.fromEntries(
+      (["name", "dose", "unit", "frequency", "duration"] as const)
+        .filter((k) => !m[k].trim())
+        .map((k) => [k, "Majburiy maydon."]),
+    ),
+  );
+}
+export const LAB_RESULTS: Record<
+  string,
+  {
+    order: string;
+    laboratory: string;
+    sampled: string;
+    ready: string;
+    confirmedBy: string;
+    comment: string;
+    values: {
+      name: string;
+      value: string;
+      unit: string;
+      range: string;
+      flag: "low" | "high" | "normal" | "unknown";
+    }[];
+  }
+> = {
+  "R-0": {
+    order: "L-00142",
+    laboratory: "Shifo Med laboratoriyasi",
+    sampled: "19.10.2026 · 09:40",
+    ready: "19.10.2026 · 10:20",
+    confirmedBy: "Malika Sobirova",
+    comment: "Qo‘shimcha izoh kiritilmagan.",
+    values: [
+      {
+        name: "Gemoglobin",
+        value: "118",
+        unit: "g/L",
+        range: "120 – 150",
+        flag: "low",
+      },
+      {
+        name: "Eritrotsitlar",
+        value: "4.3",
+        unit: "×10¹²/L",
+        range: "3.8 – 5.2",
+        flag: "normal",
+      },
+      {
+        name: "Leykotsitlar",
+        value: "11.2",
+        unit: "×10⁹/L",
+        range: "4.0 – 9.0",
+        flag: "high",
+      },
+      {
+        name: "Trombotsitlar",
+        value: "260",
+        unit: "×10⁹/L",
+        range: "180 – 320",
+        flag: "normal",
+      },
+      {
+        name: "Gematokrit",
+        value: "38",
+        unit: "%",
+        range: "36 – 46",
+        flag: "normal",
+      },
+      {
+        name: "ECHT",
+        value: "24",
+        unit: "mm/soat",
+        range: "2 – 20",
+        flag: "high",
+      },
+    ],
+  },
+  "R-4": {
+    order: "L-00108",
+    laboratory: "Namuna laboratoriya",
+    sampled: "12.10.2026 · 08:30",
+    ready: "12.10.2026 · 10:00",
+    confirmedBy: "Demo mutaxassis",
+    comment: "Namunaviy natija.",
+    values: [
+      {
+        name: "pH",
+        value: "6.0",
+        unit: "",
+        range: "5.0 – 7.0",
+        flag: "normal",
+      },
+      {
+        name: "Rang",
+        value: "Och sariq",
+        unit: "",
+        range: "",
+        flag: "unknown",
+      },
+    ],
+  },
 };

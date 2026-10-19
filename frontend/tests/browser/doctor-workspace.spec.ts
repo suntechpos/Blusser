@@ -68,7 +68,15 @@ async function shot(page: Page, name: string) {
 }
 const tab = (page: Page, name: string) =>
   page.getByRole("tab", { name, exact: true });
-const dialog = (page: Page) => page.getByRole("dialog");
+const dialog = (page: Page) => page.getByRole("dialog").last();
+async function dismiss(page: Page) {
+  await page.keyboard.press("Escape");
+  const discard = page.getByRole("button", {
+    name: "O‘zgarishlarni bekor qilish",
+    exact: true,
+  });
+  if (await discard.isVisible()) await discard.click();
+}
 test.use({ viewport: { width: 1672, height: 941 }, locale: "uz-UZ" });
 test("four tabs and approved modals share identical queue/card/shell, no new API calls", async ({
   page,
@@ -113,7 +121,7 @@ test("four tabs and approved modals share identical queue/card/shell, no new API
     .click();
   await expect(dialog(page).getByRole("textbox")).toHaveCount(0);
   await shot(page, "03-history-detail");
-  await page.keyboard.press("Escape");
+  await dismiss(page);
   await tab(page, "Tekshiruv natijalari").click();
   await page
     .getByRole("row")
@@ -137,7 +145,7 @@ test("four tabs and approved modals share identical queue/card/shell, no new API
   await shot(page, "07-internal-referral");
   await dialog(page).getByLabel("Boshqa klinikada", { exact: false }).check();
   await shot(page, "08-external-referral");
-  await page.keyboard.press("Escape");
+  await dismiss(page);
   await page.setViewportSize({ width: 1536, height: 1024 });
   await tab(page, "Tekshiruv natijalari").click();
   await shot(page, "10-results-source-viewport");
@@ -195,16 +203,23 @@ test("drafts isolate patient AND encounter, persist tab changes and reset on rel
   await page.reload();
   await expect(page.getByLabel("Shikoyatlar", { exact: true })).toHaveValue("");
 });
-test("queue search/date/next work locally and unapproved actions never complete visit", async ({
+test("queue search/date/next work locally and canceled modal actions never complete visit", async ({
   page,
 }) => {
   await setup(page);
   await page.getByRole("button", { name: "Retsept", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("hali tasdiqlanmagan");
-  await expect(dialog(page)).toHaveCount(0);
+  await expect(dialog(page)).toContainText("Retsept yozish");
+  await dismiss(page);
   await page
     .getByRole("button", { name: "Qabulni yakunlash", exact: true })
     .click();
+  await expect(
+    dialog(page).getByRole("button", {
+      name: "Qabulni yakunlash",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await dismiss(page);
   await expect(page.locator(".dw-patient-actions")).toContainText("Qabulda");
   await page.getByLabel("Navbatdagi bemorni qidirish").fill("NO MATCH");
   await expect(page.locator(".dw-queue")).toContainText("bemor topilmadi");
@@ -269,7 +284,9 @@ test("referrals validate, sanitize hidden values, remain local, do not finalize 
   await expect(page.locator(".dw-referrals")).toContainText(
     "Natija kutilmoqda",
   );
-  await expect(page.locator(".dw-referrals")).toContainText("Tashqi");
+  await expect(dialog(page).locator(".dw-created")).toBeVisible();
+  await dismiss(page);
+  await expect(page.locator(".dw-referrals")).toContainText("Boshqa klinikada");
   await shot(page, "09-referrals-list");
   await page.getByRole("button", { name: "Yo‘llanma", exact: true }).click();
   d = dialog(page);
@@ -298,10 +315,9 @@ test("history and result/document filters, read-only UZI, valid mock files and u
     .filter({ hasText: "Umumiy qon tahlili" })
     .getByRole("button", { name: "Natijani ko‘rish" })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "Laboratoriya natijasi oynasi hali tasdiqlanmagan",
-  );
-  await expect(dialog(page)).toHaveCount(0);
+  await expect(dialog(page)).toContainText("Laboratoriya natijasi");
+  await expect(dialog(page)).toContainText("Gemoglobin");
+  await dismiss(page);
   await page.getByLabel("Tur filtri").selectOption("Diagnostika");
   await page.getByLabel("Natija holati").selectOption("Jarayonda");
   await expect(page.locator("tbody")).toContainText("topilmadi");
@@ -330,7 +346,8 @@ test("history and result/document filters, read-only UZI, valid mock files and u
   await page
     .getByRole("button", { name: "Hujjat yuklash", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText("hali tasdiqlanmagan");
+  await expect(dialog(page)).toContainText("Hujjat yuklash");
+  await dismiss(page);
   await page.getByLabel("Hujjatni qidirish").fill("NO MATCH");
   await expect(page.locator("tbody")).toContainText("Hujjat topilmadi");
   await page.getByLabel("Hujjatni qidirish").fill("");
@@ -360,7 +377,7 @@ test("modal focus, escape/cancel and mobile horizontal scrolling", async ({
       true,
     );
   }
-  await page.keyboard.press("Escape");
+  await dismiss(page);
   await expect(trigger).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -377,7 +394,7 @@ test("modal focus, escape/cancel and mobile horizontal scrolling", async ({
         el.getBoundingClientRect().bottom <= innerHeight,
     ),
   ).toBe(true);
-  await page.keyboard.press("Escape");
+  await dismiss(page);
   await tab(page, "Hujjatlar").click();
   expect(
     await page
@@ -386,8 +403,9 @@ test("modal focus, escape/cancel and mobile horizontal scrolling", async ({
   ).toBe(true);
 });
 test("referral sanitization and synthetic PDF xref are internally consistent", async () => {
-  const { sanitizeReferral, referralErrors } =
-    await import("../../src/mocks/doctorWorkspace");
+  const { sanitizeReferral, referralErrors } = await import(
+    "../../src/mocks/doctorWorkspace"
+  );
   const raw = {
     id: "demo",
     encounterKey: "P1:Q1",
@@ -441,7 +459,7 @@ test("history print creates a read-only synthetic print window and results pagin
   );
   expect(await popup.evaluate(() => window.opener)).toBeNull();
   await popup.close();
-  await page.keyboard.press("Escape");
+  await dismiss(page);
   await tab(page, "Bugungi qabul").click();
   await page.getByRole("button", { name: "Yo‘llanma", exact: true }).click();
   await dialog(page)

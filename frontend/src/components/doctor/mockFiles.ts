@@ -1,7 +1,32 @@
 /** Actual synthetic PDF/JPEG blobs; never fetch or upload clinical documents. */
 export function demoPdf(title: string): Blob {
-  const label = title.replace(/[^\x20-\x7e]/g, "?").replace(/[()\\]/g, " ");
-  const stream = `BT /F1 16 Tf 50 760 Td (Blusser - synthetic UI document) Tj 0 -28 Td /F1 12 Tf (${label}) Tj 0 -24 Td (DEMO ONLY - no real medical record or advice.) Tj ET`;
+  const ascii = (value: string) =>
+    value
+      .normalize("NFKD")
+      .replace(/[‘’ʻʼ]/g, "'")
+      .replace(/[^\x20-\x7e]/g, " ")
+      .replace(/[()\\]/g, " ");
+  const lines = title.split(" | ").flatMap((value) => {
+    const words = ascii(value).split(/\s+/);
+    const wrapped: string[] = [];
+    let line = "";
+    for (const word of words) {
+      if (line.length + word.length > 68) {
+        wrapped.push(line);
+        line = "";
+      }
+      line += (line ? " " : "") + word;
+    }
+    if (line) wrapped.push(line);
+    return wrapped;
+  });
+  const stream =
+    `BT /F1 16 Tf 50 760 Td (Blusser - NAMUNAVIY HUJJAT) Tj 0 -36 Td /F1 12 Tf ` +
+    lines
+      .slice(0, 24)
+      .map((line) => `(${line}) Tj 0 -24 Td `)
+      .join("") +
+    `0 -30 Td /F1 10 Tf (DEMO ONLY - no real medical record or advice.) Tj ET`;
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
