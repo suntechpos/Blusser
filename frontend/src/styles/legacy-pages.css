@@ -1,0 +1,464 @@
+/* Opt-in only: shared shell, Employees and Doctor workspace are untouched. */
+.legacy-ui.legacy-ui {
+  font-family: "Employees Inter", Inter, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-width: 0;
+  color: #14254a;
+}
+.legacy-ui.legacy-ui h1 {
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+}
+.legacy-ui.legacy-ui h2 {
+  font-size: 20px;
+  line-height: 1.4;
+}
+.legacy-ui.legacy-ui h3 {
+  font-size: 17px;
+}
+.legacy-ui.legacy-ui p,
+.legacy-ui.legacy-ui label,
+.legacy-ui.legacy-ui table,
+.legacy-ui.legacy-ui th,
+.legacy-ui.legacy-ui td,
+.legacy-ui.legacy-ui td strong,
+.legacy-ui.legacy-ui td b {
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui small,
+.legacy-ui.legacy-ui td small {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.legacy-ui.legacy-ui button,
+.legacy-ui.legacy-ui input,
+.legacy-ui.legacy-ui select,
+.legacy-ui.legacy-ui textarea {
+  font-size: 14px;
+  font-family: inherit;
+}
+.legacy-ui.legacy-ui button {
+  min-height: 36px;
+}
+.legacy-ui.legacy-ui input:not([type="checkbox"]):not([type="radio"]),
+.legacy-ui.legacy-ui select {
+  min-height: 42px;
+}
+.legacy-ui.legacy-ui :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid #176cff;
+  outline-offset: 3px;
+}
+.legacy-ui.legacy-ui :is(input, select, textarea) {
+  max-width: 100%;
+}
+.legacy-ui.legacy-ui table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.legacy-ui.legacy-ui td,
+.legacy-ui.legacy-ui th {
+  padding: 14px 16px;
+  vertical-align: middle;
+}
+.legacy-ui.legacy-ui td {
+  line-height: 1.5;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-status,
+    .queue-status,
+    .queue-kind,
+    .patients-status,
+    .ap-status,
+    .tb-status,
+    .tb-sound,
+    .tb-counter
+  ) {
+  font-size: 13px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+}
+.legacy-ui.legacy-ui
+  :is(.reg-stat-value, .queue-stat strong, .ap-stat strong, .tb-metric strong) {
+  font-size: 28px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-stat-data > span,
+    .queue-stat span,
+    .ap-stat span,
+    .tb-metric small
+  ) {
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-stat-data p,
+    .queue-stat small,
+    .ap-stat small,
+    .tb-metric div > span
+  ) {
+  font-size: 13px;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-heading-actions,
+    .queue-top-actions,
+    .ap-head-actions,
+    .tb-head-buttons
+  ) {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.legacy-ui.legacy-ui
+  :is(.reg-heading-actions button, .queue-top-actions button, .tb-btn) {
+  height: 44px;
+  padding: 10px 16px;
+  white-space: nowrap;
+}
+.legacy-ui.legacy-ui :is(.reg-tabs, .queue-tabs, .ap-tabs, .patients-tabs) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-tabs button,
+    .queue-tabs button,
+    .ap-tabs button,
+    .patients-tabs button
+  ) {
+  font-size: 14px;
+  min-height: 46px;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+.legacy-ui.legacy-ui
+  :is(.reg-tabs span, .queue-tabs span, .ap-tabs span, .patients-tabs span) {
+  font-size: 13px;
+}
+.legacy-ui.legacy-ui :is(.reg-filters, .queue-filters) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+.legacy-ui.legacy-ui :is(.reg-filters label, .queue-filters label) {
+  height: 42px;
+  min-width: 0;
+}
+.legacy-ui.legacy-ui :is(.reg-filters input, .queue-filters input) {
+  width: 100%;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-table-scroll,
+    .queue-table-scroll,
+    .patients-table-wrap,
+    .ap-table-wrap,
+    .tb-table-wrap
+  ) {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-row-actions,
+    .queue-actions,
+    .patients-actions,
+    .ap-row-actions,
+    .tb-actions
+  ) {
+  gap: 8px;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-row-actions button,
+    .queue-actions button,
+    .patients-actions button,
+    .ap-row-actions button,
+    .ap-more-wrap > button,
+    .tb-actions button
+  ) {
+  font-size: 13px;
+  min-height: 36px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+.legacy-ui.legacy-ui
+  :is(.reg-person, .queue-patient, .patients-person, .ap-person, .tb-name) {
+  gap: 12px;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-person strong,
+    .queue-patient b,
+    .patients-person strong,
+    .ap-person strong,
+    .tb-name strong
+  ) {
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui
+  :is(
+    .reg-person small,
+    .queue-patient small,
+    .patients-person small,
+    .ap-person small,
+    .tb-name small
+  ) {
+  font-size: 13px;
+}
+.legacy-ui.legacy-ui
+  :is(.reg-avatar, .queue-avatar, .patients-avatar, .ap-avatar) {
+  width: 42px;
+  height: 42px;
+  font-size: 15px;
+  flex: none;
+}
+.legacy-ui.legacy-ui .reg-grid {
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+.legacy-ui.legacy-ui .reg-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.legacy-ui.legacy-ui .reg-stat {
+  padding: 18px;
+  min-height: 108px;
+}
+.legacy-ui.legacy-ui .reg-slot {
+  padding: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.legacy-ui.legacy-ui .reg-slot :is(span, strong, em) {
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui .reg-schedule {
+  padding: 18px;
+}
+.legacy-ui.legacy-ui .reg-quick strong {
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui .queue-columns {
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+}
+.legacy-ui.legacy-ui .queue-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.legacy-ui.legacy-ui .queue-stat {
+  min-height: 112px;
+  padding: 18px;
+}
+.legacy-ui.legacy-ui .queue-call {
+  padding: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.legacy-ui.legacy-ui .queue-call :is(strong, b, span) {
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui .queue-room {
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px;
+}
+.legacy-ui.legacy-ui .patients-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+.legacy-ui.legacy-ui .patients-search {
+  flex: 1 1 300px;
+  min-width: 200px;
+  height: 44px;
+}
+.legacy-ui.legacy-ui .patients-filter {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+.legacy-ui.legacy-ui .patients-filter small {
+  font-size: 13px;
+}
+.legacy-ui.legacy-ui .patients-panel {
+  margin-top: 18px;
+}
+.legacy-ui.legacy-ui :is(.patients-modal, .ap-modal, .tb-dialog) {
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+.legacy-ui.legacy-ui :is(.patients-overlay, .ap-overlay, .tb-overlay) {
+  padding: 16px;
+}
+.legacy-ui.legacy-ui
+  :is(.patients-modal, .ap-modal, .tb-dialog)
+  :is(input, select) {
+  min-height: 42px;
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui :is(.patients-modal, .ap-modal, .tb-dialog) label {
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui :is(.patients-modal, .ap-modal, .tb-dialog) button {
+  font-size: 14px;
+  min-height: 40px;
+}
+.legacy-ui.legacy-ui .tb-layout {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+}
+.legacy-ui.legacy-ui .tb-toolbar {
+  flex-wrap: wrap;
+}
+.legacy-ui.legacy-ui .tb-search {
+  height: 44px;
+  flex: 1 1 260px;
+}
+.legacy-ui.legacy-ui .tb-mini-tv {
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui .tb-mini-main strong {
+  font-size: 38px;
+}
+.legacy-ui.legacy-ui .tb-preview-caveat {
+  font-size: 13px;
+}
+.legacy-ui.legacy-ui :is(.queue-pagination, .ap-footer, .patients-footer) {
+  font-size: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.legacy-ui.legacy-ui [class*="pagination"] button {
+  min-width: 36px;
+  height: 36px;
+}
+@media (max-width: 1450px) {
+  .legacy-ui.legacy-ui :is(.reg-grid, .queue-columns, .tb-layout) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .legacy-ui.legacy-ui :is(.reg-schedule, .queue-side, .tb-side) {
+    width: 100%;
+  }
+  .legacy-ui.legacy-ui .tb-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .legacy-ui.legacy-ui .reg-slots {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+@media (max-width: 1000px) {
+  .legacy-ui.legacy-ui :is(.reg-filters, .queue-filters) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .legacy-ui.legacy-ui :is(.reg-stats, .queue-stats, .ap-stats, .tb-metrics) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .legacy-ui.legacy-ui :is(.reg-heading, .queue-heading, .ap-head, .tb-head) {
+    flex-wrap: wrap;
+    align-items: start;
+    gap: 16px;
+  }
+  .legacy-ui.legacy-ui .reg-heading-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 600px) {
+  .legacy-ui.legacy-ui :is(.reg-filters, .queue-filters, .reg-slots, .tb-side) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .legacy-ui.legacy-ui :is(.reg-stats, .queue-stats, .ap-stats, .tb-metrics) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .legacy-ui.legacy-ui :is(.patients-modal, .ap-modal, .tb-dialog) {
+    width: 100%;
+  }
+  .legacy-ui.legacy-ui :is(.patients-form, .ap-form, .tb-form-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.legacy-ui.legacy-ui .tb-preview-selector {
+  display: grid;
+  gap: 7px;
+  padding: 0 16px 14px;
+  font-size: 14px;
+}
+.legacy-ui.legacy-ui .tb-preview-selector select {
+  border: 1px solid #dce7fa;
+  border-radius: 7px;
+  background: white;
+  padding: 8px;
+  width: 100%;
+}
+.legacy-ui.legacy-ui button.tb-sound {
+  border: 1px solid #dce7fa;
+  background: white;
+  border-radius: 7px;
+}
+.legacy-ui.legacy-ui .reg-schedule-head {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+}
+.legacy-ui.legacy-ui .reg-schedule-head h2 {
+  white-space: nowrap;
+}
+.legacy-ui.legacy-ui .reg-doctor {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+  margin: 16px 0;
+}
+.legacy-ui.legacy-ui .reg-doctor > span {
+  min-width: 0;
+  flex: 1;
+}
+.legacy-ui.legacy-ui .reg-doctor select {
+  width: 100%;
+  border: 1px solid #dce7fa;
+  border-radius: 7px;
+  background: white;
+  padding: 8px;
+}
+.legacy-ui.legacy-ui .reg-date {
+  position: static;
+  float: none;
+  text-align: left;
+  margin: 10px 0 16px;
+}
+.legacy-ui.legacy-ui .reg-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.legacy-ui.legacy-ui .reg-slot > span {
+  grid-column: 1/-1;
+}
+.legacy-ui.legacy-ui .reg-slot > div {
+  min-width: 0;
+  width: auto;
+}
+.legacy-ui.legacy-ui .reg-slot strong {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.5;
+}
+.legacy-ui.legacy-ui .reg-slot em {
+  font-size: 13px;
+  white-space: nowrap;
+}

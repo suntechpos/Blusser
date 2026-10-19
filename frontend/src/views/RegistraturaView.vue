@@ -13,40 +13,36 @@ const patients = ref<Patient[]>([
   {name:'Yo‘ldosheva Xulkar',id:'P-00131',phone:'+998 93 890 12 34',doctor:'Nuriddinov O.',specialty:'Ortoped',status:'Oldindan',time:'10:20',wait:'—',initials:'YX'}
 ])
 const tab=ref('Barcha bemorlar'), query=ref(''), specialty=ref(''), doctor=ref(''), state=ref(''), toast=ref('')
-const tabs=[['Barcha bemorlar',42],['Jonli navbat',14],['Oldindan yozilgan',28],['Qabulda',5],['Yakunlangan',18]] as const
-const stats=[
-  {name:'Bugungi bemorlar',value:'42',note:'Kecha: 37',change:'12%',icon:Users,tone:'blue'},
-  {name:'Oldindan yozilgan',value:'28',note:'Bugungi slotlar',change:'8%',icon:CalendarDays,tone:'green'},
-  {name:'Jonli navbat',value:'14',note:'Kutmoqda',change:'',icon:Stethoscope,tone:'orange'},
-  {name:'Qabulda',value:'5',note:'Hozir qabulda',change:'',icon:Clock3,tone:'red'},
-  {name:'Yakunlangan',value:'18',note:'Bugun',change:'',icon:CheckCircle2,tone:'purple'},
-  {name:'Tushum',value:'4 250 000',note:'Kecha: 3 220 000 so‘m',change:'32%',icon:CreditCard,tone:'violet'}
-]
+const tabs=computed(()=>['Barcha bemorlar','Jonli navbat','Oldindan yozilgan','Qabulda','Yakunlangan'].map(t=>[t,patients.value.filter(p=>t==='Barcha bemorlar'||p.status===(t==='Oldindan yozilgan'?'Oldindan':t)).length] as const));
+const stats=computed(()=>tabs.value.map((t,i)=>({name:t[0],value:String(t[1]),note:'Lokal namuna holati',change:'',icon:[Users,Stethoscope,CalendarDays,Clock3,CheckCircle2][i],tone:['blue','orange','green','red','purple'][i]})));
+const sort=ref('time');
 const visible=computed(()=>patients.value.filter(p=>{
   const t=tab.value==='Barcha bemorlar'||(tab.value==='Oldindan yozilgan'?p.status==='Oldindan':p.status===tab.value)
   const q=[p.name,p.id,p.phone,p.doctor].join(' ').toLowerCase().includes(query.value.toLowerCase())
   return t&&q&&(!specialty.value||p.specialty===specialty.value)&&(!doctor.value||p.doctor===doctor.value)&&(!state.value||p.status===state.value)
-}))
-const slots=[
+}).sort((a,b)=>sort.value==='name'?a.name.localeCompare(b.name):a.time.localeCompare(b.time)))
+const baseSlots=[
   ['09:00 – 09:20','Aliyeva Mohira','Konsultatsiya','Yakunlandi'],['09:20 – 09:40','Qodirov Aziz','Konsultatsiya','Qabulda'],
   ['09:40 – 10:00','Bo‘sh vaqt','','Jonli navbat'],['10:00 – 10:20','Matchonov Siroj','Konsultatsiya','Kutmoqda'],
   ['10:20 – 10:40','Jonli navbat uchun','Zaxira slot','Zaxira'],['10:40 – 11:00','Bo‘sh vaqt','','Jonli navbat'],
   ['11:00 – 11:20','Bo‘riyev Temur','Konsultatsiya','Oldindan'],['11:20 – 11:40','Jonli navbat uchun','Zaxira slot','Zaxira'],
   ['11:40 – 12:00','Bo‘sh vaqt','','Jonli navbat'],['12:00 – 12:20','Yo‘ldosheva Xulkar','Konsultatsiya','Rejalangan']
 ]
+const scheduleDoctor=ref('Karimov A.');
+const slots=computed(()=>baseSlots.map(slot=>{const patient=patients.value.find(p=>p.time===slot[0]!.slice(0,5)&&(!scheduleDoctor.value||p.doctor===scheduleDoctor.value));return patient?[slot[0],patient.name,patient.specialty,patient.status]:[slot[0],'Bo‘sh vaqt','','Jonli navbat'];}));
 const shortcuts=[{label:'Bemor qidirish',icon:Search},{label:'Yangi bemor',icon:UserRoundPlus},{label:'Tashrif yaratish',icon:ClipboardList},{label:'Qabulga yozish',icon:CalendarDays},{label:'Navbatga qo‘shish',icon:Users},{label:'To‘lov qabul qilish',icon:CreditCard}]
-function demo(label:string){toast.value=`${label}: hozircha demo, API ulanmagan.`}
+function demo(label:string){toast.value=`${label}: bu amal namoyish rejimida hali tayyor emas.`}
 function callPatient(p:Patient){p.status='Qabulda';toast.value=`${p.name} qabulga chaqirildi (demo).`}
 </script>
 <template>
-<section class="reg">
+<section class="reg legacy-ui">
  <header class="reg-heading"><div><h1>Registratura</h1><p>Bemorlarni qabul qilish, navbat va tashriflarni boshqarish</p></div><div class="reg-heading-actions"><button class="primary" @click="demo('Yangi bemor')"><UserRoundPlus :size="17"/> Yangi bemor</button><button class="green" @click="demo('Qabulga yozish')"><CalendarDays :size="17"/> Qabulga yozish</button><button class="orange" @click="demo('Bemorni qabul qilish')"><UserCheck :size="17"/> Bemorni qabul qilish</button><button class="more" @click="demo('Ko‘proq')"><MoreHorizontal :size="17"/> Ko‘proq</button></div></header>
  <div v-if="toast" class="reg-toast" role="status">{{toast}} <button @click="toast=''">×</button></div>
  <div class="reg-stats"><article v-for="s in stats" :key="s.name" class="reg-stat" :class="s.tone"><div class="reg-stat-icon"><component :is="s.icon" :size="25"/></div><div class="reg-stat-data"><span>{{s.name}}</span><div class="reg-stat-value">{{s.value}}<small v-if="s.name==='Tushum'"> so‘m</small> <em v-if="s.change">↑ {{s.change}}</em></div><p>{{s.note}}</p></div></article></div>
- <div class="reg-grid"><div class="reg-main-col"><section class="reg-panel reg-list"><nav class="reg-tabs"><button v-for="t in tabs" :key="t[0]" :class="{active:tab===t[0]}" @click="tab=t[0]">{{t[0]}} <span>{{t[1]}}</span></button></nav><div class="reg-filters"><select v-model="specialty"><option value="">Barcha mutaxassisliklar</option><option>Kardiolog</option><option>UZI</option><option>Terapevt</option><option>Nevrolog</option><option>Ortoped</option></select><select v-model="doctor"><option value="">Barcha shifokorlar</option><option>Karimov A.</option><option>Saidov B.</option><option>Rahmonova D.</option><option>Nuriddinov O.</option></select><select v-model="state"><option value="">Barcha holatlar</option><option>Qabulda</option><option>Kutilmoqda</option><option>Oldindan</option><option>Yakunlangan</option><option>Kechikkan</option></select><label><Search :size="16"/><input v-model="query" placeholder="Bemor qidirish..." /></label><select><option>Saralash: Navbat vaqti</option></select></div>
+ <div class="reg-grid"><div class="reg-main-col"><section class="reg-panel reg-list"><nav class="reg-tabs"><button v-for="t in tabs" :key="t[0]" :class="{active:tab===t[0]}" @click="tab=t[0]">{{t[0]}} <span>{{t[1]}}</span></button></nav><div class="reg-filters"><select v-model="specialty"><option value="">Barcha mutaxassisliklar</option><option>Kardiolog</option><option>UZI</option><option>Terapevt</option><option>Nevrolog</option><option>Ortoped</option></select><select v-model="doctor"><option value="">Barcha shifokorlar</option><option>Karimov A.</option><option>Saidov B.</option><option>Rahmonova D.</option><option>Nuriddinov O.</option></select><select v-model="state"><option value="">Barcha holatlar</option><option>Qabulda</option><option>Kutilmoqda</option><option>Oldindan</option><option>Yakunlangan</option><option>Kechikkan</option></select><label><Search :size="16"/><input v-model="query" placeholder="Bemor qidirish..." /></label><select v-model="sort" aria-label="Saralash"><option value="time">Saralash: Navbat vaqti</option><option value="name">Bemor nomi</option></select></div>
  <div class="reg-table-scroll"><table><thead><tr><th>#</th><th>Bemor</th><th>Shifokor / Xizmat</th><th>Holat</th><th>Kelgan vaqt</th><th>Kutish vaqti</th><th>Amallar</th></tr></thead><tbody><tr v-for="(p,i) in visible" :key="p.id"><td>{{i+1}}</td><td><div class="reg-person"><span class="reg-avatar">{{p.initials}}</span><div><strong>{{p.name}}</strong><small>{{p.id}} · {{p.phone}}</small></div></div></td><td><strong>{{p.doctor}}</strong><small>{{p.specialty}}</small></td><td><span class="reg-status" :class="p.status">{{p.status}}</span></td><td><strong>{{p.time}}</strong></td><td class="reg-wait">{{p.wait}}</td><td><div class="reg-row-actions"><button v-if="['Kutilmoqda','Jonli navbat'].includes(p.status)" @click="callPatient(p)"><Play :size="13"/> Chaqirish</button><button v-else @click="demo('Ko‘rish')"><Eye :size="14"/> Ko‘rish</button><button @click="demo('Amallar')"><MoreHorizontal :size="16"/></button></div></td></tr><tr v-if="!visible.length"><td colspan="7" class="reg-no-results">Bemor topilmadi</td></tr></tbody></table></div></section>
  <section class="reg-panel reg-quick"><h2>Tezkor amallar</h2><div><button v-for="s in shortcuts" :key="s.label" @click="demo(s.label)"><span><component :is="s.icon" :size="22"/></span><strong>{{s.label}}</strong><small>{{s.label==='Yangi bemor'?'Tizimga qo‘shish':'Tezkor amal'}}</small></button></div></section></div>
- <aside class="reg-panel reg-schedule"><div class="reg-schedule-head"><h2>Bugungi qabullar</h2><button @click="demo('Barcha shifokorlar')">Barcha shifokorlar <ChevronRight :size="15"/></button></div><div class="reg-doctor"><div class="reg-avatar">KA</div><span><strong>Dr. Karimov Anvar</strong><small>Kardiolog</small></span><ChevronDown :size="15"/></div><p class="reg-date">15-oktabr, 2026</p><div class="reg-slots"><div v-for="(s,i) in slots" :key="i" class="reg-slot" :class="s[3]"><span>{{s[0]}}</span><div><strong>{{s[1]}}</strong><small>{{s[2]}}</small></div><em>{{s[3]}}</em><button v-if="['Zaxira','Jonli navbat'].includes(s[3])" @click="demo('Slot')"><Plus :size="16"/></button></div></div></aside></div>
+ <aside class="reg-panel reg-schedule"><div class="reg-schedule-head"><h2>Bugungi qabullar</h2><button @click="scheduleDoctor=''">Barcha shifokorlar <ChevronRight :size="15"/></button></div><div class="reg-doctor"><div class="reg-avatar">KA</div><span><select v-model="scheduleDoctor" aria-label="Qabul jadvali shifokori"><option value="">Barcha shifokorlar</option><option v-for="d in [...new Set(patients.map(p=>p.doctor))]" :key="d">{{d}}</option></select><small>Lokal namuna jadvali</small></span><ChevronDown :size="15"/></div><p class="reg-date">15-oktabr, 2026</p><div class="reg-slots"><div v-for="(s,i) in slots" :key="i" class="reg-slot" :class="s[3]"><span>{{s[0]}}</span><div><strong>{{s[1]}}</strong><small>{{s[2]}}</small></div><em>{{s[3]}}</em><button v-if="['Zaxira','Jonli navbat'].includes(s[3])" @click="demo('Slot')"><Plus :size="16"/></button></div></div></aside></div>
 </section>
 </template>
 <style scoped>
@@ -55,3 +51,5 @@ function callPatient(p:Patient){p.status='Qabulda';toast.value=`${p.name} qabulg
 @media(min-width:1600px){.reg-stats{grid-template-columns:repeat(6,minmax(0,1fr))}.reg-grid{grid-template-columns:minmax(0,1.87fr) minmax(0,.92fr)}}
 
 </style>
+
+<style scoped src="../styles/legacy-pages.css"></style>

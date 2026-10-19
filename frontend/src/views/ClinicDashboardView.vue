@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ClinicOverview from "../components/dashboard/ClinicOverview.vue"
 import {session,selectClinic} from '../services/session'
 import {errorText} from '../services/api'
 import NavbatlarView from "./NavbatlarView.vue"
@@ -11,10 +12,10 @@ import DoctorWorkspaceView from './DoctorWorkspaceView.vue'
 import RegistraturaView from './RegistraturaView.vue'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import {
-  Activity, Bell, Building2, CalendarDays, ChevronDown, ChevronRight, Clock3,
-  CreditCard, FlaskConical, Home, LayoutGrid, Map, MapPin, Menu, Package,
+  Activity, Bell, Building2, CalendarDays, ChevronDown, ChevronRight,
+  FlaskConical, Home, LayoutGrid, Map, Menu, Package,
   Search, Settings, Stethoscope, Users, Wallet, ClipboardList,
-  ChartNoAxesColumnIncreasing, TriangleAlert, ArrowRight,
+  ChartNoAxesColumnIncreasing,
   BriefcaseMedical, LogOut, BedDouble
 } from 'lucide-vue-next'
 
@@ -24,8 +25,6 @@ const activeItem = ref(window.location.hash === '#shifokor-kabineti' ? 'Shifokor
 function navigate(label:string){activeItem.value=label;window.location.hash=label==='Shifokor kabineti'?'shifokor-kabineti':label==='Bo‘limlar va Xonalar'?'bolimlar-xonalar':label==='Xodimlar'?'xodimlar':label==='Bemorlar'?'bemorlar':''}
 const activeClinic=computed(()=>session.clinics.find(c=>c.id===session.user?.active_tenant_id))
 async function changeClinic(e:Event){try{await selectClinic((e.target as HTMLSelectElement).value)}catch(error){session.error=errorText(error)}}
-const period = ref('Bugun, 15 oktabr 2026')
-const branch = ref('Barcha filiallar')
 const sidebarOpen = ref(true)
 const profileOpen = ref(false)
 const profileRef = ref<HTMLElement | null>(null)
@@ -59,33 +58,6 @@ const groups = [
   ] },
   { label: 'SOZLAMALAR', items: [{ label: 'Sozlamalar', icon: Settings }] }
 ]
-const metrics = [
-  { label: 'Bugungi bemorlar', value: '42', change: '12%', note: 'Kecha: 37', icon: Users, cls: 'sky' },
-  { label: 'Rejalashtirilgan qabullar', value: '28', change: '8%', note: 'Kecha: 26', icon: CalendarDays, cls: 'mint' },
-  { label: 'Tugagan qabullar', value: '20', change: '25%', note: 'Kecha: 16', icon: Stethoscope, cls: 'amber' },
-  { label: 'Kutilayotgan navbat', value: '6', change: '', note: 'O‘rtacha kutish: 18 daqiqa', icon: Clock3, cls: 'rose' },
-  { label: 'Bugungi tushum', value: '4 250 000', change: '32%', note: 'Kecha: 3 220 000 so‘m', icon: CreditCard, cls: 'violet' }
-]
-const visits = [
-  { time: '09:00', name: 'Aliyeva Mohira', id: 'P-00124', doctor: 'Karimov A.', specialty: 'Kardiolog', service: 'Konsultatsiya', status: 'Bajarilgan', kind: 'success', avatar: 'AM' },
-  { time: '09:30', name: 'Toshboyev Akmal', id: 'P-00125', doctor: 'Rahmonova D.', specialty: 'Terapevt', service: 'Konsultatsiya', status: 'Bajarilgan', kind: 'success', avatar: 'TA' },
-  { time: '10:00', name: 'Qodirov Aziz', id: 'P-00126', doctor: 'Saidov B.', specialty: 'Nevrolog', service: 'Konsultatsiya', status: 'Qabulda', kind: 'info', avatar: 'QA' },
-  { time: '10:30', name: 'Ismoilova Nilufar', id: 'P-00127', doctor: 'Karimov A.', specialty: 'Kardiolog', service: 'EKG', status: 'Kutilmoqda', kind: 'warning', avatar: 'IN' },
-  { time: '11:00', name: 'Matchonov Siroj', id: 'P-00128', doctor: 'Rahmonova D.', specialty: 'Terapevt', service: 'Konsultatsiya', status: 'Rejalashtirilgan', kind: 'neutral', avatar: 'MS' }
-]
-const queue = [
-  { patient: 'Aliyeva Mohira', note: 'Konsultatsiya • 5 daqiqa', doctor: 'Karimov A.', specialty: 'Kardiolog', status: 'Qabulda', kind: 'success', avatar: 'AM', dr: 'KA' },
-  { patient: 'Qodirov Aziz', note: 'UZI • 18 daqiqa', doctor: 'Saidova N.', specialty: 'UZI', status: 'Kutilmoqda', kind: 'warning', avatar: 'QA', dr: 'SN' },
-  { patient: 'Ismoilova Nilufar', note: 'Laboratoriya • 30 daqiqa', doctor: 'Rasulova M.', specialty: 'Laboratoriya', status: 'Kutilmoqda', kind: 'warning', avatar: 'IN', dr: 'RM' },
-  { patient: 'Toshboyev Akmal', note: 'Konsultatsiya • 45 daqiqa', doctor: 'Rahmonova D.', specialty: 'Terapevt', status: 'Kutilmoqda', kind: 'neutral', avatar: 'TA', dr: 'RD' }
-]
-const chartX = [0, 105, 210, 315, 420, 525, 630]
-const seriesA = [12, 23, 18, 34, 25, 40, 47]
-const seriesB = [6, 15, 10, 20, 15, 29, 34]
-const point = (v: number, i: number) => `${chartX[i]},${140-v*2.55}`
-const lineA = computed(() => seriesA.map(point).join(' '))
-const lineB = computed(() => seriesB.map(point).join(' '))
-const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
 </script>
 
 <template>
@@ -138,18 +110,7 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
       </header>
       <main class="clinic-main" :key="session.epoch">
         <div v-if="activeItem!=='Bemorlar' && activeItem!=='Xodimlar' && activeItem!=='Bo‘limlar va Xonalar' && activeItem!=='Shifokor kabineti'" class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
-        <template v-if="activeItem === 'Bosh sahifa'">
-          <div class="clinic-page-head"><div><h1>Xush kelibsiz, Gulnoza!</h1><p>Bugungi klinika faoliyati haqida umumiy ma’lumot</p></div><div class="clinic-filters"><button><CalendarDays :size="18" />{{ period }}<ChevronDown :size="16" /></button><button><MapPin :size="19" />{{ branch }}<ChevronDown :size="16" /></button></div></div>
-          <section class="clinic-stats"><div v-for="(m,i) in metrics" :key="m.label" class="clinic-stat" :class="m.cls"><span class="clinic-stat-icon"><component :is="m.icon" :size="28" /></span><div class="clinic-stat-detail"><span class="clinic-stat-label">{{ m.label }}</span><div class="clinic-stat-value">{{ m.value }}<small v-if="i===4"> so‘m</small> <em v-if="m.change">↑ {{ m.change }}</em><small v-if="i===3"> bemor</small></div><span class="clinic-stat-note">{{ m.note }}</span></div></div></section>
-          <section class="clinic-analytics">
-            <article class="clinic-panel clinic-activity"><div class="clinic-panel-head"><h2>Klinika faolligi</h2><button>So‘nggi 7 kun <ChevronDown :size="15" /></button></div><div class="clinic-line-chart"><div class="clinic-ylabels"><span>50</span><span>40</span><span>30</span><span>20</span><span>10</span><span>0</span></div><div class="clinic-plot"><svg viewBox="0 0 630 140" preserveAspectRatio="none" aria-label="7 kunlik klinika faolligi grafigi" role="img"><g stroke="#e6edf7" stroke-dasharray="3 3" stroke-width="1"><path v-for="y in [0,28,56,84,112,140]" :key="`h${y}`" :d="`M0 ${y}H630`"/><path v-for="x in chartX" :key="`v${x}`" :d="`M${x} 0V140`" /></g><polygon :points="areaB" fill="#11b99a" fill-opacity=".14"/><polyline :points="lineB" fill="none" stroke="#05b99c" stroke-width="2.5" vector-effect="non-scaling-stroke"/><polyline :points="lineA" fill="none" stroke="#2376fb" stroke-width="2.5" vector-effect="non-scaling-stroke"/><circle v-for="(v,i) in seriesA" :key="`a${i}`" :cx="chartX[i]" :cy="140-v*2.55" r="3.5" fill="#2376fb"/><circle v-for="(v,i) in seriesB" :key="`b${i}`" :cx="chartX[i]" :cy="140-v*2.55" r="3.5" fill="#05b99c" /></svg><div class="clinic-xlabels"><span v-for="day in ['9 okt','10 okt','11 okt','12 okt','13 okt','14 okt','15 okt']" :key="day">{{ day }}</span></div></div></div><div class="clinic-legend"><span><i class="blue-dot"></i>Bemorlar soni</span><span><i class="green-dot"></i>Tushum (mln so‘m)</span></div></article>
-            <article class="clinic-panel clinic-services"><div class="clinic-panel-head"><h2>Xizmatlar bo‘yicha</h2><button>Bugun <ChevronDown :size="15" /></button></div><div class="clinic-donut-row"><div class="clinic-donut"><div><strong>42</strong><small>bemor</small></div></div><div class="clinic-donut-legend"><div v-for="s in [{l:'Konsultatsiya',p:45,c:'#2477ff'},{l:'Laboratoriya',p:20,c:'#04b99b'},{l:'UZI va Diagnostika',p:18,c:'#ffbb45'},{l:'Muolajalar',p:10,c:'#b78bfa'},{l:'Boshqa',p:7,c:'#a1b5d0'}]" :key="s.l"><i :style="{background:s.c}"></i><span>{{ s.l }}</span><b>{{ s.p }}%</b></div></div></div></article>
-          </section>
-          <section class="clinic-bottom">
-            <article class="clinic-panel clinic-appointments"><div class="clinic-panel-head"><h2>Bugungi qabullar</h2><button class="clinic-link" @click="activeItem='Qabullar'">Barchasini ko‘rish <ArrowRight :size="16" /></button></div><div class="clinic-table-wrap"><table><thead><tr><th>Vaqt</th><th>Bemor</th><th>Shifokor</th><th>Xizmat</th><th>Holat</th></tr></thead><tbody><tr v-for="v in visits" :key="v.id"><td>{{ v.time }}</td><td><div class="clinic-patient"><span class="clinic-small-avatar">{{ v.avatar }}</span><div><b>{{ v.name }}</b><small>{{ v.id }}</small></div></div></td><td><b>{{ v.doctor }}</b><small>{{ v.specialty }}</small></td><td>{{ v.service }}</td><td><span class="clinic-status" :class="v.kind">{{ v.status }}</span></td></tr></tbody></table></div></article>
-            <article class="clinic-panel clinic-queue"><div class="clinic-panel-head"><h2>Navbatlar</h2><button class="clinic-link" @click="activeItem='Navbatlar'">Barchasini ko‘rish <ArrowRight :size="16" /></button></div><div v-for="(q,i) in queue" :key="q.patient" class="clinic-queue-item"><span class="clinic-queue-number">{{ i+1 }}</span><span class="clinic-small-avatar">{{ q.avatar }}</span><div class="clinic-queue-patient"><b>{{ q.patient }}</b><small>{{ q.note }}</small></div><span class="clinic-small-avatar clinic-doctor-avatar">{{ q.dr }}</span><div class="clinic-queue-doctor"><b>{{ q.doctor }}</b><small>{{ q.specialty }}</small></div><span class="clinic-status" :class="q.kind">{{ q.status }}</span></div><div class="clinic-unpaid"><TriangleAlert :size="24"/><div><strong>To‘lanmagan hisoblar</strong><small>Bugungi tashriflarda 3 ta to‘lanmagan xizmat mavjud.</small></div><button @click="activeItem='Kassa'">Kassaga o‘tish <ArrowRight :size="15"/></button></div></article>
-          </section>
-        </template>
+        <ClinicOverview v-if="activeItem === 'Bosh sahifa'" :username="session.user?.login || 'Foydalanuvchi'" @navigate="navigate"/>
         <RegistraturaView v-else-if="activeItem === 'Registratura'" />
         <BemorlarView v-else-if="activeItem === 'Bemorlar'" />
         <XodimlarView v-else-if="activeItem === 'Xodimlar'" />
