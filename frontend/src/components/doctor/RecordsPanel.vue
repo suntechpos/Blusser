@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { defineAsyncComponent, computed, ref, watch } from "vue";
 import {
   PlusCircle,
   Search,
@@ -15,21 +15,50 @@ import {
   CheckCircle2,
   Clock3,
 } from "lucide-vue-next";
+import LabResultDialog from "./LabResultDialog.vue";
+import UploadDialog from "./UploadDialog.vue";
+const DocumentViewer = defineAsyncComponent(
+  () => import("./DocumentViewer.vue"),
+);
+import { printBlob, downloadBlob } from "./localFiles";
 import ResultDialog from "./ResultDialog.vue";
 import { dateLabel } from "../../mocks/employees";
 import {
+  type Referral,
   type DocumentRow,
   type ResultRow,
   type Encounter,
 } from "../../mocks/doctorWorkspace";
-import { fileAction, printDemo } from "./mockFiles";
+
 const props = defineProps<{
   kind: "results" | "documents";
   encounter: Encounter;
   results: ResultRow[];
   documents: DocumentRow[];
+  encounters: Encounter[];
+  referrals: Referral[];
 }>();
-const emit = defineEmits<{ notice: [string] }>();
+const emit = defineEmits<{
+  notice: [string];
+  uploaded: [DocumentRow, boolean];
+}>();
+const upload = ref(false);
+const viewing = ref<DocumentRow | null>(null);
+const uploadReferral = computed(
+  () =>
+    props.referrals.find(
+      (r) =>
+        r.location === "external" &&
+        !props.results.some(
+          (x) => x.referral === r.id && x.status === "Tayyor",
+        ),
+    )?.id,
+);
+function uploaded(d: DocumentRow, external: boolean) {
+  emit("uploaded", d, external);
+  upload.value = false;
+}
+
 const detail = ref<ResultRow | null>(null);
 const query = ref(""),
   type = ref(""),
@@ -62,25 +91,33 @@ const rows = computed(() =>
 watch([query, type, status, from, to], () => (page.value = 1));
 function resultView(r: ResultRow) {
   if (r.external) {
-    void fileAction(r.name, "PDF", "view").catch(() =>
-      emit("notice", "Demo faylni ochib bo‘lmadi."),
-    );
+    const d = props.documents.find((d) => d.id === r.documentId);
+    if (d) viewing.value = d;
+    else emit("notice", "Ushbu tashqi natija fayli mavjud emas.");
     return;
   }
-  if (r.type === "Diagnostika" && r.name === "Qorin bo‘shlig‘i UZI") {
+  if (
+    r.type === "Laboratoriya" ||
+    (r.type === "Diagnostika" && r.name === "Qorin bo‘shlig‘i UZI")
+  ) {
     detail.value = r;
     return;
   }
-  emit("notice", "Laboratoriya natijasi oynasi hali tasdiqlanmagan.");
+  emit("notice", "Bu natija uchun tasdiqlangan tafsilot mavjud emas.");
 }
 function action(d: DocumentRow, kind: "view" | "download" | "print") {
-  if (kind === "print") {
-    if (!printDemo(d.name, [d.name, "Faqat sintetik demo fayl."]))
-      emit("notice", "Chop etish oynasiga brauzer ruxsat bermadi.");
-  } else
-    void fileAction(d.name, d.format, kind).catch(() =>
-      emit("notice", "Demo faylni yaratib bo‘lmadi."),
-    );
+  if (kind === "view") {
+    viewing.value = d;
+    return;
+  }
+  if (!d.blob) {
+    emit("notice", "Fayl mavjud emas.");
+    return;
+  }
+  if (kind === "download")
+    downloadBlob(d.blob, d.name + "." + d.format.toLowerCase());
+  else
+    void printBlob(d.blob).catch((e) => emit("notice", (e as Error).message));
 }
 </script>
 <template>
@@ -99,14 +136,7 @@ function action(d: DocumentRow, kind: "view" | "download" | "print") {
       <button
         class="e-button"
         :class="{ primary: kind === 'documents' }"
-        @click="
-          emit(
-            'notice',
-            kind === 'results'
-              ? 'Tashqi natija qo‘shish oynasi hali tasdiqlanmagan.'
-              : 'Hujjat yuklash oynasi hali tasdiqlanmagan.',
-          )
-        "
+        @click="upload = true"
       >
         <PlusCircle :size="20" />{{
           kind === "results" ? "Tashqi natija qo‘shish" : "Hujjat yuklash"
@@ -313,8 +343,30 @@ function action(d: DocumentRow, kind: "view" | "download" | "print") {
           : "Haqiqiy hujjatlar uchun backend ruxsatlari bu namoyishda amalga oshirilmaydi."
       }}
     </p>
+    <UploadDialog
+      v-if="upload"
+      :encounter="encounter"
+      :encounters="encounters"
+      :referrals="referrals"
+      :external-result="kind === 'results'"
+      :initial-referral="kind === 'results' ? uploadReferral : undefined"
+      @close="upload = false"
+      @save="uploaded"
+    />
+    <LabResultDialog
+      v-if="detail && detail.type === 'Laboratoriya'"
+      :encounter="encounter"
+      :result="detail"
+      @close="detail = null"
+    />
+    <DocumentViewer
+      v-if="viewing"
+      :encounter="encounter"
+      :file="viewing"
+      @close="viewing = null"
+    />
     <ResultDialog
-      v-if="detail"
+      v-if="detail && detail.type !== 'Laboratoriya'"
       :encounter="encounter"
       :result="detail"
       @close="detail = null"
