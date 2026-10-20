@@ -31,11 +31,15 @@ import { type Encounter } from "../../mocks/doctorWorkspace";
 import { dateLabel } from "../../mocks/employees";
 GlobalWorkerOptions.workerSrc = workerUrl;
 const props = defineProps<{
-  encounter: Encounter;
+  encounter?: Encounter;
+  context?: string;
+  title?: string;
+  containImage?: boolean;
   file: { name: string; blob?: Blob; date: string; external?: boolean };
 }>();
 const emit = defineEmits<{ close: [] }>();
 const canvas = ref<HTMLCanvasElement>();
+const imageElement = ref<HTMLImageElement>();
 const viewport = ref<HTMLElement>();
 const page = ref(1),
   count = ref(0),
@@ -125,13 +129,25 @@ async function fit() {
           p.getViewport({ scale: 1 }).width,
       ),
     );
+  } else if (props.containImage && imageElement.value && viewport.value) {
+    const image = imageElement.value,
+      stage = viewport.value;
+    const width = stage.clientWidth - 24;
+    scale.value = Math.max(
+      0.1,
+      Math.min(
+        1,
+        (stage.clientHeight - 24) /
+          ((width * image.naturalHeight) / image.naturalWidth),
+      ),
+    );
   } else scale.value = 1;
 }
 </script>
 <template>
   <WorkspaceDialog
     class="dw-viewer-modal"
-    title="Hujjatni ko‘rish"
+    :title="title || 'Hujjatni ko‘rish'"
     @close="emit('close')"
     ><div class="dw-modal-body">
       <div class="dw-viewer-title">
@@ -139,12 +155,17 @@ async function fit() {
         <div>
           <h3>{{ file.name }}</h3>
           <p>
-            {{ encounter.name }} · {{ encounter.patientId }} ·
-            {{ dateLabel(file.date) }}
+            {{
+              context ||
+              (encounter
+                ? `${encounter.name} · ${encounter.patientId} · ${dateLabel(file.date)}`
+                : "")
+            }}
           </p>
         </div>
         <span v-if="file.external" class="dw-badge blue">Tashqi hujjat</span>
       </div>
+      <slot name="files" />
       <div class="dw-viewer-toolbar">
         <template v-if="isPdf && count"
           ><button
@@ -190,6 +211,8 @@ async function fit() {
           aria-label="Tanlangan PDF sahifasi"
         /><img
           v-else-if="imageUrl"
+          ref="imageElement"
+          @error="error = 'Rasmni ochib bo‘lmadi.'"
           :src="imageUrl"
           :alt="file.name"
           :style="{ width: `${scale * 100}%` }"
