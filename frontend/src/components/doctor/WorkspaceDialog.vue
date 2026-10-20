@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from "vue";
+import { onMounted, onBeforeUnmount, ref, type Component } from "vue";
 import { X } from "lucide-vue-next";
 const props = defineProps<{
   title: string;
   subtitle?: string;
   dirty?: boolean;
+  icon?: Component;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const root = ref<HTMLDialogElement>();
@@ -49,6 +50,9 @@ function trap(e: KeyboardEvent) {
     @keydown="trap"
   >
     <header>
+      <span v-if="icon" class="workflow-title-icon"
+        ><component :is="icon" :size="32"
+      /></span>
       <div>
         <h2>{{ title }}</h2>
         <p v-if="subtitle">{{ subtitle }}</p>
