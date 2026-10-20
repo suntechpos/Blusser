@@ -137,7 +137,7 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
         </div>
       </header>
       <main class="clinic-main" :key="session.epoch">
-        <div v-if="activeItem!=='Bemorlar' && activeItem!=='Xodimlar' && activeItem!=='Bo‘limlar va Xonalar' && activeItem!=='Shifokor kabineti'" class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
+        <div v-if="activeItem!=='Registratura' && activeItem!=='Bemorlar' && activeItem!=='Xodimlar' && activeItem!=='Bo‘limlar va Xonalar' && activeItem!=='Shifokor kabineti'" class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
         <template v-if="activeItem === 'Bosh sahifa'">
           <div class="clinic-page-head"><div><h1>Xush kelibsiz, Gulnoza!</h1><p>Bugungi klinika faoliyati haqida umumiy ma’lumot</p></div><div class="clinic-filters"><button><CalendarDays :size="18" />{{ period }}<ChevronDown :size="16" /></button><button><MapPin :size="19" />{{ branch }}<ChevronDown :size="16" /></button></div></div>
           <section class="clinic-stats"><div v-for="(m,i) in metrics" :key="m.label" class="clinic-stat" :class="m.cls"><span class="clinic-stat-icon"><component :is="m.icon" :size="28" /></span><div class="clinic-stat-detail"><span class="clinic-stat-label">{{ m.label }}</span><div class="clinic-stat-value">{{ m.value }}<small v-if="i===4"> so‘m</small> <em v-if="m.change">↑ {{ m.change }}</em><small v-if="i===3"> bemor</small></div><span class="clinic-stat-note">{{ m.note }}</span></div></div></section>
@@ -278,4 +278,9 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
 }
 .clinic-profile-exit:hover { background:#ffe1e7; }
 
+/* Shared sidebar typography only; page content and navigation remain unchanged. */
+.clinic-nav-item{font-size:14px;font-weight:500;min-height:40px;height:40px;gap:13px;padding-inline:14px}
+.clinic-group-label{font-size:11px;font-weight:600;letter-spacing:.25px;margin-top:17px;margin-bottom:7px}
+.clinic-nav-group{margin-bottom:14px}
+@media(min-width:761px){.clinic-sidebar{width:230px}.clinic-menu{padding-inline:13px}}
 </style>

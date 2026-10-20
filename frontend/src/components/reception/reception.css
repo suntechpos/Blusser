@@ -1,0 +1,1189 @@
+/* Reception only; no legacy-page/global content overrides. */
+.rp-page,
+.rp-dialog {
+  font-family: "Employees Inter", Inter, Arial, sans-serif;
+  color: #102045;
+  font-size: 14px;
+  line-height: 1.45;
+  box-sizing: border-box;
+}
+.rp-page *,
+.rp-dialog * {
+  box-sizing: border-box;
+}
+.rp-page {
+  min-width: 0;
+}
+.rp-page button,
+.rp-dialog button,
+.rp-page input,
+.rp-page select,
+.rp-dialog input,
+.rp-dialog select,
+.rp-dialog textarea {
+  font: inherit;
+}
+.rp-page button,
+.rp-dialog button {
+  cursor: pointer;
+}
+.rp-page button:disabled,
+.rp-dialog button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.rp-page :is(button, input, select, textarea):focus-visible,
+.rp-dialog :is(button, input, select, textarea):focus-visible {
+  outline: 2px solid #176bff;
+  outline-offset: 2px;
+}
+.rp-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 3px 0 0;
+}
+.rp-heading h1 {
+  font-size: 34px;
+  line-height: 1.2;
+  letter-spacing: -0.7px;
+  margin: 0 0 5px;
+  font-weight: 750;
+}
+.rp-heading p {
+  font-size: 14px;
+  color: #617daa;
+  margin: 0;
+}
+.rp-heading-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rp-button {
+  border: 1px solid #dce7f9;
+  border-radius: 7px;
+  background: #fff;
+  color: #15346b;
+  min-height: 40px;
+  padding: 9px 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.rp-heading-actions .rp-button {
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.rp-button.rp-primary {
+  background: #0866ff;
+  color: #fff;
+  border-color: #0866ff;
+}
+.rp-button.rp-outline {
+  border-color: #176bff;
+  color: #0662ff;
+}
+.rp-button.rp-soft {
+  color: #0765ff;
+  background: #eef6ff;
+  border-color: #eef6ff;
+}
+.rp-demo {
+  font-size: 11px;
+  color: #6983a7;
+  margin: 8px 0 17px;
+}
+.rp-toast {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 13px;
+  margin: 12px 0;
+  background: #edf9f3;
+  border: 1px solid #bbebd2;
+  border-radius: 8px;
+  color: #09754d;
+}
+.rp-toast button {
+  background: none;
+  border: 0;
+  color: inherit;
+  font-size: 22px;
+}
+.rp-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 20px;
+}
+.rp-stat {
+  display: flex;
+  gap: 12px;
+  min-height: 109px;
+  padding: 15px 12px;
+  border-radius: 11px;
+  min-width: 0;
+}
+.rp-stat.blue {
+  background: #edf7ff;
+}
+.rp-stat.green {
+  background: #eaf9f4;
+}
+.rp-stat.amber {
+  background: #fff9ee;
+}
+.rp-stat.rose {
+  background: #fff0f4;
+}
+.rp-stat.violet {
+  background: #f6f1ff;
+}
+.rp-stat.teal {
+  background: #eafafa;
+}
+.rp-stat-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex: none;
+  color: #086cff;
+  background: #e0efff;
+}
+.green .rp-stat-icon,
+.teal .rp-stat-icon {
+  background: #d8f6ed;
+  color: #00af8c;
+}
+.amber .rp-stat-icon {
+  background: #fff0d4;
+  color: #f18c00;
+}
+.rose .rp-stat-icon {
+  background: #ffe1e9;
+  color: #f23d60;
+}
+.violet .rp-stat-icon {
+  background: #e9e9ff;
+  color: #176cff;
+}
+.rp-stat > div {
+  min-width: 0;
+}
+.rp-stat p {
+  font-size: 12px;
+  color: #46638e;
+  margin: 0 0 6px;
+  white-space: nowrap;
+}
+.rp-stat strong {
+  font-size: 25px;
+  font-weight: 750;
+  line-height: 1.2;
+  display: block;
+}
+.rp-stat small {
+  font-size: 11px;
+  color: #6280ac;
+  display: block;
+  margin-top: 8px;
+  white-space: nowrap;
+}
+.rp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: start;
+}
+.rp-panel {
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #e0eaf8;
+  border-radius: 10px;
+}
+.rp-list {
+  padding: 0 14px 12px;
+}
+.rp-tabs {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  border-bottom: 1px solid #e5edf9;
+  overflow-x: auto;
+}
+.rp-tabs button {
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #3c5784;
+  font-size: 13px;
+  padding: 15px 8px 13px;
+}
+.rp-tabs button.active {
+  color: #0866ff;
+  border-color: #0866ff;
+  font-weight: 600;
+}
+.rp-tabs span {
+  font-size: 12px;
+  background: #f0f5fc;
+  padding: 2px 5px;
+  border-radius: 5px;
+  margin-left: 5px;
+}
+.rp-tabs button.active span {
+  background: #e8f2ff;
+}
+.rp-filters {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.6fr) repeat(3, minmax(105px, 1fr)) 40px;
+  gap: 10px;
+  padding: 14px 0;
+}
+.rp-filters select,
+.rp-search,
+.rp-dialog select,
+.rp-dialog input,
+.rp-dialog textarea {
+  min-width: 0;
+  border: 1px solid #d4e1f7;
+  border-radius: 7px;
+  background: #fff;
+  color: #193565;
+  min-height: 40px;
+  padding: 8px 12px;
+  width: 100%;
+  font-size: 14px;
+}
+.rp-filters select {
+  font-size: 12px;
+  padding: 8px;
+}
+.rp-search {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: #5177a6;
+  padding: 0 11px;
+}
+.rp-search input {
+  outline: none;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0;
+  font-size: 13px;
+}
+.rp-search svg {
+  flex: none;
+}
+.rp-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #dce7f9;
+  border-radius: 7px;
+  background: white;
+  color: #1564e8;
+}
+.rp-filter-reset {
+  height: 40px;
+  width: 40px;
+}
+.rp-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.rp-page table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.rp-page th {
+  padding: 11px 6px;
+  background: #f2f6fc;
+  font-size: 12px;
+  font-weight: 500;
+  color: #345280;
+}
+.rp-page th:first-child {
+  border-radius: 7px 0 0 7px;
+}
+.rp-page th:last-child {
+  border-radius: 0 7px 7px 0;
+}
+.rp-page td {
+  border-bottom: 1px solid #e8eef9;
+  padding: 8px 6px;
+  height: 57px;
+  vertical-align: middle;
+}
+.rp-page td strong {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+}
+.rp-page td small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: #6885b1;
+}
+.rp-person {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.rp-avatar {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #e7f0fc, #f9e9da);
+  color: #31567f;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 13px;
+  flex: none;
+}
+.rp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  border-radius: 7px;
+  padding: 7px 9px;
+}
+.rp-badge.booked {
+  background: #eaf3ff;
+  color: #0867ff;
+}
+.rp-badge.waiting {
+  background: #fff7dc;
+  color: #b37b00;
+}
+.rp-badge.in_progress {
+  background: #ffedf2;
+  color: #da315b;
+}
+.rp-badge.completed {
+  background: #e7f9f2;
+  color: #009f77;
+}
+.rp-row-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.rp-row-actions .rp-button {
+  font-size: 12px;
+  min-height: 34px;
+  padding: 6px 9px;
+}
+.rp-more {
+  position: relative;
+}
+.rp-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: #fff;
+  box-shadow: 0 5px 18px #213a5a22;
+  z-index: 3;
+  border: 1px solid #e1eafa;
+  border-radius: 7px;
+  min-width: 145px;
+  overflow: hidden;
+}
+.rp-menu button {
+  background: white;
+  color: #204577;
+  padding: 10px;
+  width: 100%;
+  border: 0;
+  text-align: left;
+}
+.rp-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 2px 0;
+  font-size: 13px;
+  color: #46628b;
+}
+.rp-pagination > div {
+  display: flex;
+  gap: 6px;
+}
+.rp-pagination .rp-button {
+  min-height: 34px;
+  padding: 5px 12px;
+}
+.rp-pagination .rp-icon {
+  height: 34px;
+  width: 34px;
+}
+.rp-side {
+  display: grid;
+  gap: 16px;
+}
+.rp-schedule,
+.rp-quick {
+  padding: 15px;
+}
+.rp-page h2 {
+  font-size: 20px;
+  line-height: 1.3;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.rp-schedule-date {
+  font-size: 14px;
+  color: #507ab8;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: 14px 0 12px;
+}
+.rp-doctor {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #dce7fa;
+  border-radius: 8px;
+  padding: 7px;
+  margin-bottom: 14px;
+}
+.rp-doctor > div {
+  flex: 1;
+  min-width: 0;
+}
+.rp-doctor select {
+  border: 0;
+  background: white;
+  color: #18365f;
+  width: 100%;
+  font: inherit;
+  padding: 0 15px 0 0;
+}
+.rp-doctor small {
+  display: block;
+  color: #6c87b1;
+  font-size: 12px;
+  margin-top: 2px;
+}
+.rp-timeline {
+  position: relative;
+  border-left: 1px solid #e3ebf7;
+  margin: 0 0 0 4px;
+}
+.rp-timeline-row {
+  position: relative;
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  min-height: 55px;
+  border-bottom: 1px solid #e9eff8;
+  padding: 6px 0 6px 19px;
+  font-size: 14px;
+}
+.rp-timeline-row:before {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border: 1.5px solid #a7bfdc;
+  border-radius: 50%;
+  left: -5px;
+}
+.rp-timeline-row.booked:before {
+  background: #176cff;
+  border-color: #176cff;
+}
+.rp-timeline-row.waiting:before {
+  background: #18a5ab;
+  border-color: #18a5ab;
+}
+.rp-timeline-row.in_progress:before {
+  border-color: #176cff;
+}
+.rp-timeline-row > span:first-child {
+  color: #345884;
+  min-width: 42px;
+}
+.rp-timeline-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.rp-timeline-row strong {
+  font-size: 12px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-timeline-row small {
+  display: block;
+  color: #6c88b0;
+  font-size: 12px;
+  margin-top: 3px;
+}
+.rp-timeline-row .rp-badge {
+  font-size: 11px;
+  padding: 7px;
+}
+.rp-timeline-row .rp-button {
+  font-size: 12px;
+  min-height: 32px;
+  padding: 5px 9px;
+}
+.rp-slot-empty {
+  flex: 1;
+  color: #526d95;
+  font-size: 13px;
+}
+.rp-quick > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 15px;
+}
+.rp-quick button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 99px;
+  border: 1px solid #dfe8fa;
+  border-radius: 7px;
+  background: #fff;
+  color: #0767ff;
+  font-size: 12px;
+  padding: 10px 5px;
+  text-align: center;
+}
+.rp-dialog {
+  width: min(806px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid #e1e9f8;
+  border-radius: 11px;
+  box-shadow: 0 20px 70px #0e22432e;
+  overflow: hidden;
+  background: #fff;
+}
+.rp-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.rp-dialog::backdrop {
+  background: #163052a6;
+}
+.rp-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 20px 24px 15px;
+  flex: none;
+}
+.rp-title-icon {
+  display: grid;
+  place-items: center;
+  background: #e9f3ff;
+  color: #0767ff;
+  border-radius: 9px;
+  width: 49px;
+  height: 49px;
+  flex: none;
+}
+.rp-dialog-head h2 {
+  font-size: 23px;
+  line-height: 1.2;
+  letter-spacing: -0.3px;
+  margin: 0 0 4px;
+  font-weight: 650;
+}
+.rp-dialog-head p {
+  font-size: 16px;
+  margin: 0;
+  color: #5674a2;
+}
+.rp-dialog-head .rp-icon {
+  margin-left: auto;
+  align-self: flex-start;
+  border: 0;
+  color: #607da7;
+}
+.rp-dialog-body {
+  padding: 0 25px 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.rp-dialog h3 {
+  font-size: 17px;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+.rp-dialog label {
+  font-size: 14px;
+  color: #143064;
+}
+.rp-dialog label > span,
+.rp-dialog h3 > span {
+  color: #ec344a;
+}
+.rp-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px 22px;
+}
+.rp-form-grid label {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.rp-form-grid label > input,
+.rp-form-grid label > select {
+  display: block;
+  margin-top: 4px;
+}
+.rp-dialog input::placeholder,
+.rp-dialog textarea::placeholder {
+  color: #819ac2;
+}
+.rp-dialog input[type="date"] {
+  min-width: 0;
+}
+.rp-dialog textarea {
+  resize: vertical;
+  min-height: 42px;
+  max-height: 120px;
+}
+.rp-segment {
+  display: flex;
+  margin: 0 0 16px;
+  border: 1px solid #cfddf5;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.rp-segment button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  border: 1px solid transparent;
+  background: #fff;
+  color: #143064;
+  min-height: 41px;
+  font-weight: 500;
+}
+.rp-segment button.active,
+.rp-date-modes button.active {
+  border-color: #317cff;
+  background: #e5f1ff;
+  color: #0664ff;
+  border-radius: 6px;
+}
+.rp-section {
+  border-top: 1px solid #dce6f9;
+  padding-top: 13px;
+  margin-top: 16px;
+}
+.rp-date-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+.rp-date-slots > div + div {
+  border-left: 1px solid #e1e9f8;
+  padding-left: 16px;
+  margin-left: -15px;
+}
+.rp-date-slots h3 {
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+.rp-date-modes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+.rp-date-modes button {
+  background: #fff;
+  color: #18366a;
+  border: 1px solid #cfddf7;
+  min-height: 35px;
+  border-radius: 6px;
+  flex: 1;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.rp-hint {
+  font-size: 13px;
+  color: #6985b0;
+  margin: 6px 0 10px;
+}
+.rp-local-hint {
+  font-size: 11px;
+  margin: 10px 0 0;
+}
+.rp-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  max-height: 87px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.rp-slots button {
+  border: 1px solid #d3e1f8;
+  background: #fff;
+  color: #143064;
+  border-radius: 6px;
+  min-height: 37px;
+  padding: 6px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.rp-slots button.active {
+  background: #0667ff;
+  color: white;
+  border-color: #0667ff;
+}
+.rp-slots button:disabled {
+  background: #edf1f8;
+  color: #8196b9;
+  opacity: 1;
+}
+.rp-busy-dot {
+  color: #8da4c4;
+  margin-left: 15px;
+}
+.rp-note {
+  display: block;
+  margin: 14px 0 0;
+  border-top: 1px solid #e1e9f8;
+  padding-top: 12px;
+}
+.rp-note textarea {
+  display: block;
+  margin-top: 5px;
+}
+.rp-summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border-radius: 7px;
+  padding: 11px 14px;
+  background: #e8f3ff;
+  color: #0867ff;
+  margin-top: 12px;
+}
+.rp-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 25px;
+  border-top: 1px solid #e1e9f8;
+  flex: none;
+  background: white;
+}
+.rp-dialog-footer > .rp-button {
+  min-height: 43px;
+}
+.rp-empty {
+  padding: 16px;
+  color: #607ba4;
+  text-align: center;
+}
+.rp-error {
+  display: block;
+  color: #bc2548;
+  font-size: 12px;
+  margin: 4px 0;
+}
+.rp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  color: #0667ff;
+  padding: 7px 0;
+  font-size: 14px;
+}
+.rp-selected-patient {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 17px;
+  border: 1px solid #297cff;
+  border-radius: 7px;
+  background: #e8f3ff;
+  color: #1553a5;
+}
+.rp-selected-patient > div {
+  flex: 1;
+  min-width: 0;
+}
+.rp-selected-patient strong {
+  display: block;
+  font-size: 17px;
+  color: #102045;
+}
+.rp-selected-patient small {
+  display: block;
+  font-size: 14px;
+  color: #4f6e9f;
+  margin-top: 3px;
+}
+.rp-selected-patient .rp-avatar {
+  width: 47px;
+  height: 47px;
+  background: #d2e7ff;
+  color: #0667ff;
+  font-size: 17px;
+}
+.rp-search-results {
+  max-height: 158px;
+  overflow-y: auto;
+  border: 1px solid #e2eafa;
+  border-radius: 7px;
+}
+.rp-search-results button {
+  border: 0;
+  border-bottom: 1px solid #e4edf9;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  color: #193765;
+  text-align: left;
+  width: 100%;
+}
+.rp-search-results button:hover {
+  background: #eff6ff;
+}
+.rp-search-results strong,
+.rp-search-results small {
+  display: block;
+}
+.rp-search-results small {
+  font-size: 12px;
+  color: #6983ad;
+  margin-top: 3px;
+}
+.rp-other-patient {
+  display: flex;
+  margin-left: auto;
+  margin-top: 6px;
+}
+.rp-search-error,
+.rp-match {
+  padding: 10px;
+  background: #fff8ec;
+  border-radius: 7px;
+  font-size: 13px;
+  margin: 8px 0;
+}
+.rp-match .rp-link {
+  display: block;
+}
+.rp-arrival-list {
+  display: grid;
+  gap: 8px;
+}
+.rp-arrival-list label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #dce7f9;
+  border-radius: 8px;
+}
+.rp-arrival-list input[type="radio"] {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  flex: none;
+}
+.rp-arrival-list strong,
+.rp-arrival-list small {
+  display: block;
+}
+.rp-arrival-list small {
+  font-size: 12px;
+  color: #6983a7;
+  margin-top: 3px;
+}
+.rp-arrival-list .disabled {
+  background: #f4f7fb;
+  color: #7184a1;
+}
+.rp-details p {
+  margin: 10px 0;
+  color: #46648f;
+}
+.rp-details h3 {
+  margin-top: 10px;
+}
+@media (min-width: 1800px) {
+  .rp-stats {
+    gap: 16px;
+  }
+  .rp-stat {
+    padding: 17px 16px;
+  }
+  .rp-layout {
+    grid-template-columns: minmax(0, 1fr) 350px;
+  }
+  .rp-page td {
+    height: 61px;
+  }
+  .rp-page table {
+    font-size: 14px;
+  }
+  .rp-page td strong {
+    font-size: 14px;
+  }
+}
+@media (max-width: 1300px) {
+  .rp-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .rp-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .rp-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rp-side {
+    grid-template-columns: 1fr 1fr;
+  }
+  .rp-stat {
+    min-height: 96px;
+  }
+  .rp-filters {
+    grid-template-columns:
+      minmax(160px, 1.6fr) repeat(3, minmax(105px, 1fr))
+      40px;
+  }
+}
+@media (max-width: 760px) {
+  .rp-heading h1 {
+    font-size: 28px;
+  }
+  .rp-heading-actions {
+    gap: 8px;
+  }
+  .rp-heading-actions .rp-button {
+    font-size: 12px;
+    padding: 9px;
+  }
+  .rp-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .rp-stat {
+    padding: 12px 10px;
+    gap: 8px;
+  }
+  .rp-stat-icon {
+    width: 35px;
+    height: 35px;
+  }
+  .rp-stat small {
+    font-size: 10px;
+  }
+  .rp-stat p {
+    font-size: 11px;
+  }
+  .rp-side {
+    grid-template-columns: 1fr;
+  }
+  .rp-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  .rp-filters .rp-search {
+    grid-column: 1/-1;
+  }
+  .rp-tabs {
+    justify-content: flex-start;
+  }
+  .rp-table-scroll table {
+    min-width: 790px;
+  }
+  .rp-dialog-head {
+    padding: 16px 14px 12px;
+    gap: 10px;
+  }
+  .rp-title-icon {
+    width: 40px;
+    height: 40px;
+  }
+  .rp-dialog-head h2 {
+    font-size: 20px;
+  }
+  .rp-dialog-head p {
+    font-size: 13px;
+  }
+  .rp-dialog-body {
+    padding: 0 15px 12px;
+  }
+  .rp-dialog-footer {
+    padding: 12px 15px;
+  }
+  .rp-form-grid {
+    gap: 12px;
+  }
+  .rp-date-slots {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+  .rp-date-slots > div + div {
+    border-left: 0;
+    padding-left: 0;
+    margin-left: 0;
+  }
+  .rp-selected-patient {
+    gap: 10px;
+    padding: 10px;
+  }
+  .rp-selected-patient strong {
+    font-size: 14px;
+  }
+  .rp-selected-patient small {
+    font-size: 12px;
+  }
+  .rp-selected-patient > span:last-child {
+    display: none;
+  }
+  .rp-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .rp-segment button {
+    font-size: 13px;
+    padding: 7px;
+  }
+  .rp-slots {
+    max-height: 150px;
+  }
+  .rp-dialog-footer .rp-button {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+}
+
+.rp-heading {
+  margin-bottom: 20px;
+}
+.rp-demo-badge {
+  font-size: 10px;
+  color: #5c7ba6;
+  font-weight: 400;
+  letter-spacing: 0;
+  display: inline-block;
+  vertical-align: middle;
+  background: #edf4ff;
+  border-radius: 5px;
+  padding: 3px 6px;
+  margin-left: 8px;
+}
+
+/* Keep the complete booking summary visible on the reference desktop viewport. */
+.rp-dialog .rp-form-grid {
+  gap: 10px 22px;
+}
+.rp-dialog .rp-form-grid :is(input, select) {
+  min-height: 38px;
+  padding-block: 7px;
+}
+.rp-dialog h3 {
+  margin-bottom: 8px;
+}
+.rp-dialog .rp-section {
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.rp-dialog .rp-note textarea {
+  height: 42px;
+  min-height: 42px;
+}
+.rp-dialog-footer {
+  padding-block: 12px;
+}
+.rp-dialog .rp-note {
+  margin-top: 10px;
+  padding-top: 9px;
+}
+
+.rp-dialog .e-date-field {
+  color: #193565;
+  min-height: 38px;
+  padding: 7px 12px;
+  font-size: 14px;
+  margin-top: 4px;
+}
+.rp-dialog .e-date-field > input {
+  min-height: 0;
+}
+.rp-dialog .e-date-field svg {
+  color: #176bff;
+}
+
+.rp-date-context {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 6px 0;
+  font-size: 13px;
+  color: #4e74a4;
+}
+.rp-date-context .rp-link {
+  font-size: 13px;
+}
+
+.rp-timeline {
+  max-height: 330px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+/* Leave room for timeline markers inside its scrolling container. */
+.rp-timeline {
+  border-left: 0;
+  margin-left: 0;
+  padding-left: 6px;
+}
+.rp-timeline-row {
+  border-left: 1px solid #e3ebf7;
+}

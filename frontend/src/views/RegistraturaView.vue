@@ -1,57 +1,666 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Users, CalendarDays, Stethoscope, Clock3, CheckCircle2, CreditCard, UserRoundPlus, UserCheck, ChevronDown, ChevronRight, Search, Eye, Play, Plus, MoreHorizontal, ClipboardList } from 'lucide-vue-next'
-type Patient = { name: string; id: string; phone: string; doctor: string; specialty: string; status: string; time: string; wait: string; initials: string }
-const patients = ref<Patient[]>([
-  {name:'Aliyeva Mohira',id:'P-00124',phone:'+998 90 123 45 67',doctor:'Karimov A.',specialty:'Kardiolog',status:'Qabulda',time:'09:00',wait:'—',initials:'AM'},
-  {name:'Qodirov Aziz',id:'P-00126',phone:'+998 91 234 56 78',doctor:'Saidov B.',specialty:'UZI',status:'Kutilmoqda',time:'09:20',wait:'14 daqiqa',initials:'QA'},
-  {name:'Ismoilova Nilufar',id:'P-00127',phone:'+998 93 456 78 90',doctor:'Rahmonova D.',specialty:'Terapevt',status:'Kutilmoqda',time:'09:35',wait:'29 daqiqa',initials:'IN'},
-  {name:'Matchonov Siroj',id:'P-00128',phone:'+998 90 678 90 12',doctor:'Karimov A.',specialty:'Kardiolog',status:'Oldindan',time:'09:50',wait:'—',initials:'MS'},
-  {name:'Toshboyev Akmal',id:'P-00125',phone:'+998 91 789 01 23',doctor:'Rahmonova D.',specialty:'Terapevt',status:'Yakunlangan',time:'08:30',wait:'—',initials:'TA'},
-  {name:'Rahimova Sevara',id:'P-00129',phone:'+998 93 567 89 01',doctor:'Saidov B.',specialty:'Nevrolog',status:'Kechikkan',time:'09:10',wait:'24 daqiqa',initials:'RS'},
-  {name:'Bo‘riyev Temur',id:'P-00130',phone:'+998 90 123 45 67',doctor:'Karimov A.',specialty:'Kardiolog',status:'Jonli navbat',time:'10:05',wait:'44 daqiqa',initials:'BT'},
-  {name:'Yo‘ldosheva Xulkar',id:'P-00131',phone:'+998 93 890 12 34',doctor:'Nuriddinov O.',specialty:'Ortoped',status:'Oldindan',time:'10:20',wait:'—',initials:'YX'}
-])
-const tab=ref('Barcha bemorlar'), query=ref(''), specialty=ref(''), doctor=ref(''), state=ref(''), toast=ref('')
-const tabs=[['Barcha bemorlar',42],['Jonli navbat',14],['Oldindan yozilgan',28],['Qabulda',5],['Yakunlangan',18]] as const
-const stats=[
-  {name:'Bugungi bemorlar',value:'42',note:'Kecha: 37',change:'12%',icon:Users,tone:'blue'},
-  {name:'Oldindan yozilgan',value:'28',note:'Bugungi slotlar',change:'8%',icon:CalendarDays,tone:'green'},
-  {name:'Jonli navbat',value:'14',note:'Kutmoqda',change:'',icon:Stethoscope,tone:'orange'},
-  {name:'Qabulda',value:'5',note:'Hozir qabulda',change:'',icon:Clock3,tone:'red'},
-  {name:'Yakunlangan',value:'18',note:'Bugun',change:'',icon:CheckCircle2,tone:'purple'},
-  {name:'Tushum',value:'4 250 000',note:'Kecha: 3 220 000 so‘m',change:'32%',icon:CreditCard,tone:'violet'}
-]
-const visible=computed(()=>patients.value.filter(p=>{
-  const t=tab.value==='Barcha bemorlar'||(tab.value==='Oldindan yozilgan'?p.status==='Oldindan':p.status===tab.value)
-  const q=[p.name,p.id,p.phone,p.doctor].join(' ').toLowerCase().includes(query.value.toLowerCase())
-  return t&&q&&(!specialty.value||p.specialty===specialty.value)&&(!doctor.value||p.doctor===doctor.value)&&(!state.value||p.status===state.value)
-}))
-const slots=[
-  ['09:00 – 09:20','Aliyeva Mohira','Konsultatsiya','Yakunlandi'],['09:20 – 09:40','Qodirov Aziz','Konsultatsiya','Qabulda'],
-  ['09:40 – 10:00','Bo‘sh vaqt','','Jonli navbat'],['10:00 – 10:20','Matchonov Siroj','Konsultatsiya','Kutmoqda'],
-  ['10:20 – 10:40','Jonli navbat uchun','Zaxira slot','Zaxira'],['10:40 – 11:00','Bo‘sh vaqt','','Jonli navbat'],
-  ['11:00 – 11:20','Bo‘riyev Temur','Konsultatsiya','Oldindan'],['11:20 – 11:40','Jonli navbat uchun','Zaxira slot','Zaxira'],
-  ['11:40 – 12:00','Bo‘sh vaqt','','Jonli navbat'],['12:00 – 12:20','Yo‘ldosheva Xulkar','Konsultatsiya','Rejalangan']
-]
-const shortcuts=[{label:'Bemor qidirish',icon:Search},{label:'Yangi bemor',icon:UserRoundPlus},{label:'Tashrif yaratish',icon:ClipboardList},{label:'Qabulga yozish',icon:CalendarDays},{label:'Navbatga qo‘shish',icon:Users},{label:'To‘lov qabul qilish',icon:CreditCard}]
-function demo(label:string){toast.value=`${label}: hozircha demo, API ulanmagan.`}
-function callPatient(p:Patient){p.status='Qabulda';toast.value=`${p.name} qabulga chaqirildi (demo).`}
+import { computed, ref, watch } from "vue";
+import {
+  Users,
+  CalendarDays,
+  Stethoscope,
+  Clock3,
+  CheckCircle2,
+  Coins,
+  UserRoundPlus,
+  Search,
+  Eye,
+  Check,
+  MoreHorizontal,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+} from "lucide-vue-next";
+import BookingDialog from "../components/reception/BookingDialog.vue";
+import ArrivalDialog from "../components/reception/ArrivalDialog.vue";
+import ReceptionDialog from "../components/reception/ReceptionDialog.vue";
+import {
+  createReceptionState,
+  doctors,
+  branches,
+  departments,
+  services,
+  statusLabels,
+  initials,
+  localDate,
+  uzDate,
+  nextPatient,
+  checkIn,
+  validatePatient,
+  validateBooking,
+  timeText,
+  minutes,
+  blankBooking,
+  availability,
+  type ReceptionPatient,
+  type ReceptionAppointment,
+  type PatientDraft,
+  type BookingDraft,
+} from "../mocks/reception";
+import "../components/reception/reception.css";
+const state = ref(createReceptionState());
+const tab = ref("all"),
+  query = ref(""),
+  specialty = ref(""),
+  doctor = ref(""),
+  status = ref(""),
+  page = ref(1),
+  toast = ref("");
+const booking = ref(false),
+  arrival = ref(false),
+  preset = ref<ReceptionAppointment>(),
+  bookingPreset = ref<Partial<BookingDraft>>({}),
+  detail = ref<ReceptionAppointment>(),
+  menu = ref("");
+const scheduleDoctor = ref("karimov");
+const today = localDate();
+const todays = computed(() =>
+  state.value.appointments.filter((a) => a.date === today),
+);
+const listDate = ref(today);
+const listed = computed(() =>
+  state.value.appointments.filter((a) => a.date === listDate.value),
+);
+function tabCounts(appointments: ReceptionAppointment[]) {
+  return [
+    { id: "all", name: "Barcha bemorlar", count: appointments.length },
+    {
+      id: "walk_in",
+      name: "Jonli navbat",
+      count: appointments.filter(
+        (a) => a.kind === "walk_in" && a.status === "waiting",
+      ).length,
+    },
+    {
+      id: "booked",
+      name: "Oldindan yozilgan",
+      count: appointments.filter((a) => a.status === "booked").length,
+    },
+    {
+      id: "in_progress",
+      name: "Qabulda",
+      count: appointments.filter((a) => a.status === "in_progress").length,
+    },
+    {
+      id: "completed",
+      name: "Yakunlangan",
+      count: appointments.filter((a) => a.status === "completed").length,
+    },
+  ];
+}
+const tabs = computed(() => tabCounts(listed.value));
+const todayTabs = computed(() => tabCounts(todays.value));
+
+const stats = computed(() => [
+  {
+    name: "Bugungi bemorlar",
+    value: String(todayTabs.value[0]!.count),
+    icon: Users,
+    tone: "blue",
+  },
+  {
+    name: "Oldindan yozilgan",
+    value: String(todayTabs.value[2]!.count),
+    icon: CalendarDays,
+    tone: "green",
+  },
+  {
+    name: "Jonli navbat",
+    value: String(todayTabs.value[1]!.count),
+    icon: Stethoscope,
+    tone: "amber",
+  },
+  {
+    name: "Qabulda",
+    value: String(todayTabs.value[3]!.count),
+    icon: Clock3,
+    tone: "rose",
+  },
+  {
+    name: "Yakunlangan",
+    value: String(todayTabs.value[4]!.count),
+    icon: CheckCircle2,
+    tone: "violet",
+  },
+  { name: "Tushum", value: "—", icon: Coins, tone: "teal" },
+]);
+const person = (a: ReceptionAppointment) =>
+  state.value.patients.find((p) => p.id === a.patientId)!;
+const physician = (a: ReceptionAppointment) =>
+  doctors.find((d) => d.id === a.doctorId)!;
+const visible = computed(() =>
+  listed.value
+    .filter(
+      (a) =>
+        (tab.value === "all" ||
+          (tab.value === "walk_in"
+            ? a.kind === "walk_in" && a.status === "waiting"
+            : a.status === tab.value)) &&
+        (!specialty.value || physician(a).departmentId === specialty.value) &&
+        (!doctor.value || a.doctorId === doctor.value) &&
+        (!status.value || a.status === status.value) &&
+        `${person(a).name} ${person(a).id} ${person(a).phone}`
+          .toLocaleLowerCase()
+          .includes(query.value.toLocaleLowerCase()),
+    )
+    .sort((a, b) => a.time.localeCompare(b.time)),
+);
+const pageCount = computed(() =>
+  Math.max(1, Math.ceil(visible.value.length / 8)),
+);
+const rows = computed(() =>
+  visible.value.slice((page.value - 1) * 8, page.value * 8),
+);
+watch([tab, query, specialty, doctor, status], () => (page.value = 1), {
+  flush: "sync",
+});
+watch(pageCount, (n) => {
+  if (page.value > n) page.value = n;
+});
+const schedule = computed(() => {
+  const doc = doctors.find((d) => d.id === scheduleDoctor.value)!;
+  const available = availability(
+    { ...blankBooking(), doctorId: doc.id, departmentId: doc.departmentId },
+    state.value.appointments,
+  );
+  const times = [
+    ...new Set([
+      ...available.slots.map((s) => s.time),
+      ...todays.value.filter((a) => a.doctorId === doc.id).map((a) => a.time),
+    ]),
+  ].sort();
+  return times.map((time) => ({
+    time,
+    appointment: todays.value.find(
+      (a) => a.doctorId === doc.id && a.time === time,
+    ),
+    busy: todays.value.some(
+      (a) =>
+        a.doctorId === doc.id &&
+        minutes(time) >= minutes(a.time) &&
+        minutes(time) <
+          minutes(a.time) +
+            (services.find((s) => s.id === a.serviceId)?.duration ?? 30),
+    ),
+    scheduled: available.scheduled,
+  }));
+});
+function openBooking(partial: Partial<BookingDraft> = {}) {
+  bookingPreset.value = partial;
+  booking.value = true;
+}
+function openArrival(a?: ReceptionAppointment) {
+  preset.value = a;
+  arrival.value = true;
+  menu.value = "";
+}
+function createPatient(d: PatientDraft) {
+  const p = nextPatient(state.value.patients, d);
+  state.value.patients.push(p);
+  return p;
+}
+function showAppointment(appointment: ReceptionAppointment) {
+  listDate.value = appointment.date;
+  tab.value = "all";
+  query.value = "";
+  doctor.value = "";
+  specialty.value = "";
+  status.value = "";
+  page.value =
+    Math.floor(visible.value.findIndex((a) => a.id === appointment.id) / 8) + 1;
+}
+function saveBooking(p: ReceptionPatient | PatientDraft, d: BookingDraft) {
+  // Revalidate against current state before either local record is inserted.
+  if (Object.keys(validateBooking(d, state.value.appointments)).length) return;
+  if (!("id" in p) && Object.keys(validatePatient(p)).length) return;
+  const patient =
+    "id" in p
+      ? state.value.patients.find((x) => x.id === p.id)
+      : createPatient(p);
+  if (!patient) return;
+  const appointment: ReceptionAppointment = {
+    ...d,
+    id: `A-${state.value.appointments.length + 1}`,
+    patientId: patient.id,
+    status: "booked",
+    kind: "scheduled",
+  };
+  state.value.appointments.push(appointment);
+  showAppointment(appointment);
+  booking.value = false;
+  toast.value = "Qabulga yozildi — faqat lokal namuna ro‘yxatida.";
+}
+function arrive(
+  p: ReceptionPatient,
+  id: string | null,
+  doctorId: string,
+  branchId: string,
+) {
+  if (id) {
+    const a = state.value.appointments.find(
+      (a) => a.id === id && a.patientId === p.id,
+    );
+    if (!a || !checkIn(a)) return;
+  } else {
+    if (
+      state.value.appointments.some(
+        (a) => a.patientId === p.id && a.date === today,
+      )
+    ) {
+      toast.value = "Bugungi mavjud qabulni tanlang. Bemor qayta qo‘shilmadi.";
+      return;
+    }
+    const d = doctors.find(
+      (d) => d.id === doctorId && d.branches.includes(branchId),
+    );
+    if (
+      !d ||
+      !availability(
+        { ...blankBooking(), doctorId, branchId, departmentId: d.departmentId },
+        state.value.appointments,
+      ).scheduled
+    )
+      return;
+    state.value.appointments.push({
+      id: `A-${state.value.appointments.length + 1}`,
+      patientId: p.id,
+      doctorId,
+      branchId,
+      departmentId: d.departmentId,
+      serviceId: "initial",
+      date: today,
+      time: new Date().toTimeString().slice(0, 5),
+      status: "waiting",
+      kind: "walk_in",
+      note: "",
+    });
+  }
+  const appointment =
+    state.value.appointments.find((a) => a.id === id) ??
+    state.value.appointments.at(-1);
+  if (appointment) showAppointment(appointment);
+  arrival.value = false;
+  toast.value = "Keldi — navbatga qo‘shildi (faqat lokal namuna).";
+}
+function bookSlot(time: string) {
+  const doc = doctors.find((d) => d.id === scheduleDoctor.value)!;
+  openBooking({ doctorId: doc.id, departmentId: doc.departmentId, time });
+}
+function focusSearch() {
+  document.getElementById("reception-query")?.focus();
+}
 </script>
 <template>
-<section class="reg">
- <header class="reg-heading"><div><h1>Registratura</h1><p>Bemorlarni qabul qilish, navbat va tashriflarni boshqarish</p></div><div class="reg-heading-actions"><button class="primary" @click="demo('Yangi bemor')"><UserRoundPlus :size="17"/> Yangi bemor</button><button class="green" @click="demo('Qabulga yozish')"><CalendarDays :size="17"/> Qabulga yozish</button><button class="orange" @click="demo('Bemorni qabul qilish')"><UserCheck :size="17"/> Bemorni qabul qilish</button><button class="more" @click="demo('Ko‘proq')"><MoreHorizontal :size="17"/> Ko‘proq</button></div></header>
- <div v-if="toast" class="reg-toast" role="status">{{toast}} <button @click="toast=''">×</button></div>
- <div class="reg-stats"><article v-for="s in stats" :key="s.name" class="reg-stat" :class="s.tone"><div class="reg-stat-icon"><component :is="s.icon" :size="25"/></div><div class="reg-stat-data"><span>{{s.name}}</span><div class="reg-stat-value">{{s.value}}<small v-if="s.name==='Tushum'"> so‘m</small> <em v-if="s.change">↑ {{s.change}}</em></div><p>{{s.note}}</p></div></article></div>
- <div class="reg-grid"><div class="reg-main-col"><section class="reg-panel reg-list"><nav class="reg-tabs"><button v-for="t in tabs" :key="t[0]" :class="{active:tab===t[0]}" @click="tab=t[0]">{{t[0]}} <span>{{t[1]}}</span></button></nav><div class="reg-filters"><select v-model="specialty"><option value="">Barcha mutaxassisliklar</option><option>Kardiolog</option><option>UZI</option><option>Terapevt</option><option>Nevrolog</option><option>Ortoped</option></select><select v-model="doctor"><option value="">Barcha shifokorlar</option><option>Karimov A.</option><option>Saidov B.</option><option>Rahmonova D.</option><option>Nuriddinov O.</option></select><select v-model="state"><option value="">Barcha holatlar</option><option>Qabulda</option><option>Kutilmoqda</option><option>Oldindan</option><option>Yakunlangan</option><option>Kechikkan</option></select><label><Search :size="16"/><input v-model="query" placeholder="Bemor qidirish..." /></label><select><option>Saralash: Navbat vaqti</option></select></div>
- <div class="reg-table-scroll"><table><thead><tr><th>#</th><th>Bemor</th><th>Shifokor / Xizmat</th><th>Holat</th><th>Kelgan vaqt</th><th>Kutish vaqti</th><th>Amallar</th></tr></thead><tbody><tr v-for="(p,i) in visible" :key="p.id"><td>{{i+1}}</td><td><div class="reg-person"><span class="reg-avatar">{{p.initials}}</span><div><strong>{{p.name}}</strong><small>{{p.id}} · {{p.phone}}</small></div></div></td><td><strong>{{p.doctor}}</strong><small>{{p.specialty}}</small></td><td><span class="reg-status" :class="p.status">{{p.status}}</span></td><td><strong>{{p.time}}</strong></td><td class="reg-wait">{{p.wait}}</td><td><div class="reg-row-actions"><button v-if="['Kutilmoqda','Jonli navbat'].includes(p.status)" @click="callPatient(p)"><Play :size="13"/> Chaqirish</button><button v-else @click="demo('Ko‘rish')"><Eye :size="14"/> Ko‘rish</button><button @click="demo('Amallar')"><MoreHorizontal :size="16"/></button></div></td></tr><tr v-if="!visible.length"><td colspan="7" class="reg-no-results">Bemor topilmadi</td></tr></tbody></table></div></section>
- <section class="reg-panel reg-quick"><h2>Tezkor amallar</h2><div><button v-for="s in shortcuts" :key="s.label" @click="demo(s.label)"><span><component :is="s.icon" :size="22"/></span><strong>{{s.label}}</strong><small>{{s.label==='Yangi bemor'?'Tizimga qo‘shish':'Tezkor amal'}}</small></button></div></section></div>
- <aside class="reg-panel reg-schedule"><div class="reg-schedule-head"><h2>Bugungi qabullar</h2><button @click="demo('Barcha shifokorlar')">Barcha shifokorlar <ChevronRight :size="15"/></button></div><div class="reg-doctor"><div class="reg-avatar">KA</div><span><strong>Dr. Karimov Anvar</strong><small>Kardiolog</small></span><ChevronDown :size="15"/></div><p class="reg-date">15-oktabr, 2026</p><div class="reg-slots"><div v-for="(s,i) in slots" :key="i" class="reg-slot" :class="s[3]"><span>{{s[0]}}</span><div><strong>{{s[1]}}</strong><small>{{s[2]}}</small></div><em>{{s[3]}}</em><button v-if="['Zaxira','Jonli navbat'].includes(s[3])" @click="demo('Slot')"><Plus :size="16"/></button></div></div></aside></div>
-</section>
-</template>
-<style scoped>
-.reg{font-family:Inter,Arial,sans-serif;color:#102045;min-width:0}.reg *{box-sizing:border-box}.reg button{font-family:inherit;cursor:pointer}.reg-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:0 0 22px}.reg-heading h1{font-size:30px;line-height:1.15;margin:0 0 5px;font-weight:800}.reg-heading p{font-size:14px;color:#526d99;margin:0}.reg-heading-actions{display:flex;gap:12px;flex-wrap:wrap}.reg-heading-actions button{height:45px;padding:0 16px;display:flex;align-items:center;gap:9px;border-radius:8px;border:0;color:#fff;white-space:nowrap;font-size:12px;font-weight:600}.reg-heading-actions .primary{background:#176bfc}.reg-heading-actions .green{background:#00b190}.reg-heading-actions .orange{background:#ff8600}.reg-heading-actions .more{color:#273c63;background:#fff;border:1px solid #e3ebf8}.reg-toast{margin-bottom:12px;padding:10px 12px;border:1px solid #caddfd;background:#eff6ff;color:#2867b4;border-radius:8px;font-size:12px;display:flex;justify-content:space-between}.reg-toast button{background:transparent;border:0;color:inherit}.reg-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:16px}.reg-stat{display:flex;gap:12px;height:116px;border-radius:12px;padding:14px 12px;min-width:0}.reg-stat.blue{background:#eef7ff}.reg-stat.green{background:#e9f9f5}.reg-stat.orange{background:#fff9ee}.reg-stat.red{background:#fff0f3}.reg-stat.purple{background:#f7f2ff}.reg-stat.violet{background:#f5efff}.reg-stat-icon{width:47px;height:47px;border-radius:13px;background:#deeeff;display:grid;place-items:center;color:#136bf9;flex:none}.reg-green .reg-stat-icon,.reg-stat.green .reg-stat-icon{color:#00b38c;background:#d6f8ed}.reg-stat.orange .reg-stat-icon{color:#f89700;background:#ffeed0}.reg-stat.red .reg-stat-icon{color:#ef344e;background:#ffdde5}.reg-stat.purple .reg-stat-icon{color:#00b38c;background:#ddf8e9}.reg-stat.violet .reg-stat-icon{color:#7b3bea;background:#e9dfff}.reg-stat-data{min-width:0}.reg-stat-data>span{display:block;font-size:11px;color:#4d6793;white-space:nowrap;margin-top:2px}.reg-stat-value{font-size:24px;font-weight:800;white-space:nowrap;margin-top:10px;letter-spacing:-.5px}.reg-stat-value small{font-size:11px;font-weight:600}.reg-stat-value em{font-size:11px;color:#00b56f;font-style:normal;letter-spacing:0}.reg-stat-data p{font-size:11px;color:#7690b6;margin:9px 0 0;white-space:nowrap}.reg-grid{display:grid;grid-template-columns:minmax(0,1.87fr) minmax(310px,.92fr);gap:14px}.reg-main-col{min-width:0}.reg-panel{background:#fff;border:1px solid #e8eef8;border-radius:10px;min-width:0}.reg-list{padding:0 12px 12px}.reg-tabs{display:flex;justify-content:space-between;gap:7px;overflow-x:auto;border-bottom:1px solid #eaf0f7}.reg-tabs button{background:transparent;border:0;border-bottom:2px solid transparent;padding:14px 6px;font-size:11px;white-space:nowrap;color:#3c5682}.reg-tabs button.active{color:#0767f9;border-color:#0767f9;font-weight:700}.reg-tabs span{border-radius:6px;background:#f1f5fa;padding:3px 6px;margin-left:5px}.reg-filters{display:flex;gap:9px;padding:12px 0}.reg-filters select,.reg-filters label{border:1px solid #e3ebf8;border-radius:7px;height:34px;background:#fff;color:#344d78;min-width:0;flex:1;font-size:10px;padding:0 6px}.reg-filters label{display:flex;align-items:center;gap:6px;padding:0 7px}.reg-filters input{font:inherit;border:0;outline:0;min-width:0;width:100%}.reg-filters label svg{flex:none}.reg-table-scroll{overflow-x:auto}.reg table{border-collapse:collapse;width:100%;font-size:11px;text-align:left}.reg th{background:#f3f7fc;color:#526d93;font-weight:600;padding:10px 8px;white-space:nowrap}.reg td{padding:9px 8px;border-bottom:1px solid #edf1f7;white-space:nowrap;color:#18274b}.reg td strong{display:block;font-size:11px}.reg td small{display:block;font-size:10px;color:#708bb2;margin-top:5px}.reg-person{display:flex;align-items:center;gap:8px}.reg-avatar{width:34px;height:34px;flex:none;border-radius:50%;background:linear-gradient(135deg,#e4eefb,#fbe9d9);display:grid;place-items:center;font-size:11px;color:#416484}.reg-status{display:inline-block;border-radius:7px;padding:8px 10px;min-width:82px;text-align:center;background:#eaf3ff;color:#116bfa;font-size:11px}.reg-status.Kutilmoqda{background:#fff2e1;color:#e98800}.reg-status.Oldindan{background:#e9faf2;color:#00a57d}.reg-status.Yakunlangan{background:#f0f3f7;color:#7183a2}.reg-status.Kechikkan{background:#fff0f2;color:#e6364d}.reg-status.Jonli{background:#fff1e4;color:#e58600}.reg-wait{color:#6783ae!important}.reg-row-actions{display:flex;gap:6px}.reg-row-actions button{border:0;border-radius:6px;padding:7px;background:#edf5ff;color:#1168f8;display:flex;align-items:center;gap:6px;font-size:10px}.reg-row-actions button:last-child{background:#fff;border:1px solid #e7eef8}.reg-no-results{text-align:center;padding:30px!important}.reg-quick{padding:12px;margin-top:15px}.reg-quick h2,.reg-schedule-head h2{font-size:15px;margin:0 0 12px}.reg-quick>div{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}.reg-quick button{text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0;padding:9px;border:1px solid #e5ebf5;background:#fff;border-radius:8px}.reg-quick button span{padding:7px;background:#eaf3ff;border-radius:8px;color:#176bfa}.reg-quick button strong{font-size:10px;white-space:nowrap}.reg-quick button small{font-size:9px;color:#718ab0;white-space:nowrap}.reg-schedule{padding:15px 13px}.reg-schedule-head{display:flex;justify-content:space-between;align-items:center}.reg-schedule-head h2{margin:0}.reg-schedule-head button{border:0;background:none;color:#0767ff;display:flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap}.reg-doctor{display:flex;align-items:center;gap:9px;border:1px solid #e7edf7;padding:7px;border-radius:8px;margin-top:13px;width:70%}.reg-doctor span{flex:1}.reg-doctor strong,.reg-doctor small{display:block;font-size:11px}.reg-doctor small{font-size:10px;color:#7089ae;margin-top:4px}.reg-date{text-align:right;font-size:11px;color:#2b446c;margin:-26px 0 23px}.reg-slot{min-height:50px;border-bottom:1px solid #edf1f8;border-left:3px solid #e0e8f3;padding:7px 6px 7px 11px;display:flex;align-items:center;gap:6px;font-size:10px}.reg-slot.Yakunlandi,.reg-slot.Oldindan{border-left-color:#05b991}.reg-slot.Qabulda,.reg-slot.Kutmoqda{border-left-color:#2377ff}.reg-slot.Zaxira{border-left-color:#ff9608}.reg-slot>span:first-child{width:100px;flex:none;color:#5f799d}.reg-slot>div{min-width:0;flex:1}.reg-slot strong,.reg-slot small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.reg-slot small{margin-top:5px;color:#6e87ad}.reg-slot em{font-style:normal;border-radius:7px;padding:7px 8px;background:#edf3f9;color:#536b90;white-space:nowrap}.reg-slot.Yakunlandi em,.reg-slot.Oldindan em{background:#e8f9f2;color:#03a479}.reg-slot.Qabulda em{background:#eaf3ff;color:#126af8}.reg-slot.Kutmoqda em,.reg-slot.Zaxira em{background:#fff2e2;color:#dc7d00}.reg-slot button{border:1px solid #e4ecf8;background:#fff;color:#496b9d;border-radius:6px;display:grid;place-items:center;width:27px;height:27px;padding:0}.reg-slot:has(button) em{display:none}@media(max-width:1500px){.reg-stat{padding:12px 8px;gap:8px}.reg-stat-icon{width:39px;height:39px}.reg-stat-value{font-size:20px}.reg-stat-data>span,.reg-stat-data p{font-size:10px}}@media(max-width:1250px){.reg-heading{flex-wrap:wrap}.reg-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.reg-grid{grid-template-columns:1fr}.reg-quick>div{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:690px){.reg-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.reg-heading h1{font-size:24px}.reg-heading-actions button{padding:0 10px}.reg-filters{flex-wrap:wrap}.reg-filters>*{min-width:120px!important}.reg-quick>div{grid-template-columns:repeat(2,minmax(0,1fr))}.reg-date{margin:12px 0}}
-.reg{width:100%;max-width:100%;min-width:0}.reg-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.reg-stat-value{white-space:normal;overflow-wrap:anywhere}.reg-grid{grid-template-columns:minmax(0,1fr)}.reg-table-scroll{overflow-x:auto}
-@media(min-width:1600px){.reg-stats{grid-template-columns:repeat(6,minmax(0,1fr))}.reg-grid{grid-template-columns:minmax(0,1.87fr) minmax(0,.92fr)}}
+  <section class="rp-page">
+    <header class="rp-heading">
+      <div>
+        <h1>
+          Registratura
+          <small
+            class="rp-demo-badge"
+            title="O‘zgarishlar faqat sahifa xotirasida saqlanadi"
+            >Lokal namuna</small
+          >
+        </h1>
+        <p>Bemorlarni ro‘yxatga olish, qabulga yozish va navbatni boshqarish</p>
+      </div>
+      <div class="rp-heading-actions">
+        <button class="rp-button rp-outline" @click="openBooking()">
+          <CalendarDays :size="19" /> Qabulga yozish</button
+        ><button class="rp-button rp-primary" @click="openArrival()">
+          <UserRoundPlus :size="19" /> Bemorni ro‘yxatga olish
+        </button>
+      </div>
+    </header>
 
-</style>
+    <div v-if="toast" class="rp-toast" role="status">
+      {{ toast }}
+      <button aria-label="Xabarni yopish" @click="toast = ''">×</button>
+    </div>
+    <div class="rp-stats">
+      <article v-for="s in stats" :key="s.name" class="rp-stat" :class="s.tone">
+        <span class="rp-stat-icon"><component :is="s.icon" :size="24" /></span>
+        <div>
+          <p>{{ s.name }}</p>
+          <strong>{{ s.value }}</strong
+          ><small>{{
+            s.name === "Tushum" ? "Ma’lumot mavjud emas" : "Lokal namuna holati"
+          }}</small>
+        </div>
+      </article>
+    </div>
+    <div class="rp-layout">
+      <section class="rp-panel rp-list">
+        <nav class="rp-tabs" aria-label="Qabul holatlari">
+          <button
+            v-for="t in tabs"
+            :key="t.id"
+            :class="{ active: tab === t.id }"
+            :aria-pressed="tab === t.id"
+            @click="tab = t.id"
+          >
+            {{ t.name }} <span>{{ t.count }}</span>
+          </button>
+        </nav>
+        <div v-if="listDate !== today" class="rp-date-context">
+          <span>{{ uzDate(listDate) }} qabullari</span
+          ><button
+            class="rp-link"
+            @click="
+              listDate = today;
+              tab = 'all';
+              query = '';
+              doctor = '';
+              specialty = '';
+              status = '';
+              page = 1;
+            "
+          >
+            Bugungi ro‘yxatga qaytish
+          </button>
+        </div>
+        <div class="rp-filters">
+          <label class="rp-search"
+            ><Search :size="18" /><input
+              id="reception-query"
+              v-model="query"
+              aria-label="Ro‘yxatdan bemor qidirish"
+              placeholder="Bemor qidirish..." /></label
+          ><select v-model="specialty" aria-label="Mutaxassislik">
+            <option value="">Mutaxassislik</option>
+            <option v-for="d in departments" :key="d.id" :value="d.id">
+              {{ d.name }}
+            </option></select
+          ><select v-model="doctor" aria-label="Shifokor">
+            <option value="">Shifokor</option>
+            <option v-for="d in doctors" :key="d.id" :value="d.id">
+              {{ d.name }}
+            </option></select
+          ><select v-model="status" aria-label="Holat">
+            <option value="">Holat</option>
+            <option v-for="(label, id) in statusLabels" :key="id" :value="id">
+              {{ label }}
+            </option></select
+          ><button
+            class="rp-icon rp-filter-reset"
+            title="Filtrlarni tozalash"
+            aria-label="Filtrlarni tozalash"
+            @click="
+              query = '';
+              specialty = '';
+              doctor = '';
+              status = '';
+              tab = 'all';
+            "
+          >
+            <Filter :size="19" />
+          </button>
+        </div>
+        <div class="rp-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Bemor</th>
+                <th>Shifokor / Xizmat</th>
+                <th>Holat</th>
+                <th>Vaqt</th>
+                <th>Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(a, i) in rows" :key="a.id">
+                <td>{{ (page - 1) * 8 + i + 1 }}</td>
+                <td>
+                  <div class="rp-person">
+                    <span class="rp-avatar">{{
+                      initials(person(a).name)
+                    }}</span>
+                    <div>
+                      <strong>{{ person(a).name }}</strong
+                      ><small
+                        >{{ person(a).id }} ·
+                        {{ person(a).phone || "Telefon kiritilmagan" }}</small
+                      >
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <strong>{{ physician(a).name }}</strong
+                  ><small>{{ physician(a).specialty }}</small>
+                </td>
+                <td>
+                  <span class="rp-badge" :class="a.status"
+                    ><CalendarDays
+                      v-if="a.status === 'booked'"
+                      :size="16"
+                    /><Clock3
+                      v-else-if="
+                        a.status === 'waiting' || a.status === 'in_progress'
+                      "
+                      :size="16"
+                    /><CheckCircle2 v-else :size="16" />{{
+                      statusLabels[a.status]
+                    }}</span
+                  >
+                </td>
+                <td>
+                  <strong>{{ a.time }}</strong>
+                </td>
+                <td>
+                  <div class="rp-row-actions">
+                    <button
+                      v-if="a.status === 'booked' && a.date === today"
+                      class="rp-button rp-outline"
+                      @click="openArrival(a)"
+                    >
+                      <Check :size="16" /> Keldi</button
+                    ><button
+                      v-else
+                      class="rp-button rp-soft"
+                      @click="detail = a"
+                    >
+                      <Eye :size="16" /> Ko‘rish
+                    </button>
+                    <div class="rp-more">
+                      <button
+                        class="rp-icon"
+                        :aria-label="`${person(a).name} amallari`"
+                        :aria-expanded="menu === a.id"
+                        @click="menu = menu === a.id ? '' : a.id"
+                      >
+                        <MoreHorizontal :size="18" />
+                      </button>
+                      <div v-if="menu === a.id" class="rp-menu">
+                        <button
+                          @click="
+                            detail = a;
+                            menu = '';
+                          "
+                        >
+                          Qabulni ko‘rish</button
+                        ><button @click="menu = ''">Yopish</button>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="!rows.length">
+                <td colspan="6" class="rp-empty">
+                  Bemor topilmadi. Qidiruv yoki filtrlarni o‘zgartiring.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <footer class="rp-pagination">
+          <span
+            >{{ visible.length ? (page - 1) * 8 + 1 : 0 }}–{{
+              Math.min(page * 8, visible.length)
+            }}
+            / {{ visible.length }} ta bemor</span
+          >
+          <div>
+            <button
+              class="rp-icon"
+              :disabled="page === 1"
+              aria-label="Oldingi sahifa"
+              @click="page--"
+            >
+              <ChevronLeft :size="18" /></button
+            ><button
+              class="rp-button rp-primary"
+              :aria-label="`Sahifa ${page}`"
+            >
+              {{ page }}</button
+            ><button
+              class="rp-icon"
+              :disabled="page === pageCount"
+              aria-label="Keyingi sahifa"
+              @click="page++"
+            >
+              <ChevronRight :size="18" />
+            </button>
+          </div>
+        </footer>
+      </section>
+      <aside class="rp-side">
+        <section class="rp-panel rp-schedule">
+          <h2>Bugungi qabullar</h2>
+          <p class="rp-schedule-date">
+            <CalendarDays :size="16" />{{ uzDate(today) }}
+          </p>
+          <label class="rp-doctor"
+            ><span class="rp-avatar">{{
+              initials(doctors.find((d) => d.id === scheduleDoctor)!.fullName)
+            }}</span>
+            <div>
+              <select
+                v-model="scheduleDoctor"
+                aria-label="Qabul jadvali shifokori"
+              >
+                <option v-for="d in doctors" :key="d.id" :value="d.id">
+                  {{ d.name }}
+                </option></select
+              ><small>{{
+                doctors.find((d) => d.id === scheduleDoctor)?.specialty
+              }}</small>
+            </div></label
+          >
+          <p v-if="!schedule.length" class="rp-empty">
+            Bu kun uchun shifokor jadvali belgilanmagan.
+          </p>
+          <div
+            class="rp-timeline"
+            tabindex="0"
+            aria-label="Bugungi shifokor jadvali"
+          >
+            <div
+              v-for="s in schedule"
+              :key="s.time"
+              class="rp-timeline-row"
+              :class="s.appointment?.status"
+            >
+              <span>{{ s.time }}</span>
+              <div v-if="s.appointment">
+                <strong>{{ person(s.appointment).name }}</strong
+                ><small>{{ person(s.appointment).id }}</small>
+              </div>
+              <span v-else class="rp-slot-empty">{{
+                !s.scheduled ? "Jadval yo‘q" : s.busy ? "Band" : "Bo‘sh"
+              }}</span
+              ><span
+                v-if="s.appointment"
+                class="rp-badge"
+                :class="s.appointment.status"
+                >{{ statusLabels[s.appointment.status] }}</span
+              ><button
+                v-else-if="!s.busy && s.scheduled"
+                class="rp-button rp-outline"
+                :aria-label="`${s.time} vaqtiga yozish`"
+                @click="bookSlot(s.time)"
+              >
+                + Yozish
+              </button>
+            </div>
+          </div>
+        </section>
+        <section class="rp-panel rp-quick">
+          <h2>Tezkor amallar</h2>
+          <div>
+            <button @click="focusSearch">
+              <Search :size="23" />Bemor qidirish</button
+            ><button @click="openBooking()">
+              <CalendarDays :size="23" />Qabulga yozish</button
+            ><button
+              @click="
+                tab = 'walk_in';
+                doctor = '';
+                specialty = '';
+                status = '';
+                query = '';
+              "
+            >
+              <ClipboardList :size="23" />Navbatni ko‘rish
+            </button>
+          </div>
+        </section>
+      </aside>
+    </div>
+    <BookingDialog
+      v-if="booking"
+      :patients="state.patients"
+      :appointments="state.appointments"
+      :preset="bookingPreset"
+      @close="booking = false"
+      @save="saveBooking"
+    /><ArrivalDialog
+      v-if="arrival"
+      :patients="state.patients"
+      :appointments="state.appointments"
+      :preset="preset"
+      :create-patient="createPatient"
+      @close="arrival = false"
+      @arrive="arrive"
+    /><ReceptionDialog
+      v-if="detail"
+      title="Qabul ma’lumotlari"
+      subtitle="Lokal namuna · faqat ko‘rish uchun"
+      @close="detail = undefined"
+      ><div class="rp-dialog-body rp-details">
+        <h3>{{ person(detail).name }}</h3>
+        <p>
+          {{ person(detail).id }} · {{ person(detail).dob }} ·
+          {{ person(detail).phone }}
+        </p>
+        <p><b>Shifokor:</b> {{ physician(detail).fullName }}</p>
+        <p>
+          <b>Filial:</b>
+          {{ branches.find((b) => b.id === detail!.branchId)?.name }}
+        </p>
+        <p>
+          <b>Sana va vaqt:</b> {{ detail.date }} · {{ detail.time }}–{{
+            timeText(
+              minutes(detail.time) +
+                (services.find((s) => s.id === detail!.serviceId)?.duration ??
+                  30),
+            )
+          }}
+        </p>
+        <p><b>Holati:</b> {{ statusLabels[detail.status] }}</p>
+        <p><b>Izoh:</b> {{ detail.note || "Izoh kiritilmagan" }}</p>
+      </div>
+      <template #footer
+        ><button class="rp-button rp-primary" @click="detail = undefined">
+          Yopish
+        </button></template
+      ></ReceptionDialog
+    >
+  </section>
+</template>
