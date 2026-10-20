@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CalendarDays } from "lucide-vue-next";
 import { dateLabel } from "../../mocks/employees";
-defineProps<{ label: string; max?: string }>();
+defineProps<{ label: string; max?: string; min?: string }>();
 const value = defineModel<string>({ required: true });
 function picker(event: MouseEvent) {
   const input = event.currentTarget as HTMLInputElement;
@@ -18,6 +18,7 @@ function picker(event: MouseEvent) {
       type="date"
       :aria-label="label"
       :max="max"
+      :min="min"
       @click="picker"
   /></span>
 </template>
