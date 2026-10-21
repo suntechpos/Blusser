@@ -17,6 +17,8 @@ const props = defineProps<{
   files: readonly Readonly<Attachment>[];
   editable?: boolean;
   busy?: boolean;
+  maxBytes?: number;
+  maxFiles?: number;
 }>();
 const emit = defineEmits<{
   change: [files: Attachment[]];
@@ -53,7 +55,26 @@ async function select(files: File[]) {
   emit("busy", true);
   errors.value = [];
   try {
-    const result = await readAttachments(files);
+    const queue: File[] = [],
+      budgetErrors: string[] = [];
+    let bytes = props.files.reduce((n, f) => n + f.size, 0),
+      count = props.files.length;
+    for (const file of files) {
+      if (
+        count >= (props.maxFiles ?? Infinity) ||
+        bytes + file.size > (props.maxBytes ?? Infinity)
+      ) {
+        budgetErrors.push(
+          `${file.name}: lokal fayl limiti — ${props.maxFiles ?? "∞"} ta, jami ${Math.round((props.maxBytes ?? Infinity) / 1024 / 1024)} MB.`,
+        );
+      } else {
+        queue.push(file);
+        bytes += file.size;
+        count++;
+      }
+    }
+    const result = await readAttachments(queue);
+    result.errors.unshift(...budgetErrors);
     if (token === generation) {
       errors.value = result.errors;
       emit("change", [
