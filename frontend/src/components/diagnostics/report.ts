@@ -31,9 +31,12 @@ export async function resultPdf(
   return textPdf(lines);
 }
 /** Shared plain-text report renderer; preserves existing diagnostic export output. */
-export async function textPdf(lines: string[]) {
+export async function textPdf(
+  lines: string[],
+  options: { receipt?: boolean } = {},
+) {
   const c = document.createElement("canvas");
-  c.width = 1240;
+  c.width = options.receipt ? 640 : 1240;
   c.height = 1754;
   const x = c.getContext("2d");
   if (!x) throw Error("PDF yaratib bo‘lmadi.");
@@ -43,7 +46,7 @@ export async function textPdf(lines: string[]) {
     for (const para of line.split("\n")) {
       let row = "";
       for (const character of para) {
-        if (x.measureText(row + character).width > 1090) {
+        if (x.measureText(row + character).width > c.width - 140) {
           const space = row.lastIndexOf(" ");
           if (space > 0) {
             wrapped.push(row.slice(0, space));
@@ -57,16 +60,24 @@ export async function textPdf(lines: string[]) {
       wrapped.push(row);
       wrapped.push("");
     }
+  if (options.receipt) c.height = Math.max(900, wrapped.length * 36 + 180);
+  const perPage = options.receipt ? wrapped.length : 43;
+  const pageWidth = options.receipt ? (80 * 72) / 25.4 : 595;
+  const pageHeight = options.receipt ? (pageWidth * c.height) / c.width : 842;
   const pages: Uint8Array[] = [];
-  for (let start = 0; start < wrapped.length; start += 43) {
+  for (let start = 0; start < wrapped.length; start += perPage) {
     x.fillStyle = "white";
     x.fillRect(0, 0, c.width, c.height);
     x.fillStyle = "#101c43";
     x.font = "24px sans-serif";
     wrapped
-      .slice(start, start + 43)
+      .slice(start, start + perPage)
       .forEach((line, i) => x.fillText(line, 70, 90 + i * 36));
-    x.fillText(`${pages.length + 1} · NAMUNAVIY MA’LUMOTLAR`, 70, 1690);
+    x.fillText(
+      `${pages.length + 1} · NAMUNAVIY MA’LUMOTLAR`,
+      70,
+      c.height - 64,
+    );
     const blob = await new Promise<Blob>((resolve, reject) =>
       c.toBlob(
         (b) => (b ? resolve(b) : reject(Error("PDF xatosi"))),
@@ -99,15 +110,15 @@ export async function textPdf(lines: string[]) {
     const id = 3 + i * 3;
     object(
       id,
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im ${id + 1} 0 R >> >> /Contents ${id + 2} 0 R >>`,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im ${id + 1} 0 R >> >> /Contents ${id + 2} 0 R >>`,
     );
     offsets[id + 1] = length;
     add(
-      `${id + 1} 0 obj\n<< /Type /XObject /Subtype /Image /Width 1240 /Height 1754 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`,
+      `${id + 1} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`,
     );
     add(jpeg);
     add("\nendstream\nendobj\n");
-    const stream = "q 595 0 0 842 0 0 cm /Im Do Q";
+    const stream = `q ${pageWidth} 0 0 ${pageHeight} 0 0 cm /Im Do Q`;
     object(
       id + 2,
       `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
