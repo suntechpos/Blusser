@@ -28,6 +28,10 @@ export async function resultPdf(
     plainText(v.conclusion),
     "Fayllar: " + (v.files.map((f) => f.name).join(", ") || "—"),
   ];
+  return textPdf(lines);
+}
+/** Shared plain-text report renderer; preserves existing diagnostic export output. */
+export async function textPdf(lines: string[]) {
   const c = document.createElement("canvas");
   c.width = 1240;
   c.height = 1754;

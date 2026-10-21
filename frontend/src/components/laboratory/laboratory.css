@@ -1,0 +1,541 @@
+/* Laboratory content only; uses existing diagnostic primitives and local Inter. */
+.lb-page .lb-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.lb-page .lb-stats article {
+  height: 86px;
+  padding: 13px;
+  gap: 14px;
+}
+.lb-page .lb-stats .dx-stat-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.lb-page .lb-stats small {
+  font-size: 13px;
+}
+.lb-page .lb-stats strong {
+  font-size: 25px;
+  margin-top: 2px;
+}
+.lb-stats .new {
+  background: #f0f7ff;
+}
+.lb-stats .collected {
+  background: #ebfbf7;
+}
+.lb-stats .in_progress {
+  background: #f5f0ff;
+}
+.lb-stats .review {
+  background: #fff9e8;
+}
+.lb-stats .completed {
+  background: #eefbf6;
+}
+.lb-stats .collected .dx-stat-icon,
+.lb-stats .completed .dx-stat-icon {
+  background: #dff9ef;
+  color: #009b76;
+}
+.lb-stats .in_progress .dx-stat-icon {
+  background: #eee5ff;
+  color: #823dff;
+}
+.lb-stats .review .dx-stat-icon {
+  background: #fff2c7;
+  color: #b77a00;
+}
+.lb-page .dx-tabs {
+  gap: 0;
+  overflow: auto;
+}
+.lb-page .dx-tabs button {
+  padding: 17px 15px 14px;
+  white-space: nowrap;
+}
+.lb-page .dx-heading {
+  margin-bottom: 18px;
+}
+.lb-page .lb-list th,
+.lb-page .lb-list td {
+  padding: 8px 19px;
+}
+.lb-page .lb-list td b {
+  font-weight: 500;
+}
+.lb-page .lb-list td .dx-button {
+  min-width: 140px;
+  font-size: 13px;
+}
+.lb-page .lb-list .dx-pagination span {
+  margin-left: 8px;
+}
+.lb-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  max-width: 150px;
+  white-space: normal;
+}
+.lb-badge.new {
+  background: #e5f2ff;
+  color: #0066ff;
+}
+.lb-badge.collected {
+  background: #ddf9ef;
+  color: #008666;
+}
+.lb-badge.in_progress {
+  background: #f1e8ff;
+  color: #8034f0;
+}
+.lb-badge.review {
+  background: #fff5d6;
+  color: #a86500;
+}
+.lb-badge.completed {
+  background: #ddf9ef;
+  color: #008361;
+}
+.lb-queue-note {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px !important;
+  padding: 0 18px;
+  margin: 0 0 12px !important;
+}
+.lb-queue-note span {
+  font-size: 11px;
+  color: #91a2c2;
+}
+.lb-last-sample {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 2px 12px 12px;
+  color: #5578a7;
+}
+.lb-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.93fr) minmax(300px, 1fr);
+  gap: 18px;
+  padding-bottom: 65px;
+}
+.lb-content-grid > *,
+.lb-content-grid .dx-card {
+  min-width: 0;
+}
+.lb-content-grid .dx-patient {
+  padding: 16px 20px;
+  gap: 20px;
+}
+.lb-content-grid .dx-patient h2 {
+  font-size: 21px;
+}
+.lb-content-grid .dx-avatar {
+  width: 52px;
+  height: 52px;
+  font-size: 18px;
+}
+.lb-results-scroll {
+  overflow: auto;
+  border: 1px solid #dfeafb;
+  border-radius: 8px;
+}
+.lb-results {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+.lb-results th {
+  font-size: 13px;
+  font-weight: 600;
+  background: #f1f7fd;
+  padding: 10px 13px;
+  white-space: nowrap;
+}
+.lb-results td {
+  padding: 8px 13px;
+  border-top: 1px solid #e5edfb;
+  vertical-align: middle;
+}
+.lb-results td b {
+  font-weight: 400;
+}
+.lb-results td:first-child {
+  min-width: 180px;
+}
+.lb-results td small {
+  display: block;
+  color: #738cba;
+  font-size: 11px;
+}
+.lb-results input,
+.lb-results select {
+  width: 128px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  min-height: 32px;
+}
+.lb-results input[aria-invalid="true"],
+.lb-results select[aria-invalid="true"] {
+  border-color: #e24b5d;
+}
+.lb-results .abnormal:not(:has(input)) {
+  background: #fff7d9;
+}
+.lb-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.lb-flag.normal {
+  color: #00a574;
+}
+.lb-flag.high,
+.lb-flag.low {
+  color: #ed8300;
+}
+.lb-flag.unknown,
+.lb-flag.qualitative,
+.lb-flag.empty {
+  color: #647fae;
+}
+.lb-flag.invalid,
+.lb-field-error,
+.lb-required {
+  color: #d93950 !important;
+}
+.lb-sample-note {
+  font-size: 12px;
+  color: #748ab3;
+  line-height: 1.5;
+  margin: 8px 0 4px;
+}
+.lb-demo-pill {
+  font-size: 11px;
+  float: right;
+  background: #f0f7ff;
+  color: #0665ff;
+  padding: 5px 12px;
+  border: 1px solid #c9e0ff;
+  border-radius: 20px;
+  font-weight: 400;
+}
+.lb-note {
+  display: block;
+  margin-top: 18px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.lb-note textarea,
+.lb-note input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  box-sizing: border-box;
+  font-weight: 400;
+}
+.lb-note textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+.lb-note > small {
+  display: block;
+  text-align: right;
+  color: #7b92bc;
+  font-size: 11px;
+  margin-top: 4px;
+  font-weight: 400;
+}
+.lb-read-note {
+  padding: 10px 14px;
+  background: #f3f7fc;
+  border: 1px solid #dfeafb;
+  border-radius: 7px;
+  font-size: 14px !important;
+  color: #365b91 !important;
+  margin: 0 !important;
+  white-space: pre-wrap;
+}
+.lb-sample-info article + article {
+  border-top: 2px solid #dfeafb;
+  margin-top: 12px;
+}
+.lb-file-limit {
+  font-size: 12px !important;
+}
+.lb-page .lb-content-grid .dx-card {
+  padding: 18px;
+}
+.lb-page .lb-content-grid dl {
+  grid-template-columns: 45% 55%;
+}
+.lb-page .lb-content-grid dt,
+.lb-page .lb-content-grid dd {
+  padding: 12px 0;
+  font-size: 13px;
+}
+.lb-page .lb-content-grid dd {
+  padding-left: 10px;
+}
+.lb-sticky {
+  margin-top: 0;
+}
+.lb-return {
+  color: #d36c00;
+  border-color: #ffa837;
+}
+.lb-dialog.lb-dialog {
+  width: min(640px, 94vw);
+}
+.lb-dialog.lb-dialog.dx-template-dialog {
+  width: min(1200px, 95vw);
+}
+.lb-dialog .dx-modal-body {
+  padding: 10px 26px 18px;
+}
+.lb-dialog .dx-card {
+  margin-top: 12px;
+  padding: 16px;
+}
+.lb-dialog .dx-card h2 {
+  margin-bottom: 10px;
+}
+.lb-dialog .dx-modal-body p {
+  color: #6d83ac;
+}
+.lb-dialog .lb-note {
+  font-weight: 500;
+}
+.lb-dialog .lb-note textarea {
+  font-family: inherit;
+  line-height: 1.5;
+}
+.lb-dialog select,
+.lb-dialog input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid #d9e5f8;
+  border-radius: 7px;
+  background: white;
+  color: #143363;
+  min-width: 0;
+}
+.lb-dialog input[readonly] {
+  background: #eff3f8;
+}
+.lb-dialog p {
+  line-height: 1.5;
+}
+.lb-dialog-patient {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 18px 0;
+}
+.lb-dialog-patient h2 {
+  margin: 0;
+}
+.lb-dialog-patient p {
+  margin: 4px 0 0;
+}
+.lb-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px 22px;
+  margin: 20px 0;
+}
+.lb-form-grid label {
+  font-size: 14px;
+}
+.lb-form-grid select,
+.lb-form-grid input,
+.lb-form-grid .e-date-field {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  box-sizing: border-box;
+}
+.lb-form-grid small {
+  color: #8a9fc1;
+  font-size: 12px;
+}
+.lb-dialog.lb-compact {
+  width: min(550px, 94vw);
+}
+.lb-label {
+  text-align: center;
+}
+.lb-label svg {
+  width: 100%;
+  max-height: 125px;
+  padding: 12px 0;
+  margin-top: 15px;
+}
+.lb-dialog .dx-template-body {
+  grid-template-columns: 25% 75%;
+}
+.lb-dialog .dx-template-body section {
+  overflow: auto;
+}
+.lb-dialog .dx-template-body .dx-attachments {
+  margin-top: 16px;
+}
+.lb-dialog .lb-results td {
+  padding: 9px;
+  font-size: 13px;
+}
+.lb-dialog .lb-results td:first-child {
+  min-width: 140px;
+}
+.lb-dialog .lb-note > textarea:focus-visible,
+.lb-page textarea:focus-visible {
+  outline: 2px solid #0867ff;
+  outline-offset: 3px;
+}
+@media (max-width: 1400px) {
+  .lb-page .lb-list td,
+  .lb-page .lb-list th {
+    padding: 8px 11px;
+  }
+  .lb-page .lb-stats article {
+    gap: 9px;
+  }
+  .lb-page .lb-stats small {
+    font-size: 12px;
+  }
+  .lb-page .lb-list td .dx-button {
+    min-width: 130px;
+  }
+  .lb-content-grid {
+    grid-template-columns: minmax(0, 1.8fr) minmax(290px, 1fr);
+  }
+}
+@media (max-width: 1100px) {
+  .lb-page .lb-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .lb-content-grid {
+    grid-template-columns: 1fr;
+  }
+  .lb-page .lb-list table {
+    min-width: 1050px;
+  }
+  .lb-page .dx-heading {
+    flex-wrap: wrap;
+  }
+  .lb-page .dx-heading h1 {
+    font-size: 28px;
+  }
+  .lb-page .lb-content-grid aside {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .lb-queue-note {
+    gap: 12px;
+  }
+}
+@media (max-width: 750px) {
+  .lb-page .lb-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lb-page .lb-content-grid aside {
+    display: block;
+  }
+  .lb-dialog .dx-template-body {
+    grid-template-columns: 1fr;
+  }
+  .lb-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .lb-sticky {
+    flex-wrap: wrap;
+  }
+  .lb-queue-note {
+    flex-direction: column;
+  }
+  .lb-demo-pill {
+    float: none;
+    display: block;
+    width: max-content;
+    margin-top: 8px;
+  }
+}
+.lb-page > .dx-link {
+  display: inline-flex;
+}
+.lb-page > .dx-breadcrumb {
+  display: inline-block;
+  margin: 0 0 0 18px;
+  vertical-align: middle;
+}
+.lb-page > .dx-breadcrumb + .dx-heading {
+  margin-top: 12px;
+}
+.lb-page .lb-results td {
+  padding-block: 4px;
+}
+.lb-dialog .dw-discard {
+  padding: 14px 24px;
+  background: #fff4e1;
+  color: #966000;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lb-dialog .dw-discard b {
+  width: 100%;
+}
+.lb-dialog .dw-discard button {
+  padding: 8px 12px;
+  border: 1px solid #e2c48b;
+  border-radius: 6px;
+  background: white;
+  color: #77501b;
+}
+.lb-page > .dx-breadcrumb + .dx-heading {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+.lb-page > .dx-breadcrumb + .dx-heading h1 {
+  margin-bottom: 0;
+}
+.lb-page > .dx-breadcrumb + .dx-heading p {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.lb-page .lb-content-grid .lb-patient {
+  padding-block: 12px;
+}
+.lb-page .lb-results th {
+  padding-block: 8px;
+}
+.lb-page .lb-content-grid .dx-card:has(> .lb-results-scroll) > h2 {
+  margin-bottom: 12px;
+}
+.lb-page .lb-content-grid .lb-note {
+  position: relative;
+  margin-top: 14px;
+}
+.lb-page .lb-content-grid .lb-note textarea {
+  min-height: 70px;
+  padding-bottom: 24px;
+}
+.lb-page .lb-content-grid .lb-note > small {
+  position: absolute;
+  right: 10px;
+  bottom: 7px;
+  margin: 0;
+}
