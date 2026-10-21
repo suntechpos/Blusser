@@ -1,0 +1,1007 @@
+/* Cashier content only. Existing shell and shared component defaults untouched. */
+.cs-page .dx-heading h1 {
+  font-size: 36px;
+}
+.cs-tabs {
+  display: flex;
+  gap: 12px;
+  border-bottom: 1px solid #dfeafa;
+  margin: 18px 0 20px;
+}
+.cs-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: #385c95;
+  font: inherit;
+  border-radius: 10px 10px 0 0;
+}
+.cs-tabs button.active {
+  background: #e8f3ff;
+  color: #0665ff;
+  border-bottom-color: #0665ff;
+}
+.cs-tabs svg {
+  width: 22px;
+  height: 22px;
+}
+.cs-shift {
+  border: 1px solid #e0e8f1;
+  background: #eff2f7;
+  color: #657590;
+  border-radius: 8px;
+  padding: 9px 15px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.cs-shift.open {
+  background: #ebfbf6;
+  border-color: #caeee3;
+  color: #0c765e;
+}
+.cs-gate {
+  min-height: 650px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+.cs-gate > svg {
+  color: #6a87b3;
+  background: #eaf2fd;
+  border-radius: 50%;
+  padding: 23px;
+  box-sizing: content-box;
+}
+.cs-gate h2 {
+  font-size: 28px;
+  margin: 0;
+}
+.cs-gate small {
+  color: #7c91b3;
+}
+.cs-columns {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(410px, 1.33fr) minmax(
+      330px,
+      1.03fr
+    );
+  gap: 14px;
+  align-items: stretch;
+}
+.cs-columns > .dx-card {
+  padding: 17px;
+  min-width: 0;
+  min-height: 700px;
+  margin-bottom: 0;
+}
+.cs-columns h2 {
+  font-size: 19px;
+  margin: 0 0 20px;
+}
+.cs-pending h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cs-pending h2 span {
+  background: #e6f2ff;
+  color: #0867ff;
+  font-size: 15px;
+  padding: 6px 12px;
+  border-radius: 12px;
+}
+.cs-pending .dx-search {
+  margin-bottom: 14px;
+}
+.cs-pending .dx-search input {
+  width: 100%;
+  padding: 12px 8px;
+}
+.cs-invoice {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 10px;
+  background: #fff;
+  border: 1px solid #dce8fa;
+  border-radius: 10px;
+  text-align: left;
+  color: #112754;
+  margin: 0 0 10px;
+  font: inherit;
+}
+.cs-invoice.selected {
+  background: linear-gradient(120deg, #e9f4ff, #f7fbff);
+  border-color: #0867ff;
+}
+.cs-invoice > .dx-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.cs-invoice > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+.cs-invoice b {
+  font-size: 14px;
+  display: block;
+}
+.cs-invoice small {
+  display: block;
+  font-size: 11px;
+  color: #7890b8;
+  margin: 5px 0;
+}
+.cs-invoice strong {
+  display: block;
+  color: #0066ff;
+  font-size: 17px;
+}
+.cs-invoice > svg {
+  color: #6387bd;
+  flex-shrink: 0;
+}
+.cs-account {
+  display: flex;
+  flex-direction: column;
+}
+.cs-account > h2,
+.cs-payment > h2 {
+  border-bottom: 1px solid #e1eafa;
+  margin: 0 -17px 18px;
+  padding: 0 17px 18px;
+}
+.cs-patient {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.cs-patient > .dx-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.cs-patient > div:last-child {
+  margin-left: auto;
+  text-align: right;
+  flex-shrink: 0;
+}
+.cs-patient b {
+  display: block;
+  font-size: 15px;
+}
+.cs-patient small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6e8bb9;
+  margin-top: 6px;
+}
+.cs-badge {
+  display: block;
+  margin-top: 8px;
+  background: #fff0f1;
+  color: #cf3046;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.cs-account > .dx-button {
+  width: max-content;
+  margin-bottom: 16px;
+}
+.cs-table-scroll {
+  overflow: auto;
+  min-width: 0;
+}
+.cs-services {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+.cs-services th {
+  background: #f0f6fe;
+  color: #426697;
+  font-weight: 500;
+  padding: 12px 9px;
+  white-space: nowrap;
+}
+.cs-services td {
+  padding: 13px 9px;
+  border-bottom: 1px solid #e2ebfa;
+  line-height: 1.5;
+}
+.cs-services td small {
+  display: block;
+  color: #7c92b9;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.cs-services td:not(:first-child) {
+  white-space: nowrap;
+}
+.cs-services input[type="number"] {
+  width: 48px;
+  border: 1px solid #dce7fa;
+  padding: 5px;
+  font: inherit;
+  border-radius: 5px;
+}
+.cs-account > footer {
+  margin-top: auto;
+  padding-top: 17px;
+  border-top: 1px solid #e0eafa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6a85b0;
+  font-size: 13px;
+}
+.cs-payment dl {
+  grid-template-columns: 58% 42%;
+  font-size: 13px;
+}
+.cs-payment dl dt,
+.cs-payment dl dd {
+  padding: 10px 0;
+  border-top: 0;
+}
+.cs-payment dl dd {
+  font-weight: 600;
+  text-align: right;
+}
+.cs-payment dl dt {
+  color: #315183;
+}
+.cs-discount {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-size: 13px;
+  margin: 7px 0 14px;
+}
+.cs-discount > span {
+  margin-right: auto;
+}
+.cs-discount input {
+  width: 65px;
+  padding: 7px;
+}
+.cs-discount button {
+  padding: 7px;
+  border: 1px solid #dce6f6;
+  background: #f4f8ff;
+  color: #587aad;
+}
+.cs-discount button.active {
+  color: #0066ff;
+  border-color: #97b9ff;
+  background: white;
+}
+.cs-discount b {
+  margin-left: auto;
+  min-width: 70px;
+  text-align: right;
+}
+.cs-summary {
+  border-top: 1px solid #e0eafa;
+  border-bottom: 1px solid #e0eafa;
+  margin: 14px 0 !important;
+  padding: 8px 0;
+}
+.cs-summary dt:nth-last-of-type(1),
+.cs-summary dd:last-child {
+  color: #0066ff;
+  font-weight: 600;
+}
+.cs-label {
+  display: block;
+  font-weight: 500;
+  font-size: 14px;
+  margin: 16px 0 7px;
+}
+.cs-label > input,
+.cs-label > select,
+.cs-label > textarea {
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+  margin-top: 8px;
+}
+.cs-segments {
+  display: flex;
+  border: 1px solid #d8e7fd;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 9px 0 12px;
+}
+.cs-segments button {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid #d8e7fd;
+  background: #f8fbff;
+  color: #365b8b;
+  padding: 12px 6px;
+  font: inherit;
+}
+.cs-segments button.active {
+  background: #0867ff;
+  color: white;
+}
+.cs-check {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+  margin: 14px 0;
+  line-height: 1.5;
+}
+.cs-check input,
+.cs-services input[type="checkbox"] {
+  accent-color: #0665ff;
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+}
+.cs-partial {
+  padding: 7px 10px;
+  background: #edf6ff;
+  border-radius: 7px;
+  color: #0665ff;
+}
+.cs-money-field {
+  display: block;
+  margin: 13px 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+.cs-money-input {
+  display: flex;
+  margin-top: 8px;
+  border: 1px solid #d3e0f7;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #f1f6fe;
+  align-items: center;
+}
+.cs-money-input input {
+  border: 0;
+  border-radius: 0;
+  width: 100%;
+  min-width: 0;
+  font-size: 17px;
+  padding: 11px 14px;
+  color: #0f2451;
+  font-weight: 500;
+}
+.cs-money-input small {
+  padding: 0 15px;
+  color: #6484b5;
+  font-size: 13px;
+}
+.cs-money-input input:disabled {
+  background: #edf2f8;
+}
+.cs-change,
+.cs-debt,
+.cs-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 12px;
+  margin: 14px 0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #edf5ff;
+  color: #0961f3;
+  flex-wrap: wrap;
+}
+.cs-change {
+  background: #e9faf3;
+  color: #00886b;
+}
+.cs-debt {
+  background: #fff6de;
+  color: #b26b00;
+}
+.cs-change b,
+.cs-debt b {
+  font-size: 18px;
+}
+.cs-pay.cs-pay {
+  width: 100%;
+  margin-top: 6px;
+  padding: 15px 6px;
+  font-size: 15px;
+}
+.cs-muted,
+.cs-demo {
+  font-size: 12px !important;
+  color: #7b91b7 !important;
+  line-height: 1.6;
+}
+.cs-demo {
+  display: block;
+  text-align: right;
+}
+.cs-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.cs-stat-grid article {
+  display: flex;
+  gap: 25px;
+  align-items: center;
+  padding: 17px;
+}
+.cs-stat-grid svg {
+  width: 60px;
+  height: 60px;
+  padding: 15px;
+  border-radius: 50%;
+  background: #e5f6ff;
+  color: #0867ff;
+  flex-shrink: 0;
+}
+.cs-stat-grid strong {
+  display: block;
+  color: #0867ff;
+  font-size: 26px;
+  margin-top: 5px;
+}
+.cs-stat-grid small {
+  font-size: 14px;
+}
+.cs-history {
+  padding: 15px;
+}
+.cs-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 14px;
+  flex-wrap: wrap;
+}
+.cs-filters > input {
+  flex: 1;
+  min-width: 160px;
+}
+.cs-filters .e-date-field {
+  min-width: 160px !important;
+  flex: 0 0 160px;
+}
+.cs-filters select {
+  min-width: 130px;
+}
+.cs-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.cs-history-table th {
+  background: #f0f6ff;
+  padding: 14px 16px;
+  font-weight: 500;
+  color: #345e9a;
+}
+.cs-history-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e0eafb;
+}
+.cs-history-table td > b {
+  display: block;
+  font-size: 14px;
+}
+.cs-history-table td small {
+  display: block;
+  color: #8195b8;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.cs-history-table .dx-button {
+  padding: 8px 12px;
+}
+.cs-method {
+  padding: 5px 12px;
+  background: #e8f3ff;
+  color: #0665ff;
+  border-radius: 7px;
+}
+.cs-dialog.cs-dialog {
+  width: min(590px, 94vw);
+}
+.cs-dialog.cs-wide {
+  width: min(820px, 95vw);
+}
+.cs-dialog.cs-refund-dialog {
+  width: min(1050px, 95vw);
+}
+.cs-dialog > .dx-modal-body {
+  padding: 8px 26px 20px;
+}
+.cs-dialog input,
+.cs-dialog select,
+.cs-dialog textarea {
+  font: inherit;
+  color: #183764;
+  border: 1px solid #d4e3f9;
+  border-radius: 7px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+.cs-dialog textarea {
+  min-height: 75px;
+  resize: vertical;
+}
+.cs-dialog .cs-services {
+  border: 1px solid #dfebfa;
+}
+.cs-dialog .cs-services input:not([type="checkbox"]) {
+  width: 130px;
+  padding: 7px 9px;
+}
+.cs-dialog dl {
+  font-size: 14px;
+}
+.cs-dialog dl dd {
+  font-weight: 500;
+}
+.cs-dialog p {
+  color: #6b83ac;
+}
+.cs-clinic {
+  background: #f0f7ff;
+  border: 1px solid #d8e8ff;
+  border-radius: 8px;
+  padding: 17px;
+  margin: 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #355d98;
+  font-size: 14px;
+}
+.cs-clinic b {
+  color: #122651;
+}
+.cs-clinic span {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+}
+.cs-pin-dialog.cs-pin-dialog {
+  width: min(470px, 94vw);
+}
+.cs-pin-body {
+  position: relative;
+}
+.cs-pin-body > input[type="password"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0.01;
+  left: 50%;
+  top: 100px;
+  padding: 0;
+}
+.cs-pin-dots {
+  display: flex;
+  gap: 12px;
+  margin: 22px 0 18px;
+  justify-content: center;
+}
+.cs-pin-dots span {
+  height: 52px;
+  width: 62px;
+  border: 1px solid #abc8ff;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #0f2058;
+  font-size: 25px;
+}
+.cs-pin-body:focus-within .cs-pin-dots {
+  outline: 2px solid #e1edff;
+  outline-offset: 4px;
+  border-radius: 7px;
+}
+.cs-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.cs-keypad button {
+  font:
+    600 22px "Employees Inter",
+    Arial,
+    sans-serif;
+  background: #f3f8ff;
+  border: 1px solid #dce8fa;
+  border-radius: 7px;
+  color: #132955;
+  min-height: 50px;
+  display: grid;
+  place-items: center;
+}
+.cs-keypad button:disabled {
+  background: #edf1f6;
+  border-color: transparent;
+}
+.cs-pin-dialog footer > button {
+  flex: 1;
+}
+.cs-success-icon {
+  width: 100px;
+  height: 100px;
+  border: 16px solid #e0faf0;
+  background: #00ad80;
+  color: white;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  margin: 10px auto 25px;
+}
+.cs-success-dialog footer {
+  flex-wrap: wrap;
+}
+.cs-success-dialog footer > button:last-child {
+  width: 100%;
+}
+.cs-receipt-stage {
+  background: #e9eff5;
+  padding: 18px;
+  overflow: auto;
+  max-height: 65vh;
+  border-radius: 9px;
+}
+.cs-receipt {
+  width: 80mm;
+  min-height: 100mm;
+  box-sizing: border-box;
+  background: white;
+  color: #121928;
+  padding: 16px 18px;
+  box-shadow: 0 4px 18px #10234520;
+  margin: auto;
+  font:
+    12px Arial,
+    sans-serif;
+  clip-path: polygon(
+    0 0,
+    2% 3px,
+    4% 0,
+    6% 3px,
+    8% 0,
+    10% 3px,
+    12% 0,
+    14% 3px,
+    16% 0,
+    18% 3px,
+    20% 0,
+    22% 3px,
+    24% 0,
+    26% 3px,
+    28% 0,
+    30% 3px,
+    32% 0,
+    34% 3px,
+    36% 0,
+    38% 3px,
+    40% 0,
+    42% 3px,
+    44% 0,
+    46% 3px,
+    48% 0,
+    50% 3px,
+    52% 0,
+    54% 3px,
+    56% 0,
+    58% 3px,
+    60% 0,
+    62% 3px,
+    64% 0,
+    66% 3px,
+    68% 0,
+    70% 3px,
+    72% 0,
+    74% 3px,
+    76% 0,
+    78% 3px,
+    80% 0,
+    82% 3px,
+    84% 0,
+    86% 3px,
+    88% 0,
+    90% 3px,
+    92% 0,
+    94% 3px,
+    96% 0,
+    98% 3px,
+    100% 0,
+    100% 100%,
+    0 100%
+  );
+}
+.cs-receipt p {
+  font: inherit;
+  line-height: 1.4;
+  color: #172238;
+  margin: 7px 0;
+  padding: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.cs-receipt p:nth-of-type(-n + 2),
+.cs-receipt p:last-child {
+  font-weight: bold;
+  text-align: center;
+}
+.cs-receipt p:nth-of-type(8),
+.cs-receipt p:last-child {
+  border-bottom: 1px dashed #7c8594;
+  padding-bottom: 10px;
+}
+.cs-receipt p.cs-receipt-total {
+  font-weight: 700;
+  border-top: 1px dashed #73809a;
+  padding-top: 7px;
+  font-size: 13px;
+}
+.cs-receipt-brand {
+  text-align: center;
+  font:
+    bold 25px "Employees Inter",
+    Arial,
+    sans-serif;
+  margin: 6px 0 16px;
+}
+.cs-receipt-brand small {
+  display: block;
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+.cs-paper-size {
+  text-align: center;
+  font-size: 12px;
+  color: #8398ba !important;
+}
+.cs-refund-search {
+  max-height: 210px;
+  overflow: auto;
+  display: grid;
+  gap: 5px;
+}
+.cs-refund-search button {
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #dce7fa;
+  border-radius: 7px;
+  background: #f6faff;
+  color: #1d4171;
+}
+.cs-refund-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 16px;
+  background: #f2f8ff;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #6380b1;
+}
+.cs-refund-summary b {
+  display: block;
+  font-size: 20px;
+  color: #0665ff;
+  margin-top: 8px;
+}
+.cs-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.cs-refund-detail {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr;
+  gap: 20px;
+}
+.cs-refund-detail > section {
+  min-width: 0;
+}
+.cs-refund-detail .cs-receipt {
+  width: 100%;
+  max-width: 80mm;
+}
+.cs-refund-detail .cs-receipt-stage {
+  padding: 12px;
+}
+.cs-refunded {
+  display: inline-block;
+  background: #e4faf0;
+  color: #008d68;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.cs-close-dialog dl dt,
+.cs-close-dialog dl dd {
+  padding: 9px 0;
+}
+.cs-close-dialog h3 {
+  margin: 18px 0 8px;
+}
+.cs-dialog .dw-discard {
+  background: #fff6df;
+  padding: 14px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cs-dialog .dw-discard b {
+  width: 100%;
+}
+.cs-dialog .dw-discard button {
+  padding: 8px 12px;
+  border: 1px solid #dbca9c;
+  border-radius: 6px;
+  background: #fff;
+}
+.cs-page .cs-field-error {
+  color: #c52b44;
+  font-size: 12px;
+  display: block;
+  margin-top: 5px;
+}
+@media (max-width: 1400px) {
+  .cs-columns {
+    grid-template-columns: minmax(190px, 0.7fr) minmax(360px, 1.2fr) minmax(
+        300px,
+        1fr
+      );
+    gap: 12px;
+  }
+  .cs-columns > .dx-card {
+    padding: 13px;
+  }
+  .cs-account > h2,
+  .cs-payment > h2 {
+    margin-inline: -13px;
+    padding-inline: 13px;
+  }
+  .cs-patient {
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  .cs-patient > div:last-child {
+    margin-left: 0;
+  }
+  .cs-patient b {
+    font-size: 13px;
+  }
+  .cs-services {
+    font-size: 12px;
+  }
+  .cs-services td,
+  .cs-services th {
+    padding: 11px 7px;
+  }
+  .cs-discount b {
+    font-size: 11px;
+  }
+  .cs-discount input {
+    width: 48px;
+  }
+  .cs-invoice {
+    padding: 13px 7px;
+  }
+  .cs-invoice small {
+    font-size: 10px;
+  }
+  .cs-invoice > .dx-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 13px;
+  }
+  .cs-invoice strong {
+    font-size: 15px;
+  }
+}
+@media (max-width: 1180px) {
+  .cs-columns {
+    grid-template-columns: minmax(220px, 0.8fr) minmax(360px, 1.2fr);
+  }
+  .cs-payment {
+    grid-column: 1/-1;
+    min-height: 0 !important;
+  }
+  .cs-payment > dl,
+  .cs-payment > .cs-summary {
+    max-width: 600px;
+  }
+  .cs-payment .cs-pay {
+    max-width: 600px;
+  }
+  .cs-stat-grid strong {
+    font-size: 21px;
+  }
+  .cs-history-table {
+    min-width: 1000px;
+  }
+}
+@media (max-width: 760px) {
+  .cs-columns {
+    grid-template-columns: 1fr;
+  }
+  .cs-columns > .dx-card {
+    min-height: 0;
+  }
+  .cs-payment {
+    grid-column: auto;
+  }
+  .cs-account > footer {
+    margin-top: 24px;
+  }
+  .cs-stat-grid {
+    grid-template-columns: 1fr;
+  }
+  .cs-tabs {
+    gap: 0;
+    overflow: auto;
+  }
+  .cs-tabs button {
+    padding: 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .cs-page > .dx-heading {
+    display: block;
+  }
+  .cs-page > .dx-heading > .dx-actions {
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .cs-refund-detail {
+    grid-template-columns: 1fr;
+  }
+  .cs-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .cs-refund-summary {
+    grid-template-columns: 1fr;
+  }
+  .cs-refund-summary b {
+    font-size: 18px;
+  }
+  .cs-receipt-stage {
+    padding: 10px;
+  }
+  .cs-receipt {
+    width: 72mm;
+  }
+  .cs-gate {
+    min-height: 450px;
+  }
+  .cs-filters .e-date-field {
+    min-width: 130px !important;
+    flex-basis: 130px;
+  }
+}

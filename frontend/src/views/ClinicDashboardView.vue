@@ -12,6 +12,7 @@ import RegistraturaView from './RegistraturaView.vue'
 import ServicesView from './ServicesView.vue'
 import DiagnosticsView from './DiagnosticsView.vue'
 import LaboratoryView from './LaboratoryView.vue'
+import CashierView from './CashierView.vue'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import {
   Activity, Bell, Building2, CalendarDays, ChevronDown, ChevronRight, Clock3,
@@ -142,7 +143,7 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
         </div>
       </header>
       <main class="clinic-main" :key="session.epoch">
-        <div v-if="activeItem!=='Laboratoriya' && activeItem!=='UZI va Diagnostika' && activeItem!=='Xizmatlar' && activeItem!=='Registratura' && activeItem!=='Bemorlar' && activeItem!=='Xodimlar' && activeItem!=='Bo‘limlar va Xonalar' && activeItem!=='Shifokor kabineti'" class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
+        <div v-if="activeItem!=='Kassa' && activeItem!=='Laboratoriya' && activeItem!=='UZI va Diagnostika' && activeItem!=='Xizmatlar' && activeItem!=='Registratura' && activeItem!=='Bemorlar' && activeItem!=='Xodimlar' && activeItem!=='Bo‘limlar va Xonalar' && activeItem!=='Shifokor kabineti'" class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
         <template v-if="activeItem === 'Bosh sahifa'">
           <div class="clinic-page-head"><div><h1>Xush kelibsiz, Gulnoza!</h1><p>Bugungi klinika faoliyati haqida umumiy ma’lumot</p></div><div class="clinic-filters"><button><CalendarDays :size="18" />{{ period }}<ChevronDown :size="16" /></button><button><MapPin :size="19" />{{ branch }}<ChevronDown :size="16" /></button></div></div>
           <section class="clinic-stats"><div v-for="(m,i) in metrics" :key="m.label" class="clinic-stat" :class="m.cls"><span class="clinic-stat-icon"><component :is="m.icon" :size="28" /></span><div class="clinic-stat-detail"><span class="clinic-stat-label">{{ m.label }}</span><div class="clinic-stat-value">{{ m.value }}<small v-if="i===4"> so‘m</small> <em v-if="m.change">↑ {{ m.change }}</em><small v-if="i===3"> bemor</small></div><span class="clinic-stat-note">{{ m.note }}</span></div></div></section>
@@ -156,6 +157,7 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
           </section>
         </template>
         <RegistraturaView v-else-if="activeItem === 'Registratura'" />
+        <CashierView v-else-if="activeItem === 'Kassa'" />
         <LaboratoryView ref="laboratoryView" v-else-if="activeItem === 'Laboratoriya'" />
         <DiagnosticsView ref="diagnosticsView" v-else-if="activeItem === 'UZI va Diagnostika'" />
         <ServicesView v-else-if="activeItem === 'Xizmatlar'" />
