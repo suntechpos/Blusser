@@ -11,9 +11,15 @@ import {
   today,
   type Employee,
 } from "../../mocks/employees";
+import { useRolesStore } from "../settings/store";
+const rolesStore = useRolesStore();
 const props = defineProps<{ employee: Employee | null }>();
 const emit = defineEmits<{ cancel: []; save: [Employee] }>();
 const draft = ref(clone(props.employee ?? blankEmployee()));
+if (draft.value.roleId === undefined)
+  draft.value.roleId =
+    rolesStore.state.value.roles.find((r) => r.name === draft.value.role)?.id ??
+    "";
 const errors = ref<Record<string, string>>({});
 const password = ref("");
 const showPassword = ref(false);
@@ -77,7 +83,8 @@ function save() {
   }
   if (d.access) {
     if (!d.login.trim()) e.login = "Loginni kiriting.";
-    if (!d.role) e.role = "Ruxsat rolini tanlang.";
+    if (!rolesStore.state.value.roles.some((r) => r.id === d.roleId))
+      e.role = "Ruxsat rolini tanlang.";
     if (
       (!props.employee || !props.employee.access) &&
       password.value.length < 8
@@ -91,7 +98,12 @@ function save() {
   if (!d.access) {
     d.login = "";
     d.role = "";
+    d.roleId = "";
   }
+  if (d.access)
+    d.role =
+      rolesStore.state.value.roles.find((r) => r.id === d.roleId)?.name ??
+      d.role;
   if (d.position !== "Shifokor") d.specialty = "";
   password.value = "";
   emit("save", clone(d));
@@ -309,8 +321,15 @@ function save() {
               }}</small></label
             ><label class="e-label"
               >Ruxsat roli <em>*</em
-              ><select v-model="draft.role" aria-label="Ruxsat roli *">
-                <option v-for="p in positions" :key="p">{{ p }}</option></select
+              ><select v-model="draft.roleId" aria-label="Ruxsat roli *">
+                <option value="">Rolni tanlang</option>
+                <option
+                  v-for="r in rolesStore.state.value.roles"
+                  :key="r.id"
+                  :value="r.id"
+                >
+                  {{ r.name }}
+                </option></select
               ><small v-if="errors.role" class="e-error">{{
                 errors.role
               }}</small></label

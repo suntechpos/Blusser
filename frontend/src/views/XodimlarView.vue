@@ -25,7 +25,6 @@ import EmployeeForm from "../components/employees/EmployeeForm.vue";
 import ScheduleDialog from "../components/employees/ScheduleDialog.vue";
 import ExceptionDialog from "../components/employees/ExceptionDialog.vue";
 import {
-  createEmployees,
   positions,
   branches,
   fullName,
@@ -38,7 +37,26 @@ import {
   type Schedule,
   type Exception,
 } from "../mocks/employees";
-const employees = ref(createEmployees());
+import { useRolesStore } from "../components/settings/store";
+const rolesStore = useRolesStore();
+const employees = computed(() => rolesStore.state.value.employees);
+const saveError = ref("");
+function changeEmployees(fn: (es: Employee[]) => void) {
+  try {
+    rolesStore.transact((s) => fn(s.employees));
+    saveError.value = "";
+    return true;
+  } catch (e) {
+    saveError.value = (e as Error).message;
+    return false;
+  }
+}
+function roleLabel(e: Employee) {
+  return (
+    rolesStore.state.value.roles.find((r) => r.id === e.roleId)?.name ??
+    (e.role || "—")
+  );
+}
 const screen = ref<"list" | "form" | "profile">("list");
 const selected = ref("");
 const editing = ref<Employee | null>(null);
@@ -86,30 +104,41 @@ function form(e: Employee | null = null) {
   screen.value = "form";
 }
 function save(e: Employee) {
-  if (e.id) {
-    const i = employees.value.findIndex((x) => x.id === e.id);
-    employees.value[i] = e;
-  } else {
-    e.id = `X${String(Math.max(...employees.value.map((x) => Number(x.id.slice(1)))) + 1).padStart(3, "0")}`;
-    employees.value.push(e);
-  }
-  screen.value = "list";
+  const ok = changeEmployees((es) => {
+    if (e.id) {
+      const i = es.findIndex((x) => x.id === e.id);
+      es[i] = e;
+    } else {
+      e.id = `X${String(Math.max(0, ...es.map((x) => Number(x.id.slice(1)) || 0)) + 1).padStart(3, "0")}`;
+      es.push(e);
+    }
+  });
+  if (ok) screen.value = "list";
 }
 function saveSchedule(value: Schedule) {
-  if (current.value) current.value.schedule = value;
-  scheduleOpen.value = false;
+  if (
+    current.value &&
+    changeEmployees((es) => {
+      es.find((e) => e.id === selected.value)!.schedule = value;
+    })
+  )
+    scheduleOpen.value = false;
 }
 function openException(e: Exception | null = null) {
   exception.value = e ? clone(e) : null;
   exceptionOpen.value = true;
 }
 function saveException(value: Exception) {
-  if (current.value) {
-    const i = current.value.exceptions.findIndex((x) => x.id === value.id);
-    if (i < 0) current.value.exceptions.push(value);
-    else current.value.exceptions[i] = value;
-  }
-  exceptionOpen.value = false;
+  if (
+    current.value &&
+    changeEmployees((es) => {
+      const e = es.find((e) => e.id === selected.value)!;
+      const i = e.exceptions.findIndex((x) => x.id === value.id);
+      if (i < 0) e.exceptions.push(value);
+      else e.exceptions[i] = value;
+    })
+  )
+    exceptionOpen.value = false;
 }
 const colors = [
   "blue",
@@ -126,6 +155,9 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
 </script>
 <template>
   <div class="employees-ui">
+    <p v-if="saveError || rolesStore.error.value" class="e-error" role="alert">
+      {{ saveError || rolesStore.error.value }}
+    </p>
     <EmployeeForm
       v-if="screen === 'form'"
       :employee="editing"
@@ -447,7 +479,11 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
               ><div
                 v-for="item in [
                   { icon: UserRound, label: 'Login', value: current.login },
-                  { icon: Shield, label: 'Ruxsat roli', value: current.role },
+                  {
+                    icon: Shield,
+                    label: 'Ruxsat roli',
+                    value: roleLabel(current),
+                  },
                 ]"
                 :key="item.label"
                 class="e-detail"

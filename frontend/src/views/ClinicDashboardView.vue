@@ -13,6 +13,7 @@ import ServicesView from './ServicesView.vue'
 import DiagnosticsView from './DiagnosticsView.vue'
 import LaboratoryView from './LaboratoryView.vue'
 import CashierView from './CashierView.vue'
+import SettingsView from './SettingsView.vue'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import {
   Activity, Bell, Building2, CalendarDays, ChevronDown, ChevronRight, Clock3,
@@ -24,10 +25,11 @@ import {
 
 /** Shared authenticated shell. Only Patients is connected; other pages retain the demo banner. */
 const emit = defineEmits<{ logout: [] }>()
+const settingsView = ref<InstanceType<typeof SettingsView>>()
 const diagnosticsView = ref<InstanceType<typeof DiagnosticsView>>()
 const laboratoryView = ref<InstanceType<typeof LaboratoryView>>()
-const activeItem = ref(window.location.hash === '#shifokor-kabineti' ? 'Shifokor kabineti' : window.location.hash === '#bolimlar-xonalar' ? 'Bo‘limlar va Xonalar' : window.location.hash === '#xodimlar' ? 'Xodimlar' : window.location.hash === '#bemorlar' ? 'Bemorlar' : 'Bosh sahifa')
-function navigate(label:string){activeItem.value=label;window.location.hash=label==='Shifokor kabineti'?'shifokor-kabineti':label==='Bo‘limlar va Xonalar'?'bolimlar-xonalar':label==='Xodimlar'?'xodimlar':label==='Bemorlar'?'bemorlar':''}
+const activeItem = ref(window.location.hash === '#sozlamalar' ? 'Sozlamalar' : window.location.hash === '#shifokor-kabineti' ? 'Shifokor kabineti' : window.location.hash === '#bolimlar-xonalar' ? 'Bo‘limlar va Xonalar' : window.location.hash === '#xodimlar' ? 'Xodimlar' : window.location.hash === '#bemorlar' ? 'Bemorlar' : 'Bosh sahifa')
+function navigate(label:string){if(settingsView.value?.guardLeave(()=>navigate(label)))return;activeItem.value=label;window.location.hash=label==='Sozlamalar'?'sozlamalar':label==='Shifokor kabineti'?'shifokor-kabineti':label==='Bo‘limlar va Xonalar'?'bolimlar-xonalar':label==='Xodimlar'?'xodimlar':label==='Bemorlar'?'bemorlar':''}
 const activeClinic=computed(()=>session.clinics.find(c=>c.id===session.user?.active_tenant_id))
 async function changeClinic(e:Event){try{await selectClinic((e.target as HTMLSelectElement).value)}catch(error){session.error=errorText(error)}}
 const period = ref('Bugun, 15 oktabr 2026')
@@ -41,7 +43,7 @@ function closeProfileOutside(event: MouseEvent) {
     profileOpen.value = false
   }
 }
-function syncHash(){const nextHash=window.location.hash;if((diagnosticsView.value??laboratoryView.value)?.guardLeave(()=>{window.history.replaceState(null,'',window.location.pathname+window.location.search+nextHash);syncHash()})){window.history.replaceState(null,'',window.location.pathname+window.location.search);return;}if(window.location.hash==='#shifokor-kabineti')activeItem.value='Shifokor kabineti';else if(window.location.hash==='#bolimlar-xonalar')activeItem.value='Bo‘limlar va Xonalar';else if(window.location.hash==='#xodimlar')activeItem.value='Xodimlar';else if(window.location.hash==='#bemorlar')activeItem.value='Bemorlar';else if(activeItem.value==='Bemorlar'||activeItem.value==='Xodimlar'||activeItem.value==='Bo‘limlar va Xonalar'||activeItem.value==='Shifokor kabineti')activeItem.value='Bosh sahifa'}
+function syncHash(){const nextHash=window.location.hash;if((settingsView.value??diagnosticsView.value??laboratoryView.value)?.guardLeave(()=>{window.history.replaceState(null,'',window.location.pathname+window.location.search+nextHash);syncHash()})){window.history.replaceState(null,'',window.location.pathname+window.location.search+(settingsView.value?'#sozlamalar':''));return;}if(window.location.hash==='#sozlamalar')activeItem.value='Sozlamalar';else if(window.location.hash==='#shifokor-kabineti')activeItem.value='Shifokor kabineti';else if(window.location.hash==='#bolimlar-xonalar')activeItem.value='Bo‘limlar va Xonalar';else if(window.location.hash==='#xodimlar')activeItem.value='Xodimlar';else if(window.location.hash==='#bemorlar')activeItem.value='Bemorlar';else if(activeItem.value==='Sozlamalar'||activeItem.value==='Bemorlar'||activeItem.value==='Xodimlar'||activeItem.value==='Bo‘limlar va Xonalar'||activeItem.value==='Shifokor kabineti')activeItem.value='Bosh sahifa'}
 onMounted(()=>{document.addEventListener('click',closeProfileOutside);window.addEventListener('hashchange',syncHash)})
 onUnmounted(()=>{document.removeEventListener('click',closeProfileOutside);window.removeEventListener('hashchange',syncHash)})
 
@@ -143,7 +145,7 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
         </div>
       </header>
       <main class="clinic-main" :key="session.epoch">
-        <div v-if="activeItem!=='Kassa' && activeItem!=='Laboratoriya' && activeItem!=='UZI va Diagnostika' && activeItem!=='Xizmatlar' && activeItem!=='Registratura' && activeItem!=='Bemorlar' && activeItem!=='Xodimlar' && activeItem!=='Bo‘limlar va Xonalar' && activeItem!=='Shifokor kabineti'" class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
+        <div v-if="activeItem!=='Sozlamalar' && activeItem!=='Kassa' && activeItem!=='Laboratoriya' && activeItem!=='UZI va Diagnostika' && activeItem!=='Xizmatlar' && activeItem!=='Registratura' && activeItem!=='Bemorlar' && activeItem!=='Xodimlar' && activeItem!=='Bo‘limlar va Xonalar' && activeItem!=='Shifokor kabineti'" class="clinic-demo-note"><span>DEMO VERSTKA</span> Figma dizayni asosida namunaviy ma’lumotlar. Haqiqiy klinika va bemorlar bazasiga ulanmagan.</div>
         <template v-if="activeItem === 'Bosh sahifa'">
           <div class="clinic-page-head"><div><h1>Xush kelibsiz, Gulnoza!</h1><p>Bugungi klinika faoliyati haqida umumiy ma’lumot</p></div><div class="clinic-filters"><button><CalendarDays :size="18" />{{ period }}<ChevronDown :size="16" /></button><button><MapPin :size="19" />{{ branch }}<ChevronDown :size="16" /></button></div></div>
           <section class="clinic-stats"><div v-for="(m,i) in metrics" :key="m.label" class="clinic-stat" :class="m.cls"><span class="clinic-stat-icon"><component :is="m.icon" :size="28" /></span><div class="clinic-stat-detail"><span class="clinic-stat-label">{{ m.label }}</span><div class="clinic-stat-value">{{ m.value }}<small v-if="i===4"> so‘m</small> <em v-if="m.change">↑ {{ m.change }}</em><small v-if="i===3"> bemor</small></div><span class="clinic-stat-note">{{ m.note }}</span></div></div></section>
@@ -157,6 +159,7 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`)
           </section>
         </template>
         <RegistraturaView v-else-if="activeItem === 'Registratura'" />
+        <SettingsView ref="settingsView" v-else-if="activeItem === 'Sozlamalar'" />
         <CashierView v-else-if="activeItem === 'Kassa'" />
         <LaboratoryView ref="laboratoryView" v-else-if="activeItem === 'Laboratoriya'" />
         <DiagnosticsView ref="diagnosticsView" v-else-if="activeItem === 'UZI va Diagnostika'" />
