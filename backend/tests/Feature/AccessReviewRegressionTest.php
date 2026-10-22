@@ -271,22 +271,79 @@ WORKER;
         }
     }
 
-    public function test_upgrade_of_installed_editor_preserves_existing_profile_etags(): void
+    public function test_upgrade_invalidates_held_old_forms_after_legacy_access_revocation(): void
+    {
+        $db = DB::connection('migration');
+        $steps = $db->table('migrations')->where('migration', '>=', '2026_10_22_000013')->count();
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => $steps, '--force' => true]));
+        try {
+            $a = $this->clinic();
+            $role = $this->role($a, 'installed', ['patients.view' => 'entire_clinic']);
+            $jar = $this->signed('synthetic.a', $a['tenant']);
+            $forms = [];
+            foreach ([true, false] as $profile) {
+                $e = $this->member($a, 'review.installed.'.($profile ? 'profile' : 'legacy'), $role, [$a['branch'], $a['branch_b']], $profile);
+                $old = $this->detail($jar, $e);
+                $this->assertSame(1, $old['version']);
+                $forms[] = [$e, $this->payload($e), $old['version']];
+                $this->browser($jar, 'DELETE', '/api/v1/clinic/employees/'.$e['member'])->assertNoContent();
+                $this->assertSame(1, $this->detail($jar, $e)['version']);
+            }
+            $members = $db->table('tenant_memberships')->orderBy('id')->get()->toArray();
+            $branches = $db->table('membership_branches')->orderBy('id')->get()->toArray();
+            $roles = $db->table('role_permissions')->orderBy('role_id')->orderBy('permission_id')->get()->toArray();
+            $profiles = $db->table('employee_profiles')->orderBy('id')->get(['id', 'tenant_id', 'membership_id', 'profile', 'active'])->toArray();
+            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
+            $after = $db->table('tenant_memberships')->orderBy('id')->get()->toArray();
+            foreach ($after as $m) {
+                unset($m->employee_version);
+            }
+            $this->assertEquals($members, $after);
+            $this->assertEquals($branches, $db->table('membership_branches')->orderBy('id')->get()->toArray());
+            $this->assertEquals($roles, $db->table('role_permissions')->orderBy('role_id')->orderBy('permission_id')->get()->toArray());
+            $this->assertEquals($profiles, $db->table('employee_profiles')->orderBy('id')->get(['id', 'tenant_id', 'membership_id', 'profile', 'active'])->toArray());
+            foreach ($forms as [$e, $body, $oldVersion]) {
+                $this->patchProfile($jar, $e, $body, $oldVersion)->assertConflict();
+                $current = $this->detail($jar, $e);
+                $this->assertFalse($current['access']);
+                $this->assertFalse($db->table('tenant_memberships')->where('id', $e['member'])->value('active'));
+                $this->assertGreaterThan($oldVersion, $current['version']);
+                $version = $current['version'];
+                $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
+                $this->assertSame($version, $this->detail($jar, $e)['version']);
+                $body['access'] = false;
+                $body['profile']['phone'] = '+998907777777';
+                $this->patchProfile($jar, $e, $body, $version)->assertOk();
+                $this->assertFalse($this->detail($jar, $e)['access']);
+            }
+        } finally {
+            $db->statement('TRUNCATE tenants, users CASCADE');
+            Artisan::call('migrate', ['--database' => 'migration', '--force' => true]);
+        }
+    }
+
+    public function test_invalidation_upgrades_an_installed_000013_and_never_revalidates_tokens_on_rollback(): void
     {
         $db = DB::connection('migration');
         $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
         try {
             $a = $this->clinic();
-            $role = $this->role($a, 'installed', ['patients.view' => 'entire_clinic']);
-            $e = $this->member($a, 'review.installed', $role, [$a['branch']]);
+            $role = $this->role($a, 'already13', ['patients.view' => 'entire_clinic']);
+            $e = $this->member($a, 'review.already13', $role, [$a['branch']]);
             $db->table('employee_profiles')->where('id', $e['id'])->update(['version' => 7]);
+            $db->table('tenant_memberships')->where('id', $e['member'])->update(['employee_version' => 9]);
+            $loginless = (string) Str::uuid();
+            $db->table('employee_profiles')->insert(['id' => $loginless, 'tenant_id' => $a['tenant'], 'profile' => json_encode($e['profile']), 'version' => 12]);
             $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
             $jar = $this->signed('synthetic.a', $a['tenant']);
-            $this->assertSame(7, $this->detail($jar, $e)['version']);
-            $body = $this->payload($e);
-            unset($body['branch_ids']);
-            $this->patchProfile($jar, $e, $body, 7)->assertOk();
-            $this->assertSame(8, $this->detail($jar, $e)['version']);
+            $this->assertSame(10, $this->detail($jar, $e)['version']);
+            $this->assertSame(10, $db->table('employee_profiles')->where('id', $e['id'])->value('version'));
+            $this->assertSame(13, $this->detail($jar, ['id' => $loginless])['version']);
+            $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
+            $this->assertSame(10, $this->detail($jar, $e)['version']);
+            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
+            $this->assertSame(11, $this->detail($jar, $e)['version']);
+            $this->assertSame(14, $this->detail($jar, ['id' => $loginless])['version']);
         } finally {
             $db->statement('TRUNCATE tenants, users CASCADE');
             Artisan::call('migrate', ['--database' => 'migration', '--force' => true]);

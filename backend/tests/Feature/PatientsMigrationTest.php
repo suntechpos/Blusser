@@ -15,7 +15,7 @@ final class PatientsMigrationTest extends FoundationTestCase
 {
     private function rollback(): void
     {
-        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 9, '--force' => true]));
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 10, '--force' => true]));
     }
 
     public function test_verified_ceo_only_backfill_provenance_repeatability_and_safe_down(): void
@@ -79,7 +79,7 @@ final class PatientsMigrationTest extends FoundationTestCase
         $created = $service->command($actor, $a['tenant'], 'create', null, ['name' => 'Synthetic retained version', 'date_of_birth' => '1990-01-01', 'branch_id' => $a['branch']], (string) Str::uuid());
         $id = $created['patient']['id'];
         try {
-            $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 8, '--force' => true]));
+            $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 9, '--force' => true]));
             $legacy = $service->command($actor, $a['tenant'], 'update', $id, ['name' => 'Synthetic legacy update'], (string) Str::uuid());
             $this->assertSame(2, $legacy['version']);
         } finally {
@@ -101,7 +101,7 @@ final class PatientsMigrationTest extends FoundationTestCase
     {
         $this->fixture();
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 9, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 10, '--force' => true]);
             $this->fail('Later delegated grants must not be deleted.');
         } catch (RuntimeException $exception) {
             $this->assertStringContainsString('forward migration', $exception->getMessage());
@@ -117,7 +117,7 @@ final class PatientsMigrationTest extends FoundationTestCase
         $a = $this->fixture()['a'];
         app(Patients::class)->command($this->actor($a['user']), $a['tenant'], 'create', null, ['name' => 'Synthetic retained', 'date_of_birth' => '1990-01-01', 'branch_id' => $a['branch']], (string) Str::uuid());
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 9, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 10, '--force' => true]);
             $this->fail('Clinical data must prevent destructive rollback.');
         } catch (RuntimeException $exception) {
             $this->assertStringContainsString('forward migration', $exception->getMessage());
