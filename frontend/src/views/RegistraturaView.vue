@@ -44,6 +44,7 @@ import {
   type BookingDraft,
 } from "../mocks/reception";
 import "../components/reception/reception.css";
+import { canReception } from "../services/receptionAccess";
 const state = ref(createReceptionState());
 const tab = ref("all"),
   query = ref(""),
@@ -192,15 +193,24 @@ const schedule = computed(() => {
   }));
 });
 function openBooking(partial: Partial<BookingDraft> = {}) {
+  if (!canReception("book")) return;
   bookingPreset.value = partial;
   booking.value = true;
 }
 function openArrival(a?: ReceptionAppointment) {
+  if (
+    a
+      ? !canReception("checkIn")
+      : !canReception("checkIn") && !canReception("walkIn")
+  )
+    return;
   preset.value = a;
   arrival.value = true;
   menu.value = "";
 }
 function createPatient(d: PatientDraft) {
+  if (!canReception("patient"))
+    throw Error("Bemor qo‘shish uchun ruxsat yo‘q.");
   const p = nextPatient(state.value.patients, d);
   state.value.patients.push(p);
   return p;
@@ -216,6 +226,8 @@ function showAppointment(appointment: ReceptionAppointment) {
     Math.floor(visible.value.findIndex((a) => a.id === appointment.id) / 8) + 1;
 }
 function saveBooking(p: ReceptionPatient | PatientDraft, d: BookingDraft) {
+  if (!canReception("book") || (!("id" in p) && !canReception("patient")))
+    return;
   // Revalidate against current state before either local record is inserted.
   if (Object.keys(validateBooking(d, state.value.appointments)).length) return;
   if (!("id" in p) && Object.keys(validatePatient(p)).length) return;
@@ -242,6 +254,7 @@ function arrive(
   doctorId: string,
   branchId: string,
 ) {
+  if (!canReception(id ? "checkIn" : "walkIn")) return;
   if (id) {
     const a = state.value.appointments.find(
       (a) => a.id === id && a.patientId === p.id,
@@ -311,9 +324,19 @@ function focusSearch() {
         <p>Bemorlarni ro‘yxatga olish, qabulga yozish va navbatni boshqarish</p>
       </div>
       <div class="rp-heading-actions">
-        <button class="rp-button rp-outline" @click="openBooking()">
+        <button
+          class="rp-button rp-outline"
+          data-permission="appointments.create"
+          :disabled="!canReception('book')"
+          @click="openBooking()"
+        >
           <CalendarDays :size="19" /> Qabulga yozish</button
-        ><button class="rp-button rp-primary" @click="openArrival()">
+        ><button
+          class="rp-button rp-primary"
+          data-permission="reception.view"
+          :disabled="!canReception('checkIn') && !canReception('walkIn')"
+          @click="openArrival()"
+        >
           <UserRoundPlus :size="19" /> Bemorni ro‘yxatga olish
         </button>
       </div>
@@ -343,6 +366,7 @@ function focusSearch() {
             :key="t.id"
             :class="{ active: tab === t.id }"
             :aria-pressed="tab === t.id"
+            data-permission="reception.view"
             @click="tab = t.id"
           >
             {{ t.name }} <span>{{ t.count }}</span>
@@ -456,7 +480,11 @@ function focusSearch() {
                 <td>
                   <div class="rp-row-actions">
                     <button
-                      v-if="a.status === 'booked' && a.date === today"
+                      v-if="
+                        a.status === 'booked' &&
+                        a.date === today &&
+                        canReception('checkIn')
+                      "
                       class="rp-button rp-outline"
                       @click="openArrival(a)"
                     >
@@ -464,6 +492,7 @@ function focusSearch() {
                     ><button
                       v-else
                       class="rp-button rp-soft"
+                      data-permission="appointments.view"
                       @click="detail = a"
                     >
                       <Eye :size="16" /> Ko‘rish
@@ -479,6 +508,7 @@ function focusSearch() {
                       </button>
                       <div v-if="menu === a.id" class="rp-menu">
                         <button
+                          data-permission="appointments.view"
                           @click="
                             detail = a;
                             menu = '';
@@ -510,18 +540,21 @@ function focusSearch() {
             <button
               class="rp-icon"
               :disabled="page === 1"
+              data-permission="reception.view"
               aria-label="Oldingi sahifa"
               @click="page--"
             >
               <ChevronLeft :size="18" /></button
             ><button
               class="rp-button rp-primary"
+              data-permission="reception.view"
               :aria-label="`Sahifa ${page}`"
             >
               {{ page }}</button
             ><button
               class="rp-icon"
               :disabled="page === pageCount"
+              data-permission="reception.view"
               aria-label="Keyingi sahifa"
               @click="page++"
             >
@@ -584,6 +617,8 @@ function focusSearch() {
                 v-else-if="!s.busy && s.scheduled"
                 class="rp-button rp-outline"
                 :aria-label="`${s.time} vaqtiga yozish`"
+                data-permission="appointments.create"
+                :disabled="!canReception('book')"
                 @click="bookSlot(s.time)"
               >
                 + Yozish
@@ -596,7 +631,11 @@ function focusSearch() {
           <div>
             <button @click="focusSearch">
               <Search :size="23" />Bemor qidirish</button
-            ><button @click="openBooking()">
+            ><button
+              data-permission="appointments.create"
+              :disabled="!canReception('book')"
+              @click="openBooking()"
+            >
               <CalendarDays :size="23" />Qabulga yozish</button
             ><button
               @click="

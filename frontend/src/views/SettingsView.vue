@@ -22,8 +22,13 @@ import { clone } from "../mocks/employees";
 import { useRolesStore, type ServerRole } from "../components/settings/store";
 import SettingsDialog from "../components/settings/SettingsDialog.vue";
 import "../components/settings/settings.css";
+import { receptionActions } from "../services/receptionAccess";
 const store = useRolesStore();
 const permissionSections=computed(()=>store.sections.value);
+function permissionLocation(code: string) {
+  const section = store.sections.value.find(s => s.permissions.some(p => p.code === code));
+  return section ? `${section.label} → ${section.permissions.find(p => p.code === code)!.label}` : code;
+}
 const viewCode=(s:{permissions:{code:string}[]})=>s.permissions[0]?.code??'';
 function hasDraftPermission(r:ServerRole,code:string):boolean{const s=permissionSections.value.find(s=>s.permissions.some(p=>p.code===code));return !!s&&r.permissions.includes(viewCode(s))&&(!s.parent||hasDraftPermission(r,s.parent))&&r.permissions.includes(code);}
 function setPermission(r:ServerRole,code:string,on:boolean){const s=permissionSections.value.find(s=>s.permissions.some(p=>p.code===code));if(!s)return;if(on&&(!store.allowedScopes(code).length||(s.parent&&!hasDraftPermission(r,s.parent))))return;const values=new Set(r.permissions);on?values.add(code):values.delete(code);if(code===viewCode(s)&&!on)s.permissions.forEach(p=>values.delete(p.code));for(const child of permissionSections.value)if(child.parent&&!values.has(child.parent))child.permissions.forEach(p=>values.delete(p.code));r.permissions=[...values];r.grants=r.permissions.map(c=>({code:c,scope:r.grants.find(g=>g.code===c)?.scope??store.allowedScopes(c)[0]??''}));}
@@ -41,7 +46,7 @@ const blank = (): ServerRole => ({
   permissions: [],code:"",grants:[],version:1,employee_count:0,active:true,
 });
 const saved = computed(() =>
-  store.state.value.roles.find((r) => r.id === selected.value),
+  creating.value ? undefined : store.state.value.roles.find((r) => r.id === selected.value),
 );
 const draft = ref<ServerRole>(clone(saved.value ?? blank()));
 const baseline = ref(JSON.stringify(draft.value));
@@ -340,6 +345,14 @@ onBeforeUnmount(() => {
                     "
                   />{{ p.label }}<select v-if="draft.permissions.includes(p.code)" :aria-label="p.label+' doirasi'" :disabled="(!!saved?.protected&&!creating)||saving" v-model="draft.grants.find(g=>g.code===p.code)!.scope"><option v-for="scope in [...new Set([...(store.allowedScopes(p.code)),draft.grants.find(g=>g.code===p.code)?.scope??''])].filter(Boolean)" :key="scope" :value="scope">{{({own:'O‘ziga tegishli',assigned_branches:'Biriktirilgan filiallar',entire_clinic:'Butun klinika'} as Record<string,string>)[scope]}}</option></select></label
                 >
+                <div v-if="s.id === 'reception'" class="sr-hint sr-reception-links" aria-label="Registratura amallari bog‘liqligi">
+                  <p>Registratura sahifasini ko‘rish amallarni avtomatik yoqmaydi. Quyidagi ruxsatlar tegishli bo‘limlarda boshqariladi:</p>
+                  <p v-for="(action, key) in receptionActions" :key="key">
+                    <b>{{ action.label }}:</b> {{ action.codes.map(permissionLocation).join(' + ') }}
+                    <small>({{ action.codes.join(', ') }})</small>
+                  </p>
+                  <p>Registratura jarayonlari hozir lokal namuna. Haqiqiy API amallari o‘z ruxsatlari va filial doirasi bilan himoyalanadi.</p>
+                </div>
                 <p v-if="s.parent && !hasDraftPermission(draft, s.parent)">
                   <Info :size="18" />Avval asosiy sahifani ko‘rish ruxsatini
                   yoqing.

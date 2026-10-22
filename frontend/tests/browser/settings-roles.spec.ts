@@ -110,9 +110,65 @@ test("stale API version preserves draft and sends If-Match; unsaved navigation i
   await expect(page.getByRole("dialog")).toBeVisible();
 });
 
-test('server field validation is displayed beside note and retains draft',async({page})=>{
- await open(page);await role(page,'Kassir');
- await page.route('**/api/v1/clinic/roles/cashier',route=>route.request().method()==='PUT'?route.fulfill({status:422,json:{errors:{note:['Server note validation']}}}):route.fallback());
- await page.getByLabel('Izoh',{exact:true}).fill('Retained invalid note');await page.getByRole('button',{name:'Saqlash',exact:true}).click();
- await expect(page.locator('#role-note-error')).toContainText('Server note validation');await expect(page.getByLabel('Izoh',{exact:true})).toHaveValue('Retained invalid note');
+test("server field validation is displayed beside note and retains draft", async ({
+  page,
+}) => {
+  await open(page);
+  await role(page, "Kassir");
+  await page.route("**/api/v1/clinic/roles/cashier", (route) =>
+    route.request().method() === "PUT"
+      ? route.fulfill({
+          status: 422,
+          json: { errors: { note: ["Server note validation"] } },
+        })
+      : route.fallback(),
+  );
+  await page.getByLabel("Izoh", { exact: true }).fill("Retained invalid note");
+  await page.getByRole("button", { name: "Saqlash", exact: true }).click();
+  await expect(page.locator("#role-note-error")).toContainText(
+    "Server note validation",
+  );
+  await expect(page.getByLabel("Izoh", { exact: true })).toHaveValue(
+    "Retained invalid note",
+  );
+});
+
+test("new role has no protected state and reception explains shared action grants", async ({
+  page,
+}) => {
+  await open(page);
+  await role(page, "Administrator");
+  await expect(
+    page.getByText(
+      "Himoyalangan tizim roli: tahrirlash va o‘chirish bloklangan.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Rol qo‘shish", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Himoyalangan tizim roli: tahrirlash va o‘chirish bloklangan.",
+    ),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Rol nomi", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Rol nomi", { exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: /^Registratura \d/ }).click();
+  const help = page.getByLabel("Registratura amallari bog‘liqligi");
+  await expect(help).toContainText("appointments.create");
+  await expect(help).toContainText("patients.create");
+  await expect(help).toContainText("appointments.check_in");
+  await expect(help).toContainText("visits.create");
+  await expect(help).toContainText("queues.create");
+  await expect(help).toContainText("Qabullar →");
+  await expect(help).toContainText("Bemorlar →");
+  await expect(help).toContainText("Navbatlar →");
+  expect(
+    await help.evaluate(
+      (el) =>
+        el.getBoundingClientRect().width /
+        el.parentElement!.getBoundingClientRect().width,
+    ),
+  ).toBeGreaterThan(0.8);
+  expect(await help.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
 });

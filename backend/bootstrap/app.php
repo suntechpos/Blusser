@@ -4,6 +4,7 @@ use App\Http\Middleware\FirstPartySession;
 use App\Http\Middleware\FullIdentity;
 use App\Http\Middleware\NoStore;
 use App\Modules\Access\Console\AccessDemo;
+use App\Modules\Access\Console\ClinicRoles;
 use App\Modules\Access\Services\GovernanceDenied;
 use App\Modules\Patients\Console\BackfillCeoPermissions;
 use App\Modules\Platform\Console\CreatePlatformOperator;
@@ -19,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         api: __DIR__.'/../routes/api.php',
     )
-    ->withCommands([AccessDemo::class, CreatePlatformOperator::class, BackfillCeoPermissions::class])
+    ->withCommands([ClinicRoles::class, AccessDemo::class, CreatePlatformOperator::class, BackfillCeoPermissions::class])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
         $middleware->trimStrings(except: ['password', 'password_confirmation', 'current_password', 'temporary_password', 'token']);
