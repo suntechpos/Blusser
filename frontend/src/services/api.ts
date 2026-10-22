@@ -8,6 +8,10 @@ export const api = axios.create({
 });
 export interface AuthUser {
   id: string;
+  employee_id?: string;
+  membership_id?: string;
+  role?: { id: string; code: string; name: string; protected: boolean };
+  grants?: Record<string, string>;
   login: string;
   is_platform_admin: boolean;
   must_change_password: boolean;
@@ -57,6 +61,8 @@ export function errorText(e: unknown): string {
         403: "Bu amal uchun ruxsat yo‘q.",
         404: "Yozuv topilmadi yoki sizga ko‘rinmaydi.",
         409: "Ma’lumot o‘zgargan yoki vaqt band. Yangilang va qayta tekshiring.",
+        428: "Joriy versiya kerak. Sahifani yangilang.",
+        412: "Ma’lumot o‘zgargan. Yangilang va qayta tekshiring.",
         429: "So‘rovlar ko‘p. Birozdan keyin urinib ko‘ring.",
       } as Record<number, string>
     )[status ?? 0] ?? "Server bilan bog‘lanib bo‘lmadi. Qayta urinib ko‘ring."
@@ -78,7 +84,14 @@ export async function clinicRequest<T>(
 ) {
   const token = contextGate.capture();
   const method = options.method ?? "GET";
-  const identity = JSON.stringify([method, path, options.body, options.etag]);
+  // Intent lookup keys retain no plaintext credentials from account/reset payloads.
+  const encoded = new TextEncoder().encode(
+    JSON.stringify([method, path, options.body, options.etag]),
+  );
+  const identity = Array.from(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", encoded)),
+    (b) => b.toString(16).padStart(2, "0"),
+  ).join("");
   const key = method === "GET" ? undefined : intents.get(identity);
   const response = await api.request<T>({
     url: "/api/v1/clinic/" + path,

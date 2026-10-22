@@ -24,8 +24,11 @@ async function handleAuthenticated() {
     session.checking = false;
   }
 }
+import IdentityLinks from "./components/operations/IdentityLinks.vue";
+const linksOpen = ref(false);
 const loggingOut = ref(false);
 let rechecking = false;
+let accessTimer: ReturnType<typeof setInterval>;
 async function regainFocus() {
   if (!session.user || session.checking || session.switching || rechecking)
     return;
@@ -41,13 +44,20 @@ async function regainFocus() {
 onMounted(() => {
   void handleAuthenticated();
   window.addEventListener("focus", regainFocus);
+  accessTimer = setInterval(() => {
+    if (!document.hidden) void regainFocus();
+  }, 15000);
 });
-onUnmounted(() => window.removeEventListener("focus", regainFocus));
+onUnmounted(() => {
+  clearInterval(accessTimer);
+  window.removeEventListener("focus", regainFocus);
+});
 async function handleLogout() {
   if (loggingOut.value) return;
   loggingOut.value = true;
   try {
     await logoutUser();
+    linksOpen.value = false;
     expire();
     notifyLogout();
     window.history.replaceState({}, "", "/");
@@ -68,6 +78,7 @@ async function handleLogout() {
       session.user.is_platform_admin ||
       !session.user.active_tenant_id
     "
+    @links="linksOpen = true"
     @logout="handleLogout"
   /><template v-else
     ><p v-if="session.error" role="alert">
@@ -76,6 +87,15 @@ async function handleLogout() {
     </p>
     <ClinicDashboardView
       :key="session.user.active_tenant_id"
-      @logout="handleLogout"
-  /></template>
+      @links="linksOpen = true"
+      @logout="handleLogout" /></template
+  ><IdentityLinks
+    v-if="
+      linksOpen &&
+      session.user &&
+      !session.user.must_change_password &&
+      !session.user.is_platform_admin
+    "
+    @close="linksOpen = false"
+  />
 </template>

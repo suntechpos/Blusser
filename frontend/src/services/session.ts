@@ -56,7 +56,10 @@ api.interceptors.response.use(
     return Promise.reject(e);
   },
 );
-export const can = (code: string) => session.grants?.[code] !== undefined;
+export const can = (code: string) =>
+  ["own", "assigned_branches", "entire_clinic"].includes(
+    session.grants?.[code] ?? "",
+  );
 export async function refreshSession() {
   const token = contextGate.capture();
   const user = await getCurrentUser(token.signal);

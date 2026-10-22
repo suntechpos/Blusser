@@ -239,7 +239,8 @@ final class SprintTwoApiTest extends FoundationTestCase
         $this->browser($aJar, 'GET', '/api/v1/clinic/branches')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $branch);
         $this->browser($aJar, 'POST', '/api/v1/clinic/branches', ['name' => 'Forbidden', 'code' => 'forbidden'])->assertForbidden();
         DB::connection('migration')->table('tenant_memberships')->where('id', $member)->update(['active' => false]);
-        $this->browser($aJar, 'GET', '/api/v1/clinic/branches')->assertNotFound();
+        $this->browser($aJar, 'GET', '/api/v1/clinic/branches')->assertUnauthorized();
+        $this->login($aJar, 'ceo.a')->assertOk();
         $this->select($aJar, $a);
         $this->browser($aJar, 'GET', '/api/v1/clinic/branches')->assertOk();
     }

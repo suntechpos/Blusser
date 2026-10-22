@@ -1,3 +1,4 @@
+import {allServerGrants} from "./access.fixture";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 const output =
@@ -44,9 +45,11 @@ async function setup(
           data: [{ id: "ui-clinic", name: "Namuna klinika", role: "Shifokor" }],
         },
       });
+    // Access-control fixture: the shell now reads authorized branches.
+    if(path === '/api/v1/clinic/branches')return route.fulfill({json:{data:[]}});
     if (path === "/api/v1/clinic/context")
       return route.fulfill({
-        json: { grants: {}, branches: [], timezone: "Asia/Tashkent" },
+        json: { grants: allServerGrants, branches: [], timezone: "Asia/Tashkent" },
       });
     return route.fulfill({
       status: 500,

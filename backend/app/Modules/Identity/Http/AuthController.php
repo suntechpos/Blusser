@@ -5,8 +5,11 @@ namespace App\Modules\Identity\Http;
 use App\Modules\Access\Services\Governance;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Services\Identity;
+use App\Modules\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class AuthController
 {
@@ -71,7 +74,24 @@ final class AuthController
 
     private function status(Request $request, User $actor): array
     {
-        return ['id' => $actor->id, 'login' => $actor->login, 'is_platform_admin' => $actor->is_platform_admin,
+        $result = ['id' => $actor->id, 'login' => $actor->login, 'is_platform_admin' => $actor->is_platform_admin,
             'must_change_password' => $actor->must_change_password, 'active_tenant_id' => $request->session()->get('active_tenant_id')];
+        if ($result['active_tenant_id'] && ! $actor->must_change_password && ! $actor->is_platform_admin) {
+            try {
+                $self = app(TenantContext::class)->run($actor, $result['active_tenant_id'], function () {
+                    $data = json_decode(DB::selectOne('SELECT governance.self_membership() AS value')->value, true, flags: JSON_THROW_ON_ERROR);
+                    $data['grants'] = (object) DB::table('permissions')->selectRaw('code,public.permission_scope(code) AS scope')->get()->filter(fn ($p) => $p->scope !== null)->pluck('scope', 'code')->all();
+                    $data['branches'] = json_decode(DB::selectOne('SELECT governance.self_branches() AS value')->value, true, flags: JSON_THROW_ON_ERROR);
+
+                    return $data;
+                }, consistentSnapshot: true);
+                $result = array_merge($result, $self);
+            } catch (NotFoundHttpException) {
+                $request->session()->forget('active_tenant_id');
+                $result['active_tenant_id'] = null;
+            }
+        }
+
+        return $result;
     }
 }

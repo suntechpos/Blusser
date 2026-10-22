@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { session, refreshSession, selectClinic } from "../../services/session";
 import { api, errorText } from "../../services/api";
-defineEmits<{ logout: [] }>();
+defineEmits<{ logout: []; links: [] }>();
 const current = ref(""),
   password = ref(""),
   confirmation = ref(""),
@@ -75,6 +75,13 @@ async function change() {
       >
         {{ c.name }} · {{ c.role }}
       </button></template
+    ><button
+      v-if="
+        !session.user?.must_change_password && !session.user?.is_platform_admin
+      "
+      @click="$emit('links')"
+    >
+      Klinikaga bog‘lash so‘rovlari</button
     ><button @click="$emit('logout')">Tizimdan chiqish</button>
   </main>
 </template>

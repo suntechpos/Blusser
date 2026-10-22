@@ -1,6 +1,7 @@
 // Synthetic network fixtures; production auth and Patients code unchanged.
 import { expect, type Page } from "@playwright/test";
-export async function receptionSession(page: Page) {
+import {allServerGrants} from "./access.fixture";
+export async function receptionSession(page: Page, grants:Record<string,string>=allServerGrants) {
   const requests: {
     method: string;
     path: string;
@@ -56,15 +57,11 @@ export async function receptionSession(page: Page) {
           data: [{ id: "clinic-a", name: "Synthetic Clinic", role: "CEO" }],
         },
       });
+    if(path.endsWith('/clinic/branches')&&req.method()==='GET')return route.fulfill({json:{data:[{id:'branch-a',name:'Synthetic branch',active:true}]}});
     if (path.endsWith("/clinic/context"))
       return route.fulfill({
         json: {
-          grants: Object.fromEntries(
-            ["view", "create", "update", "export"].map((x) => [
-              "patients." + x,
-              "entire_clinic",
-            ]),
-          ),
+          grants,
           branches: [{ id: "branch-a", name: "Synthetic branch" }],
           timezone: "Asia/Tashkent",
         },
@@ -140,7 +137,7 @@ export async function receptionSession(page: Page) {
   await page.route("**/sanctum/csrf-cookie", (r) => r.fulfill({ status: 204 }));
   await page.goto("/");
   await expect(
-    page.getByRole("button", { name: "Bosh sahifa", exact: true }),
+    page.locator(".clinic-sidebar"),
   ).toBeVisible();
   return requests;
 }

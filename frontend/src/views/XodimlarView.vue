@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import {
   Users,
   UserRound,
@@ -26,7 +26,6 @@ import ScheduleDialog from "../components/employees/ScheduleDialog.vue";
 import ExceptionDialog from "../components/employees/ExceptionDialog.vue";
 import {
   positions,
-  branches,
   fullName,
   initials,
   dateLabel,
@@ -38,19 +37,71 @@ import {
   type Exception,
 } from "../mocks/employees";
 import { useRolesStore } from "../components/settings/store";
+import { session, can } from "../services/session";
+import { clinicRequest, errorText } from "../services/api";
+import axios from "axios";
+const branches = computed(() => session.branches);
+const branchLabel = (id: string) =>
+  session.branches.find((b) => b.id === id)?.name ?? id;
 const rolesStore = useRolesStore();
+onMounted(() => rolesStore.refresh("employees"));
 const employees = computed(() => rolesStore.state.value.employees);
 const saveError = ref("");
-function changeEmployees(fn: (es: Employee[]) => void) {
+import SettingsDialog from "../components/settings/SettingsDialog.vue";
+const resetOpen = ref(false),
+  resetCurrent = ref(""),
+  resetPassword = ref("");
+async function resetAccount() {
+  if (!current.value?.membershipId || saving.value) return;
+  saving.value = true;
   try {
-    rolesStore.transact((s) => fn(s.employees));
+    await clinicRequest(
+      `employees/${current.value.membershipId}/password-reset`,
+      {
+        method: "POST",
+        body: {
+          current_password: resetCurrent.value,
+          temporary_password: resetPassword.value,
+        },
+      },
+    );
+    resetOpen.value = false;
     saveError.value = "";
-    return true;
   } catch (e) {
-    saveError.value = (e as Error).message;
-    return false;
+    saveError.value = errorText(e);
+  } finally {
+    resetCurrent.value = "";
+    resetPassword.value = "";
+    saving.value = false;
   }
 }
+const successNotice = ref("");
+async function linkAccount(e: Employee) {
+  if (saving.value) return;
+  saving.value = true;
+  try {
+    await clinicRequest("links", {
+      method: "POST",
+      body: {
+        login: e.login,
+        role_id: e.roleId,
+        branch_ids: [e.branch],
+        ...(e.id ? { employee_id: e.id } : {}),
+      },
+      etag: e.id ? `"${e.version}"` : undefined,
+    });
+    screen.value = "list";
+    successNotice.value =
+      "Bog‘lash so‘rovi yuborildi. Hisob egasi rozilik bergach kirish ochiladi; parol o‘zgartirilmadi.";
+    await rolesStore.refresh("employees");
+  } catch (err) {
+    saveError.value = errorText(err);
+  } finally {
+    saving.value = false;
+  }
+}
+const saving = ref(false);
+const serverErrors = ref<Record<string, string>>({});
 function roleLabel(e: Employee) {
   return (
     rolesStore.state.value.roles.find((r) => r.id === e.roleId)?.name ??
@@ -103,42 +154,42 @@ function form(e: Employee | null = null) {
   editing.value = e ? clone(e) : null;
   screen.value = "form";
 }
-function save(e: Employee) {
-  const ok = changeEmployees((es) => {
-    if (e.id) {
-      const i = es.findIndex((x) => x.id === e.id);
-      es[i] = e;
-    } else {
-      e.id = `X${String(Math.max(0, ...es.map((x) => Number(x.id.slice(1)) || 0)) + 1).padStart(3, "0")}`;
-      es.push(e);
-    }
-  });
-  if (ok) screen.value = "list";
+async function save(e: Employee, password?: string) {
+  if (saving.value) return;
+  saving.value = true;
+  serverErrors.value = {};
+  try {
+    await rolesStore.saveEmployee(e, password);
+    screen.value = "list";
+    saveError.value = "";
+  } catch (err) {
+    saveError.value = errorText(err);
+    if (axios.isAxiosError(err))
+      serverErrors.value = Object.fromEntries(
+        Object.entries(err.response?.data?.errors ?? {}).map(([k, v]) => [
+          (
+            {
+              role_id: "role",
+              branch_id: "branch",
+              temporary_password: "password",
+            } as Record<string, string>
+          )[k] ?? k.replace("profile.", ""),
+          (v as string[])[0] ?? "Tekshiring.",
+        ]),
+      );
+  } finally {
+    saving.value = false;
+  }
 }
-function saveSchedule(value: Schedule) {
-  if (
-    current.value &&
-    changeEmployees((es) => {
-      es.find((e) => e.id === selected.value)!.schedule = value;
-    })
-  )
-    scheduleOpen.value = false;
+function saveSchedule(_value: Schedule) {
+  saveError.value = "Xodim jadvali bu API oqimiga hali ulanmagan.";
 }
 function openException(e: Exception | null = null) {
   exception.value = e ? clone(e) : null;
   exceptionOpen.value = true;
 }
-function saveException(value: Exception) {
-  if (
-    current.value &&
-    changeEmployees((es) => {
-      const e = es.find((e) => e.id === selected.value)!;
-      const i = e.exceptions.findIndex((x) => x.id === value.id);
-      if (i < 0) e.exceptions.push(value);
-      else e.exceptions[i] = value;
-    })
-  )
-    exceptionOpen.value = false;
+function saveException(_value: Exception) {
+  saveError.value = "Istisnolar bu API oqimiga hali ulanmagan.";
 }
 const colors = [
   "blue",
@@ -155,21 +206,84 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
 </script>
 <template>
   <div class="employees-ui">
+    <SettingsDialog
+      v-if="resetOpen"
+      title="Parolni almashtirish"
+      @close="
+        resetOpen = false;
+        resetCurrent = '';
+        resetPassword = '';
+      "
+      ><form @submit.prevent="resetAccount">
+        <label
+          >Joriy shaxsiy parolingiz<input
+            v-model="resetCurrent"
+            type="password"
+            autocomplete="current-password"
+            required /></label
+        ><label
+          >Yangi vaqtinchalik parol<input
+            v-model="resetPassword"
+            type="password"
+            autocomplete="new-password"
+            minlength="12"
+            required
+        /></label>
+        <p>
+          Hisob sessiyalari bekor qilinadi. Xodim keyingi kirishda vaqtinchalik
+          parolni almashtiradi.
+        </p>
+        <p v-if="saveError" role="alert">{{ saveError }}</p>
+        <footer>
+          <button
+            type="button"
+            class="e-button"
+            @click="
+              resetOpen = false;
+              resetCurrent = '';
+              resetPassword = '';
+            "
+          >
+            Bekor qilish</button
+          ><button class="e-button primary" :disabled="saving">
+            Parolni tasdiqlash
+          </button>
+        </footer>
+      </form></SettingsDialog
+    >
+
     <p v-if="saveError || rolesStore.error.value" class="e-error" role="alert">
       {{ saveError || rolesStore.error.value }}
     </p>
+    <button
+      v-if="rolesStore.error.value"
+      class="e-button"
+      @click="rolesStore.refresh('employees')"
+    >
+      Qayta urinish
+    </button>
+    <p v-if="successNotice" role="status">{{ successNotice }}</p>
     <EmployeeForm
       v-if="screen === 'form'"
       :employee="editing"
+      :saving="saving"
+      :server-errors="serverErrors"
       @cancel="screen = 'list'"
       @save="save"
-    /><template v-else-if="screen === 'list'"
+      @link="linkAccount"
+    /><template v-else-if="rolesStore.loading.value"
+      ><p role="status">Xodimlar yuklanmoqda…</p></template
+    ><template v-else-if="screen === 'list'"
       ><div class="e-page-head">
         <div>
           <h1>Xodimlar</h1>
           <p>Klinika xodimlari va ularning ma’lumotlarini boshqaring.</p>
         </div>
-        <button class="e-button primary" @click="form()">
+        <button
+          class="e-button primary"
+          v-if="can('employees.create')"
+          @click="form()"
+        >
           <Plus :size="20" />Xodim qo‘shish
         </button>
       </div>
@@ -204,7 +318,9 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
             <option v-for="p in positions" :key="p">{{ p }}</option></select
           ><select v-model="branch" aria-label="Filial bo‘yicha filtr">
             <option value="">Barcha filiallar</option>
-            <option v-for="b in branches" :key="b">{{ b }}</option></select
+            <option v-for="b in branches" :key="b.id" :value="b.id">
+              {{ b.name }}
+            </option></select
           ><select v-model="status" aria-label="Holat bo‘yicha filtr">
             <option value="">Barcha holatlar</option>
             <option value="true">Faol</option>
@@ -255,7 +371,7 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
                   }}<small v-if="e.specialty">{{ e.specialty }}</small>
                 </td>
                 <td>{{ e.department || "—" }}</td>
-                <td>{{ e.branch }}</td>
+                <td>{{ branchLabel(e.branch) }}</td>
                 <td>
                   <span
                     class="e-badge"
@@ -325,7 +441,11 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
         <div class="e-actions">
           <button class="e-button" @click="screen = 'list'">
             <ArrowLeft :size="19" />Orqaga</button
-          ><button class="e-button primary" @click="form(current)">
+          ><button
+            class="e-button primary"
+            v-if="can('employees.update')"
+            @click="form(current)"
+          >
             <Pencil :size="18" />Tahrirlash
           </button>
         </div>
@@ -388,7 +508,11 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
                     label: 'Bo‘lim',
                     value: current.department,
                   },
-                  { icon: Building2, label: 'Filial', value: current.branch },
+                  {
+                    icon: Building2,
+                    label: 'Filial',
+                    value: branchLabel(current.branch),
+                  },
                   {
                     icon: CalendarDays,
                     label: 'Ishga kirgan sana',
@@ -463,6 +587,13 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
         <div>
           <section class="e-card">
             <h2>Tizimga kirish</h2>
+            <button
+              v-if="current.membershipId && can('employees.reset_password')"
+              class="e-button"
+              @click="resetOpen = true"
+            >
+              Parolni almashtirish
+            </button>
             <div class="e-detail">
               <span><LockKeyhole :size="23" /></span><small>Ruxsat holati</small
               ><span
@@ -545,7 +676,12 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
                 v-if="current.position === 'Shifokor'"
                 class="e-badge blue duration"
                 ><Clock3 :size="18" />Qabul: {{ current.duration }} daqiqa</span
-              ><button class="e-button primary" @click="scheduleOpen = true">
+              ><button
+                class="e-button primary"
+                disabled
+                title="Jadval bu API oqimiga hali ulanmagan"
+                @click="scheduleOpen = true"
+              >
                 <Pencil :size="18" />{{
                   current.schedule ? "Jadvalni tahrirlash" : "Jadval yaratish"
                 }}
@@ -615,7 +751,12 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
         <section class="e-card">
           <div class="e-section-head">
             <h2>Istisno sanalar</h2>
-            <button class="e-button" @click="openException()">
+            <button
+              class="e-button"
+              disabled
+              title="Istisnolar bu API oqimiga hali ulanmagan"
+              @click="openException()"
+            >
               <Plus :size="20" />Istisno qo‘shish
             </button>
           </div>

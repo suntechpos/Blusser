@@ -18,7 +18,9 @@ final class ContextController
             $membership = DB::table('tenant_memberships')->where('tenant_id', DB::raw('public.context_tenant()'))->where('user_id', $request->user()->id)->where('active', true)->value('id');
             $grants = DB::table('permissions')->selectRaw('code, public.permission_scope(code) AS scope')->get()->filter(fn ($p) => $p->scope !== null)->pluck('scope', 'code');
 
-            return response()->json(['membership_id' => $membership, 'grants' => (object) $grants->all(), 'branches' => json_decode(DB::selectOne('SELECT governance.self_branches() AS value')->value, true), 'timezone' => DB::table('tenants')->where('id', DB::raw('public.context_tenant()'))->value('timezone')]);
+            $self = json_decode(DB::selectOne('SELECT governance.self_membership() AS value')->value, true, flags: JSON_THROW_ON_ERROR);
+
+            return response()->json(['role' => $self['role'], 'employee_id' => $self['employee_id'], 'membership_id' => $membership, 'grants' => (object) $grants->all(), 'branches' => json_decode(DB::selectOne('SELECT governance.self_branches() AS value')->value, true), 'timezone' => DB::table('tenants')->where('id', DB::raw('public.context_tenant()'))->value('timezone')]);
         }, consistentSnapshot: true);
     }
 }

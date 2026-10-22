@@ -1,3 +1,5 @@
+> Historical UI design notes. Runtime persistence/auth now follow [Access control integration](access-control-integration.md); local demo storage descriptions below no longer describe Settings/Employees.
+
 # Xodimlar — frontend namoyishi
 
 Manba: foydalanuvchi yuborgan 6 ta 1672×941 maket. Mavjud sidebar, header,

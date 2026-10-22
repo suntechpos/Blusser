@@ -170,7 +170,8 @@ final class PatientsApiTest extends FoundationTestCase
         $this->browser($jar, 'GET', '/api/v1/clinic/patients')->assertNotFound();
         DB::connection('migration')->table('users')->where('id', $a['user'])->update(['is_platform_admin' => false]);
         DB::connection('migration')->table('tenant_memberships')->where('id', $a['membership'])->update(['active' => false]);
-        $this->browser($jar, 'GET', '/api/v1/clinic/patients')->assertNotFound();
+        // Disabling membership now revokes the authenticated session immediately.
+        $this->browser($jar, 'GET', '/api/v1/clinic/patients')->assertUnauthorized();
     }
 
     public function test_idempotency_replay_cannot_return_data_after_revocation(): void

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import {
   Shield,
@@ -15,38 +16,34 @@ import {
   MoreHorizontal,
   Info,
 } from "lucide-vue-next";
-import { session } from "../services/session";
+import {errorText} from "../services/api";
+import { session,can } from "../services/session";
 import { clone } from "../mocks/employees";
-import {
-  permissionSections,
-  assigned,
-  saveRole,
-  deleteRole,
-  setPermission,
-  viewCode,
-  canDemo,
-  type LocalRole,
-} from "../mocks/settingsRoles";
-import { useRolesStore } from "../components/settings/store";
+import { useRolesStore, type ServerRole } from "../components/settings/store";
 import SettingsDialog from "../components/settings/SettingsDialog.vue";
 import "../components/settings/settings.css";
 const store = useRolesStore();
+const permissionSections=computed(()=>store.sections.value);
+const viewCode=(s:{permissions:{code:string}[]})=>s.permissions[0]?.code??'';
+function hasDraftPermission(r:ServerRole,code:string):boolean{const s=permissionSections.value.find(s=>s.permissions.some(p=>p.code===code));return !!s&&r.permissions.includes(viewCode(s))&&(!s.parent||hasDraftPermission(r,s.parent))&&r.permissions.includes(code);}
+function setPermission(r:ServerRole,code:string,on:boolean){const s=permissionSections.value.find(s=>s.permissions.some(p=>p.code===code));if(!s)return;if(on&&(!store.allowedScopes(code).length||(s.parent&&!hasDraftPermission(r,s.parent))))return;const values=new Set(r.permissions);on?values.add(code):values.delete(code);if(code===viewCode(s)&&!on)s.permissions.forEach(p=>values.delete(p.code));for(const child of permissionSections.value)if(child.parent&&!values.has(child.parent))child.permissions.forEach(p=>values.delete(p.code));r.permissions=[...values];r.grants=r.permissions.map(c=>({code:c,scope:r.grants.find(g=>g.code===c)?.scope??store.allowedScopes(c)[0]??''}));}
+
 const tab = ref("Rollar va ruxsatlar");
 const tabs = ["Umumiy", "To‘lovlar", "Rollar va ruxsatlar"];
 const search = ref("");
 const selected = ref("cashier");
 const creating = ref(false);
 const menu = ref(false);
-const blank = (): LocalRole => ({
+const blank = (): ServerRole => ({
   id: "",
   name: "",
   note: "",
-  permissions: [],
+  permissions: [],code:"",grants:[],version:1,employee_count:0,active:true,
 });
 const saved = computed(() =>
   store.state.value.roles.find((r) => r.id === selected.value),
 );
-const draft = ref<LocalRole>(clone(saved.value ?? blank()));
+const draft = ref<ServerRole>(clone(saved.value ?? blank()));
 const baseline = ref(JSON.stringify(draft.value));
 const dirty = computed(() => JSON.stringify(draft.value) !== baseline.value);
 const filtered = computed(() =>
@@ -57,11 +54,12 @@ const filtered = computed(() =>
   ),
 );
 const count = computed(() =>
-  creating.value ? 0 : assigned(store.state.value, selected.value),
+  creating.value ? 0 : (saved.value?.employee_count??0),
 );
 const expanded = ref<string[]>(["cashier"]);
 const notice = ref("");
 const error = ref("");
+const fieldErrors = ref<Record<string,string>>({});
 const modal = ref<"leave" | "save" | "delete" | "">("");
 let pending: (() => void) | undefined;
 let timer: ReturnType<typeof setTimeout>;
@@ -72,7 +70,7 @@ function load(id: string) {
     store.state.value.roles.find((r) => r.id === id) ?? blank(),
   );
   baseline.value = JSON.stringify(draft.value);
-  error.value = "";
+  error.value = "";fieldErrors.value={};
   menu.value = false;
 }
 function guardLeave(fn: () => void) {
@@ -97,7 +95,7 @@ function create() {
     creating.value = true;
     draft.value = blank();
     baseline.value = JSON.stringify(draft.value);
-    error.value = "";
+    error.value = "";fieldErrors.value={};
     menu.value = false;
   });
 }
@@ -110,17 +108,11 @@ function message(s: string) {
   clearTimeout(timer);
   timer = setTimeout(() => (notice.value = ""), 3500);
 }
-function validateDraft() {
-  const next = clone(store.state.value);
-  saveRole(next, {
-    ...draft.value,
-    id: creating.value ? "new-validation-id" : draft.value.id,
-  });
-}
+function validateDraft(){if(!draft.value.name.trim())throw Error('Rol nomini kiriting.');if(store.state.value.roles.some(r=>r.id!==draft.value.id&&r.name.trim().replace(/\s+/g,' ').toLowerCase()===draft.value.name.trim().replace(/\s+/g,' ').toLowerCase()))throw Error('Rol nomi takrorlangan.');if(!draft.value.permissions.length)throw Error('Kamida bitta foydali ruxsat tanlang.');}
 function requestSave() {
   try {
     validateDraft();
-    error.value = "";
+    error.value = "";fieldErrors.value={};
     if (
       !creating.value &&
       count.value &&
@@ -133,32 +125,9 @@ function requestSave() {
     error.value = (e as Error).message;
   }
 }
-function save() {
-  try {
-    const value = {
-      ...clone(draft.value),
-      id: creating.value ? `local-${crypto.randomUUID()}` : draft.value.id,
-    };
-    store.transact((s) => saveRole(s, value));
-    load(value.id);
-    modal.value = "";
-    message("Rol saqlandi.");
-  } catch (e) {
-    error.value = (e as Error).message;
-    modal.value = "";
-  }
-}
-function remove() {
-  try {
-    store.transact((s) => deleteRole(s, selected.value));
-    load(store.state.value.roles[0]!.id);
-    modal.value = "";
-    message("Rol o‘chirildi.");
-  } catch (e) {
-    error.value = (e as Error).message;
-    modal.value = "";
-  }
-}
+const saving=ref(false);
+async function save(){if(saving.value)return;saving.value=true;try{const id=await store.saveRole(draft.value,creating.value);load(id);modal.value='';message('Rol serverda saqlandi.');}catch(e){error.value=errorText(e);if(axios.isAxiosError(e))fieldErrors.value=Object.fromEntries(Object.entries(e.response?.data?.errors??{}).map(([key,value])=>[key,(value as string[])[0]??'Tekshiring.']));modal.value='';}finally{saving.value=false;}}
+async function remove(){if(saving.value||!saved.value)return;saving.value=true;try{await store.removeRole(saved.value);load(store.state.value.roles[0]?.id??'');modal.value='';message('Rol o‘chirildi.');}catch(e){error.value=errorText(e);modal.value='';}finally{saving.value=false;}}
 function toggle(id: string) {
   expanded.value = expanded.value.includes(id)
     ? expanded.value.filter((x) => x !== id)
@@ -190,7 +159,8 @@ function unload(e: BeforeUnloadEvent) {
     e.returnValue = "";
   }
 }
-onMounted(() => {
+onMounted(async () => {
+  await store.refresh("roles");load(store.state.value.roles[0]?.id??"");
   document.addEventListener("click", navigation, true);
   document.addEventListener("change", clinicChange, true);
   window.addEventListener("beforeunload", unload);
@@ -224,11 +194,13 @@ onBeforeUnmount(() => {
       {{ store.error.value }}
     </p>
     <div v-if="tab !== 'Rollar va ruxsatlar'" class="sr-coming">Tez orada</div>
+    <p v-else-if="store.loading.value" role="status">Yuklanmoqda…</p>
+    <div v-else-if="store.error.value"><button class="sr-button" @click="store.refresh('roles')">Qayta urinish</button></div>
     <div v-else class="sr-columns">
       <aside class="sr-card sr-role-list">
         <header>
           <h2>Rollar</h2>
-          <button class="sr-button primary" @click="create">
+          <button class="sr-button primary" v-if="can('roles.create')&&can('roles.manage_permissions')" @click="create">
             <Plus :size="18" />Rol qo‘shish
           </button>
         </header>
@@ -248,7 +220,7 @@ onBeforeUnmount(() => {
             @click="go(() => load(role.id))"
           >
             <Shield :size="23" /><b>{{ role.name }}</b
-            ><small>{{ assigned(store.state.value, role.id) }} ta xodim</small
+            ><small>{{ role.employee_count }} ta xodim</small
             ><ChevronRight :size="18" />
           </button>
         </div>
@@ -262,7 +234,7 @@ onBeforeUnmount(() => {
             <h2>{{ creating ? "Yangi rol" : saved?.name }}</h2>
             <span v-if="!creating" class="sr-badge">{{ count }} ta xodim</span>
           </div>
-          <div v-if="!creating" class="sr-more">
+          <div v-if="!creating&&can('roles.delete')" class="sr-more">
             <button
               class="sr-icon"
               aria-label="Rol amallari"
@@ -283,23 +255,23 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </header>
-        <form @submit.prevent="requestSave" novalidate>
+        <form v-if="creating||saved" @submit.prevent="requestSave" novalidate>
           <div class="sr-fields">
             <label
               >Rol nomi <em>*</em
               ><input
-                v-model="draft.name"
+                v-model="draft.name" :disabled="saving||!!saved?.protected&&!creating"
                 aria-label="Rol nomi"
                 aria-required="true"
                 maxlength="80"
-                :aria-invalid="!!error" /></label
+                :aria-invalid="!!error" aria-describedby="role-name-error" /><small id="role-name-error" v-if="fieldErrors.name" class="sr-error">{{fieldErrors.name}}</small></label
             ><label
               >Izoh<input
-                v-model="draft.note"
+                v-model="draft.note" :disabled="saving||!!saved?.protected&&!creating"
                 aria-label="Izoh"
                 maxlength="300"
-                placeholder="Ixtiyoriy izoh"
-            /></label>
+                placeholder="Ixtiyoriy izoh" aria-describedby="role-note-error"
+            /><small id="role-note-error" v-if="fieldErrors.note" class="sr-error">{{fieldErrors.note}}</small></label>
           </div>
           <h3>Bo‘limlar va ruxsatlar</h3>
           <p class="sr-hint">
@@ -352,12 +324,12 @@ onBeforeUnmount(() => {
               >
                 <label v-for="p in s.permissions" :key="p.code"
                   ><input
-                    type="checkbox"
+                    type="checkbox" :aria-label="p.label"
                     :checked="draft.permissions.includes(p.code)"
                     :disabled="
-                      (p.code !== viewCode(s) &&
-                        !canDemo(draft, viewCode(s))) ||
-                      (!!s.parent && !canDemo(draft, s.parent))
+                      ((!!saved?.protected&&!creating)||saving||(!store.allowedScopes(p.code).length&&!draft.permissions.includes(p.code)) || p.code !== viewCode(s) &&
+                        !hasDraftPermission(draft, viewCode(s))) ||
+                      (!!s.parent && !hasDraftPermission(draft, s.parent))
                     "
                     @change="
                       setPermission(
@@ -366,9 +338,9 @@ onBeforeUnmount(() => {
                         ($event.target as HTMLInputElement).checked,
                       )
                     "
-                  />{{ p.label }}</label
+                  />{{ p.label }}<select v-if="draft.permissions.includes(p.code)" :aria-label="p.label+' doirasi'" :disabled="(!!saved?.protected&&!creating)||saving" v-model="draft.grants.find(g=>g.code===p.code)!.scope"><option v-for="scope in [...new Set([...(store.allowedScopes(p.code)),draft.grants.find(g=>g.code===p.code)?.scope??''])].filter(Boolean)" :key="scope" :value="scope">{{({own:'O‘ziga tegishli',assigned_branches:'Biriktirilgan filiallar',entire_clinic:'Butun klinika'} as Record<string,string>)[scope]}}</option></select></label
                 >
-                <p v-if="s.parent && !canDemo(draft, s.parent)">
+                <p v-if="s.parent && !hasDraftPermission(draft, s.parent)">
                   <Info :size="18" />Avval asosiy sahifani ko‘rish ruxsatini
                   yoqing.
                 </p>
@@ -380,21 +352,20 @@ onBeforeUnmount(() => {
             </section>
           </div>
           <p class="sr-demo">
-            <Info :size="17" />Lokal namuna: bu sozlamalar haqiqiy sessiya,
-            sidebar yoki API himoyasini o‘zgartirmaydi.
+            <Info :size="17" />Rollar server orqali boshqariladi. Klinik demo sahifalarining backend amallari alohida ulanadi.
           </p>
           <p v-if="!creating && count" class="sr-hint">
             Ruxsatlar saqlanganda shu rolga biriktirilgan {{ count }} ta xodimga
             taalluqli bo‘ladi.
           </p>
-          <p v-if="error" class="sr-error" role="alert">{{ error }}</p>
+          <p v-if="saved?.protected" class="sr-hint">Himoyalangan tizim roli: tahrirlash va o‘chirish bloklangan.</p><p v-if="error" class="sr-error" role="alert">{{ error }}</p>
           <footer>
             <button type="button" class="sr-button" @click="cancel">
               Bekor qilish</button
             ><button
               type="submit"
               class="sr-button primary"
-              :disabled="!!store.error.value"
+              :disabled="saving||(!!saved?.protected&&!creating)||!can(creating?'roles.create':'roles.update')||!can('roles.manage_permissions')"
             >
               <Save :size="18" />{{ creating ? "Rolni yaratish" : "Saqlash" }}
             </button>

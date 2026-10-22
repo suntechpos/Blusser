@@ -3,7 +3,7 @@
   "info": {
     "title": "Blusser Sprint 2 API",
     "version": "0.2.0",
-    "description": "CEO-governed multi-tenant clinic management. First-party Sanctum cookie authentication, mandatory CSRF on mutations, Secure/HttpOnly/SameSite=Lax session cookies and encrypted server payload. Secure cookies may be disabled ONLY for documented localhost HTTP development. No public registration, bearer tokens, frontend or medical/financial APIs. All clinic routes use active_tenant_id selected on server, ignore client context overrides and recheck current RBAC; platform has no default tenant-data access. Successful critical mutations are atomic with secret-free audit. PostgreSQL FORCE RLS remains enabled; API only uses runtime credentials. List pages contain up to 50 rows; my-clinics and pending proposals return only the authenticated identity records. Input properties not declared in DTOs are ignored, never used to set authority. For assigned_branches delegation, destination visible branch ids must be a subset of the initiating actor branch set for each restricted permission; checks run before commit and cannot be bypassed by creating/resetting another account."
+    "description": "CEO-governed multi-tenant clinic management. First-party Sanctum cookie authentication, mandatory CSRF on mutations, Secure/HttpOnly/SameSite=Lax session cookies and encrypted server payload. Secure cookies may be disabled ONLY for documented localhost HTTP development. No public registration or bearer tokens. Access editor and Patients integrations are implemented; other clinical/financial frontend pages may remain demos. All clinic routes use active_tenant_id selected on server, ignore client context overrides and recheck current RBAC; platform has no default tenant-data access. Successful critical mutations are atomic with secret-free audit. PostgreSQL FORCE RLS remains enabled; API only uses runtime credentials. List pages contain up to 50 rows; my-clinics and pending proposals return only the authenticated identity records. Input properties not declared in DTOs are ignored, never used to set authority. For assigned_branches delegation, destination visible branch ids must be a subset of the initiating actor branch set for each restricted permission; checks run before commit and cannot be bypassed by creating/resetting another account."
   },
   "servers": [
     {
@@ -1854,7 +1854,7 @@
       "post": {
         "operationId": "Create_custom_tenant_role",
         "summary": "Create custom tenant role",
-        "description": "roles.create + roles.manage_permissions entire_clinic; every grant must fit actor effective action/scope ceiling.",
+        "description": "roles.create + roles.manage_permissions entire_clinic; every grant must fit actor effective action/scope ceiling. Access editor mode preserves governance delegation, protected/own role rules, active CEO protection and secret-free audit. Roles use normalized unique names and view/action scope dependencies. Profile writes require entire-clinic authority and are atomic with account/membership changes; deactivation revokes existing sessions. No localStorage import.",
         "tags": [
           "Clinic"
         ],
@@ -1881,29 +1881,38 @@
               "type": "string"
             },
             "description": "Value of XSRF-TOKEN cookie from CSRF handshake or latest rotated response."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Editor clients supply a stable key per command/retry. Required for profile-mode employee writes; role legacy clients may omit it."
           }
         ],
         "responses": {
           "201": {
-            "description": "Create custom tenant role",
+            "description": "Atomic editor operation completed.",
             "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "Cache-Control": {
                 "schema": {
                   "type": "string"
                 },
                 "description": "no-store, private"
-              },
-              "Set-Cookie": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "Encrypted session cookie (HttpOnly, SameSite=Lax, Secure on HTTPS) and XSRF-TOKEN. IDs and CSRF token rotate on login/password change/logout."
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Id"
+                  "$ref": "#/components/schemas/AccessWriteResult"
                 }
               }
             }
@@ -1918,7 +1927,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -1928,6 +1945,17 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "428": {
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         },
         "requestBody": {
@@ -2026,7 +2054,7 @@
       "put": {
         "operationId": "Replace_role_grants",
         "summary": "Replace role grants",
-        "description": "roles.update + roles.manage_permissions. Cannot modify protected CEO role, own assigned role or role above delegation ceiling. Atomic replacement.",
+        "description": "roles.update + roles.manage_permissions. Cannot modify protected CEO role, own assigned role or role above delegation ceiling. Atomic replacement. Access editor mode preserves governance delegation, protected/own role rules, active CEO protection and secret-free audit. Roles use normalized unique names and view/action scope dependencies. Profile writes require entire-clinic authority and are atomic with account/membership changes; deactivation revokes existing sessions. No localStorage import.",
         "tags": [
           "Clinic"
         ],
@@ -2062,29 +2090,48 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Editor clients supply a stable key per command/retry. Required for profile-mode employee writes; role legacy clients may omit it."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Current role/profile version ETag. Missing returns 428; stale version returns 409."
           }
         ],
         "responses": {
           "200": {
-            "description": "Replace role grants",
+            "description": "Atomic editor operation completed.",
             "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "Cache-Control": {
                 "schema": {
                   "type": "string"
                 },
                 "description": "no-store, private"
-              },
-              "Set-Cookie": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "Encrypted session cookie (HttpOnly, SameSite=Lax, Secure on HTTPS) and XSRF-TOKEN. IDs and CSRF token rotate on login/password change/logout."
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Id"
+                  "$ref": "#/components/schemas/AccessWriteResult"
                 }
               }
             }
@@ -2099,7 +2146,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2109,6 +2164,17 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "428": {
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         },
         "requestBody": {
@@ -2125,7 +2191,7 @@
       "delete": {
         "operationId": "Delete_unused_tenant_role",
         "summary": "Delete unused tenant role",
-        "description": "roles.delete; protected/in-use/higher-privilege roles cannot be deleted.",
+        "description": "roles.delete; protected/in-use/higher-privilege roles cannot be deleted. Access editor mode preserves governance delegation, protected/own role rules, active CEO protection and secret-free audit. Roles use normalized unique names and view/action scope dependencies. Profile writes require entire-clinic authority and are atomic with account/membership changes; deactivation revokes existing sessions. No localStorage import.",
         "tags": [
           "Clinic"
         ],
@@ -2161,6 +2227,26 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Editor clients supply a stable key per command/retry. Required for profile-mode employee writes; role legacy clients may omit it."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Current role/profile version ETag. Missing returns 428; stale version returns 409."
           }
         ],
         "responses": {
@@ -2191,7 +2277,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2201,6 +2295,17 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "428": {
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         }
       }
@@ -2238,6 +2343,18 @@
               "default": 1
             },
             "description": "Fixed page size 50; no unrestricted global search."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "profile"
+              ]
+            },
+            "description": "Profile mode includes loginless staff, metadata and version. Omit to preserve the legacy membership directory DTO."
           }
         ],
         "responses": {
@@ -2260,19 +2377,37 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Employee"
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Employee"
+                          }
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "data"
+                      ],
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/StaffEmployee"
+                          }
+                        }
                       }
                     }
-                  },
-                  "required": [
-                    "data"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -2303,7 +2438,7 @@
       "post": {
         "operationId": "Create_clinic_employee",
         "summary": "Create clinic employee",
-        "description": "employees.create + assign_role and assign_branches when used. CEO or authorized tenant admin; platform denied. Temporary password is supplied by admin and delivered out of band, never returned/stored in logs. Global login conflict never overwrites an identity; use consent linking.",
+        "description": "employees.create + assign_role and assign_branches when used. CEO or authorized tenant admin; platform denied. Temporary password is supplied by admin and delivered out of band, never returned/stored in logs. Global login conflict never overwrites an identity; use consent linking. Access editor mode preserves governance delegation, protected/own role rules, active CEO protection and secret-free audit. Roles use normalized unique names and view/action scope dependencies. Profile writes require entire-clinic authority and are atomic with account/membership changes; deactivation revokes existing sessions. No localStorage import.",
         "tags": [
           "Clinic"
         ],
@@ -2330,29 +2465,38 @@
               "type": "string"
             },
             "description": "Value of XSRF-TOKEN cookie from CSRF handshake or latest rotated response."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Editor clients supply a stable key per command/retry. Required for profile-mode employee writes; role legacy clients may omit it."
           }
         ],
         "responses": {
           "201": {
-            "description": "Create clinic employee",
+            "description": "Atomic editor operation completed.",
             "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
               "Cache-Control": {
                 "schema": {
                   "type": "string"
                 },
                 "description": "no-store, private"
-              },
-              "Set-Cookie": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "Encrypted session cookie (HttpOnly, SameSite=Lax, Secure on HTTPS) and XSRF-TOKEN. IDs and CSRF token rotate on login/password change/logout."
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Id"
+                  "$ref": "#/components/schemas/AccessWriteResult"
                 }
               }
             }
@@ -2367,7 +2511,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2377,6 +2529,17 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "428": {
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         },
         "requestBody": {
@@ -2384,7 +2547,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EmployeeCreate"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/EmployeeCreate"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StaffCreateWrite"
+                  }
+                ]
               }
             }
           }
@@ -2422,6 +2592,18 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "profile"
+              ]
+            },
+            "description": "Profile mode includes loginless staff, metadata and version. Omit to preserve the legacy membership directory DTO."
           }
         ],
         "responses": {
@@ -2444,7 +2626,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Employee"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Employee"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StaffEmployee"
+                    }
+                  ]
                 }
               }
             }
@@ -2475,7 +2664,7 @@
       "patch": {
         "operationId": "Update_employee_assignments",
         "summary": "Update employee assignments",
-        "description": "employees.update and specific assign_role/assign_branches/delete permissions. Every role/branch belongs to selected clinic. Own assignments and protected CEO cannot be modified; no escalation beyond actor ceiling.",
+        "description": "employees.update and specific assign_role/assign_branches/delete permissions. Every role/branch belongs to selected clinic. Own assignments and protected CEO cannot be modified; no escalation beyond actor ceiling. Access editor mode preserves governance delegation, protected/own role rules, active CEO protection and secret-free audit. Roles use normalized unique names and view/action scope dependencies. Profile writes require entire-clinic authority and are atomic with account/membership changes; deactivation revokes existing sessions. No localStorage import.",
         "tags": [
           "Clinic"
         ],
@@ -2511,6 +2700,26 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Editor clients supply a stable key per command/retry. Required for profile-mode employee writes; role legacy clients may omit it."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Required strong profile version for profile-mode PATCH. Legacy membership payload retains its existing contract."
           }
         ],
         "responses": {
@@ -2541,7 +2750,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2551,6 +2768,40 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "428": {
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
+          },
+          "200": {
+            "description": "Atomic editor operation completed.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessWriteResult"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -2558,7 +2809,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EmployeeUpdate"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/EmployeeUpdate"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StaffWrite"
+                  }
+                ]
               }
             }
           }
@@ -2567,7 +2825,7 @@
       "delete": {
         "operationId": "Deactivate_employee_membership",
         "summary": "Deactivate employee membership",
-        "description": "Soft deactivation; employees.update + employees.delete and delegation ceiling. Cannot deactivate self or CEO. Global user and memberships in other clinics are unchanged.",
+        "description": "Soft deactivation; employees.update + employees.delete and delegation ceiling. Cannot deactivate self or CEO. Global user and memberships in other clinics are unchanged. Access editor mode preserves governance delegation, protected/own role rules, active CEO protection and secret-free audit. Roles use normalized unique names and view/action scope dependencies. Profile writes require entire-clinic authority and are atomic with account/membership changes; deactivation revokes existing sessions. No localStorage import.",
         "tags": [
           "Clinic"
         ],
@@ -2603,6 +2861,26 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Editor clients supply a stable key per command/retry. Required for profile-mode employee writes; role legacy clients may omit it."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Required strong profile version for profile-mode PATCH. Legacy membership payload retains its existing contract."
           }
         ],
         "responses": {
@@ -2633,7 +2911,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "$ref": "#/components/responses/Conflict"
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2643,6 +2929,17 @@
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
+          },
+          "428": {
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         }
       }
@@ -2949,6 +3246,25 @@
               "type": "string"
             },
             "description": "Value of XSRF-TOKEN cookie from CSRF handshake or latest rotated response."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required when employee_id is supplied: strong current profile version."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Required when employee_id is supplied."
           }
         ],
         "responses": {
@@ -9152,6 +9468,54 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "protected": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "protected"
+            ]
+          },
+          "membership_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "grants": {
+            "type": "object",
+            "additionalProperties": {
+              "enum": [
+                "own",
+                "assigned_branches",
+                "entire_clinic"
+              ]
+            }
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         },
         "required": [
@@ -9302,10 +9666,18 @@
           },
           "grants": {
             "type": "array",
-            "maxItems": 100,
+            "maxItems": 150,
             "items": {
               "$ref": "#/components/schemas/Grant"
-            }
+            },
+            "minItems": 1
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
           }
         },
         "required": [
@@ -9341,6 +9713,17 @@
             "items": {
               "$ref": "#/components/schemas/Grant"
             }
+          },
+          "note": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "employee_count": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -9349,7 +9732,10 @@
           "name",
           "active",
           "protected",
-          "grants"
+          "grants",
+          "note",
+          "version",
+          "employee_count"
         ],
         "additionalProperties": false
       },
@@ -9368,11 +9754,38 @@
                 "entire_clinic"
               ]
             }
+          },
+          "label": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string"
+          },
+          "section_label": {
+            "type": "string"
+          },
+          "view": {
+            "type": "string"
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ui_only": {
+            "type": "boolean"
           }
         },
         "required": [
           "code",
-          "allowed_scopes"
+          "allowed_scopes",
+          "label",
+          "section",
+          "section_label",
+          "view",
+          "parent",
+          "ui_only"
         ],
         "additionalProperties": false
       },
@@ -9622,6 +10035,11 @@
             },
             "uniqueItems": true,
             "maxItems": 100
+          },
+          "employee_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional existing loginless profile. Requires Idempotency-Key and strong If-Match profile version; consent is still required."
           }
         },
         "required": [
@@ -11027,6 +11445,34 @@
                 "timezone"
               ]
             }
+          },
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "protected": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "protected"
+            ]
           }
         },
         "required": [
@@ -11034,6 +11480,280 @@
           "timezone",
           "grants",
           "branches"
+        ]
+      },
+      "AccessWriteResult": {
+        "type": "object",
+        "required": [
+          "id",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffProfile": {
+        "type": "object",
+        "required": [
+          "first",
+          "last",
+          "phone",
+          "position"
+        ],
+        "properties": {
+          "first": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "last": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "patronymic": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "dob": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "department": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "hired": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "specialty": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "duration": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 5,
+            "maximum": 480
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffWrite": {
+        "type": "object",
+        "required": [
+          "profile",
+          "active",
+          "access",
+          "branch_id"
+        ],
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/StaffProfile"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "access": {
+            "type": "boolean"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "uniqueItems": true,
+            "maxItems": 100,
+            "description": "Required on create. On profile PATCH omit to preserve every current membership branch; supplying a different list requires employees.assign_branches. Primary profile branch_id does not replace these assignments."
+          },
+          "login": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "role_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "temporary_password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 12,
+            "maxLength": 128,
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Profile mode. Access=false creates no account and needs no credentials. Access=true requires login/role; new membership requires a temporary password. Existing identity login is immutable; password reset is a separate reauthenticated operation. Existing cross-clinic identities use consent via links, not automatic account takeover."
+      },
+      "StaffEmployee": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "membership_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "role_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "role_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "login": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "access": {
+            "type": "boolean"
+          },
+          "profile": {
+            "type": "object",
+            "description": "Saved profile fields plus stable branch UUID; empty for legacy memberships."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Opaque integer ETag. Membership role/active/branch changes through legacy and profile writers invalidate it. Fetch a fresh version after a conflict; do not assume an increment of exactly one."
+          },
+          "branch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "membership_id",
+          "active",
+          "access",
+          "profile",
+          "version",
+          "branch_ids"
+        ],
+        "additionalProperties": false
+      },
+      "StaffCreateWrite": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StaffWrite"
+          },
+          {
+            "type": "object",
+            "required": [
+              "branch_ids"
+            ]
+          }
         ]
       }
     },
