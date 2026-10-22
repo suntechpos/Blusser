@@ -1,0 +1,501 @@
+.settings-roles-ui {
+  font-size: 15px;
+  color: #101b4b;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.settings-roles-ui h1 {
+  font-size: 30px;
+  margin: 0 0 5px;
+  letter-spacing: -0.7px;
+}
+.settings-roles-ui h2 {
+  font-size: 23px;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+.settings-roles-ui h3 {
+  font-size: 21px;
+  margin: 26px 0 5px;
+}
+.sr-subtitle {
+  color: #738abb;
+  margin: 0 0 23px;
+}
+.sr-tabs {
+  display: flex;
+  gap: 16px;
+  border-bottom: 1px solid #dbe8fb;
+  margin-bottom: 22px;
+  overflow: auto;
+}
+.sr-tabs button {
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #102052;
+  padding: 16px 25px;
+  white-space: nowrap;
+}
+.sr-tabs button.selected {
+  color: #06f;
+  background: linear-gradient(#e9f3ff, #f0f7ff);
+  border-bottom-color: #06f;
+  border-radius: 9px 9px 0 0;
+}
+.sr-columns {
+  display: grid;
+  grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.sr-card {
+  background: white;
+  border: 1px solid #dfebfb;
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 0;
+}
+.sr-card > header,
+.sr-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sr-card > header {
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+.sr-button {
+  border: 1px solid #cbdfff;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 9px 16px;
+  color: #1250a5;
+  background: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.sr-button.primary {
+  background: #06f;
+  border-color: #06f;
+  color: white;
+  box-shadow: 0 3px 8px #0066ff15;
+}
+.sr-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.sr-button.danger {
+  background: #c22c36;
+  border-color: #c22c36;
+  color: white;
+}
+.sr-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #d4e3fc;
+  border-radius: 8px;
+  padding: 0 14px;
+  margin-bottom: 20px;
+  color: #7f98c6;
+}
+.sr-search input {
+  border: 0 !important;
+  min-width: 0;
+  width: 100%;
+  outline-offset: 2px;
+}
+.settings-roles-ui input:not([type="checkbox"]) {
+  height: 42px;
+  border: 1px solid #d4e3fc;
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #101b4b;
+  background: white;
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+}
+.settings-roles-ui input::placeholder {
+  color: #8098c1;
+}
+.sr-role-items {
+  display: grid;
+  gap: 10px;
+}
+.sr-role {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 15px;
+  background: white;
+  border: 1px solid #deebfb;
+  border-radius: 8px;
+  text-align: left;
+  color: #193e74;
+  position: relative;
+  overflow: hidden;
+}
+.sr-role b {
+  font-weight: 500;
+  color: #102052;
+  overflow-wrap: anywhere;
+}
+.sr-role small {
+  margin-left: auto;
+  color: #7a93bc;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.sr-role.selected {
+  background: linear-gradient(120deg, #eef6ff, #e9f1ff);
+  border-color: #c7ddff;
+}
+.sr-role.selected:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #06f;
+}
+.sr-role.selected b {
+  font-weight: 650;
+}
+.sr-role svg {
+  flex-shrink: 0;
+}
+.sr-badge {
+  border: 1px solid #c6dcff;
+  border-radius: 20px;
+  background: #edf5ff;
+  color: #06f;
+  padding: 5px 13px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.sr-fields {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 24px;
+}
+.sr-fields label {
+  display: block;
+  font-size: 14px;
+}
+.sr-fields input {
+  display: block;
+  margin-top: 6px;
+}
+.sr-fields em {
+  color: red;
+  font-style: normal;
+}
+.sr-hint {
+  color: #8299c3;
+  font-size: 14px;
+  margin: 0 0 17px;
+}
+.sr-permissions {
+  display: grid;
+  gap: 10px;
+  max-height: clamp(260px, calc(100dvh - 650px), 535px);
+  overflow: auto;
+  padding-right: 3px;
+  scrollbar-width: thin;
+}
+.sr-section {
+  border: 1px solid #d6e6ff;
+  border-radius: 8px;
+  overflow: clip;
+  flex-shrink: 0;
+}
+.sr-accordion {
+  width: 100%;
+  border: 0;
+  background: #fbfdff;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  text-align: left;
+  color: #254c83;
+  padding: 12px 18px;
+  min-height: 44px;
+}
+.sr-accordion b {
+  font-weight: 500;
+  color: #101b4b;
+}
+.sr-accordion small {
+  margin-left: auto;
+  color: #748dbb;
+  white-space: nowrap;
+}
+.sr-accordion .up {
+  transform: rotate(180deg);
+}
+.sr-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px 20px;
+  padding: 20px 25px 12px;
+}
+.sr-checks label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #305083;
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.sr-checks input {
+  width: 21px;
+  height: 21px;
+  accent-color: #06f;
+  flex-shrink: 0;
+  margin: 0;
+}
+.sr-checks label:has(input:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}
+.sr-checks p {
+  grid-column: 1/-1;
+  border-top: 1px solid #e0ebfb;
+  color: #8199c2;
+  padding-top: 10px;
+  margin: 3px 0 0;
+  font-size: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.sr-checks p svg {
+  color: #06f;
+  flex-shrink: 0;
+}
+.settings-roles-ui footer,
+.sr-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.sr-more {
+  position: relative;
+}
+.sr-icon {
+  background: white;
+  border: 0;
+  color: #6d86ae;
+  display: grid;
+  place-items: center;
+  padding: 5px;
+}
+.sr-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 2;
+  background: white;
+  border: 1px solid #d5e5fb;
+  border-radius: 8px;
+  box-shadow: 0 8px 25px #1234;
+  padding: 6px;
+  white-space: nowrap;
+}
+.sr-menu button {
+  border: 0;
+  background: white;
+  color: #b72936;
+  padding: 9px;
+}
+.sr-demo {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #7087af;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 15px 0;
+}
+.sr-error {
+  color: #b32435;
+  background: #fff1f1;
+  padding: 12px;
+  border-radius: 8px;
+}
+.sr-success {
+  color: #087d55;
+  background: #e5fbef;
+  padding: 12px;
+  border-radius: 8px;
+}
+.sr-coming {
+  min-height: 500px;
+  display: grid;
+  place-items: center;
+  color: #7891b9;
+  font-size: 25px;
+}
+.sr-empty {
+  color: #7891b9;
+  padding: 20px 0;
+}
+.sr-dialog {
+  border: 1px solid #d5e5fb;
+  border-radius: 13px;
+  padding: 24px;
+  width: min(550px, calc(100% - 30px));
+  max-height: 90vh;
+  overflow: auto;
+  color: #13254c;
+  box-shadow: 0 15px 70px #17365333;
+}
+.sr-dialog::backdrop {
+  background: #122c5c99;
+}
+.sr-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+.sr-dialog header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.sr-dialog header > button {
+  border: 0;
+  background: white;
+  color: #6682af;
+}
+.sr-dialog p {
+  line-height: 1.7;
+}
+.settings-roles-ui button:focus-visible,
+.settings-roles-ui input:focus-visible,
+.sr-dialog button:focus-visible {
+  outline: 3px solid #76b3ff;
+  outline-offset: 2px;
+}
+@media (min-width: 1500px) {
+  .sr-role-list {
+    min-height: 720px;
+  }
+}
+@media (max-width: 1100px) {
+  .sr-columns {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+  .sr-card {
+    padding: 15px;
+  }
+  .sr-role {
+    gap: 8px;
+    padding: 12px 10px;
+  }
+  .sr-checks {
+    padding: 15px;
+    gap: 12px;
+  }
+  .sr-fields {
+    gap: 12px;
+  }
+  .sr-role-list > header {
+    flex-wrap: wrap;
+  }
+  .sr-title {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 800px) {
+  .sr-columns {
+    grid-template-columns: 1fr;
+  }
+  .sr-role-items {
+    max-height: 240px;
+    overflow: auto;
+  }
+  .sr-fields {
+    grid-template-columns: 1fr;
+  }
+  .sr-permissions {
+    max-height: 600px;
+  }
+}
+@media (max-width: 460px) {
+  .sr-checks {
+    grid-template-columns: 1fr;
+  }
+  .sr-tabs {
+    gap: 0;
+  }
+  .sr-tabs button {
+    padding: 14px;
+  }
+  .sr-accordion {
+    padding: 12px;
+    gap: 9px;
+  }
+  .settings-roles-ui h2 {
+    font-size: 20px;
+  }
+  .sr-card {
+    padding: 12px;
+  }
+}
+
+.settings-roles-ui .sr-checks input {
+  appearance: none;
+  border: 1px solid #9bb5db;
+  border-radius: 5px;
+  background: white;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+.settings-roles-ui .sr-checks input:checked {
+  background: #06f;
+  border-color: #06f;
+}
+.settings-roles-ui .sr-checks input:checked:after {
+  content: "";
+  width: 6px;
+  height: 11px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-top: -3px;
+}
+.sr-section[data-section="cashier"] .sr-checks label:nth-child(1) {
+  order: 1;
+}
+.sr-section[data-section="cashier"] .sr-checks label:nth-child(2) {
+  order: 3;
+}
+.sr-section[data-section="cashier"] .sr-checks label:nth-child(3) {
+  order: 5;
+}
+.sr-section[data-section="cashier"] .sr-checks label:nth-child(4) {
+  order: 2;
+}
+.sr-section[data-section="cashier"] .sr-checks label:nth-child(5) {
+  order: 4;
+}
+.sr-section[data-section="cashier"] .sr-checks label:nth-child(6) {
+  order: 6;
+}
+.sr-section[data-section="cashier"] .sr-checks p {
+  order: 7;
+}

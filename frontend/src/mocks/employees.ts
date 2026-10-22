@@ -1,4 +1,4 @@
-/** Synthetic, volatile UI fixtures. No API, credentials or browser persistence. */
+/** Synthetic employee fixtures. Settings demo store owns optional local persistence; no API or passwords. */
 export const positions = [
   "Shifokor",
   "Hamshira",
@@ -75,6 +75,8 @@ export interface Employee {
   access: boolean;
   login: string;
   role: string;
+  /** Stable local demo role ID; legacy role label is retained for migration. */
+  roleId?: string;
   specialty: string;
   duration: number;
   note: string;

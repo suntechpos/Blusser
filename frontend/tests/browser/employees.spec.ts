@@ -246,12 +246,12 @@ test("employee validation, local photo, access toggle, doctor fields, editing an
     await page.evaluate(() =>
       JSON.stringify({ ...localStorage, ...sessionStorage }),
     ),
-  ).not.toContain("demo.new");
+  ).toContain("demo.new");
   expect(requests.some((r) => r.includes("/employees"))).toBe(false);
   expect(errors).toEqual([]);
   await page.reload();
   await page.getByLabel("Xodimlarni qidirish").fill("Namuna");
-  await expect(page.locator("tbody")).toContainText("Xodim topilmadi");
+  await expect(page.locator("tbody")).toContainText("O‘zgartirilgan");
 });
 test("schedule copy, additional intervals, validation and exception editing without duplicates", async ({
   page,
