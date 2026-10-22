@@ -28,6 +28,7 @@ const draft = ref(clone(props.employee ?? blankEmployee()));
 if (!props.employee) {
   draft.value.branch = session.branches[0]?.id ?? "";
   draft.value.roleId = "";
+  draft.value.branchIds = draft.value.branch ? [draft.value.branch] : [];
 }
 const errors = ref<Record<string, string>>({});
 watch(
@@ -359,7 +360,29 @@ function save() {
                 ><small v-if="errors.role" class="e-error">{{
                   errors.role
                 }}</small></label
-              ><template v-if="!employee?.membershipId"
+              >
+              <div class="e-label">
+                <span>Kirish filiallari</span>
+                <label
+                  v-for="branch in branches"
+                  :key="branch.id"
+                  class="e-hint"
+                >
+                  <input
+                    type="checkbox"
+                    v-model="draft.branchIds"
+                    :value="branch.id"
+                    :aria-label="'Kirish filiali: ' + branch.name"
+                    :disabled="!can('employees.assign_branches')"
+                  />
+                  {{ branch.name }}
+                </label>
+                <small class="e-hint"
+                  >Bu biriktirishlar xodimning asosiy filialidan alohida
+                  boshqariladi.</small
+                >
+              </div>
+              <template v-if="!employee?.membershipId"
                 ><label class="e-label">Yangi hisob paroli *</label>
                 <div class="password-row">
                   <div>

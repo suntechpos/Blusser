@@ -89,14 +89,20 @@ export async function editorSession(page: Page, grants = allServerGrants) {
       return route.fulfill({
         json: {
           grants,
-          branches: [{ id: "branch-a", name: "Asosiy filial", active: true }],
+          branches: [
+            { id: "branch-a", name: "Asosiy filial", active: true },
+            { id: "branch-b", name: "Qo‘shimcha filial", active: true },
+          ],
           timezone: "Asia/Tashkent",
         },
       });
     if (path.endsWith("/clinic/branches"))
       return route.fulfill({
         json: {
-          data: [{ id: "branch-a", name: "Asosiy filial", active: true }],
+          data: [
+            { id: "branch-a", name: "Asosiy filial", active: true },
+            { id: "branch-b", name: "Qo‘shimcha filial", active: true },
+          ],
         },
       });
     if (path.endsWith("/clinic/permissions"))
@@ -184,7 +190,7 @@ export async function editorSession(page: Page, grants = allServerGrants) {
         active: body.active,
         access: body.access,
         profile: { ...body.profile, branch: body.branch_id },
-        branch_ids: body.branch_ids,
+        branch_ids: body.branch_ids ?? old?.branch_ids ?? [],
         version: (old?.version ?? 0) + 1,
       };
       if (old) Object.assign(old, row);

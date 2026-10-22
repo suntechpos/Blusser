@@ -66,7 +66,7 @@ ACCESS_REAL_API=1 PW_CHROMIUM_PATH=/usr/bin/chromium npx playwright test --confi
 
 The fixture's synthetic credentials are test-only. `access-real.spec.ts` does not intercept API responses. `access-editor.fixture.ts` and other UI fixture suites intentionally mock API responses and are not evidence of backend authorization. Test logs for this delivery are saved under `/tmp/access-*.log`; final verified totals are recorded in the delivery report.
 
-## Verified delivery checks (2026-10-22)
+## Earlier delivery checks (before PR #23 review fixes)
 
 - Full real PostgreSQL/Sanctum backend suite: **164 passed, 8,629 assertions** (`/tmp/access-full-final.log`). Includes RLS, delegation, CEO, sessions, concurrent existing commands, profile/account atomicity, consent, role versions and rollback protection.
 - Real access browser suite, without API interception: **4 passed** (`/tmp/access-real-final.log`), run from the publication snapshot excluding unrelated local files. Covers role/staff creation, mandatory password change, allowed menus/direct URL denial, immediate API revocation, client action capture guard, loginless profile, stale draft and zero-page grants.
@@ -76,3 +76,13 @@ The fixture's synthetic credentials are test-only. `access-real.spec.ts` does no
 - Pint check, Composer strict validation and platform requirements passed. OpenAPI JSON and all **789** local references resolve.
 
 The first full run reported 11 failures; migration test rollback depths were updated to include the new migration while retaining their assertions. Deactivation now explicitly expects revoked-session 401. The final full run above passed without disabling tests or relaxing scope enforcement.
+
+## PR #23 review fixes
+
+The membership `employee_version` is the authoritative opaque profile ETag for linked accounts. Legacy active/role/branch writes advance it inside the same transaction; loginless profiles retain their own version. An installed editor seeds membership versions from existing profiles, preserving issued ETags. Locks and the version comparison prevent a stale form (including concurrent requests) from restoring revoked access. The disabled-access profile path uses the same branch-delegation guard as legacy assignment; a denial rolls back profile, membership and session changes.
+
+`branch_id` is profile metadata. `branch_ids` is the independent access assignment: required on create, optional on PATCH. Omission preserves every current access branch. A changed list still requires `employees.assign_branches`; ordinary profile edits do not. The form exposes explicit access-branch checkboxes only editable with that authority.
+
+The existing 000012 migration is unchanged. Additive `2026_10_21_000012_prepare_access_role_names` sorts before it for upgrades from main and also runs as a pending migration on already upgraded installations. It locks role writes and keeps the smallest UUID's original name in each clinic/normalized-name collision group. Other colliding names use the whitespace-normalized original plus ` [role <full UUID>]`; if occupied, use ` [role <UUID> #1]`, then #2, etc. The base is truncated to keep 255 characters. Blank display names use `Rol` as the base. Rows are processed by tenant/UUID order. No roles are merged or deleted; IDs, codes, protection, permissions and memberships are unchanged. Owner-only FORCE-RLS `role_name_upgrades` records old/new names. A temporary unique index prevents new collisions between migration transactions; 000013 removes that duplicate index once the original permanent unique index exists. Rollback with rename history or editor data refuses and requires a forward migration.
+
+Regression evidence before fixes at 6e4c823: `/tmp/review-fixes-red-backend.log` (four failures), `/tmp/review-fixes-red-parallel.log` (stale parallel request incorrectly succeeded), `/tmp/review-fixes-red-frontend.log` (two failures). The new tests also exercise permitted same-branch disabling, fresh-profile saves, authorized branch reassignment and a collision-free repeated migration. Existing revoked-session 401 assertions remain unchanged.

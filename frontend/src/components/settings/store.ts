@@ -215,6 +215,16 @@ function makeStore() {
         "note",
       ].map((k) => [k, e[k as keyof Employee]]),
     );
+    const previous = state.value.employees.find((row) => row.id === e.id);
+    const branchIds =
+      e.branchIds ?? previous?.branchIds ?? (e.access ? [e.branch] : []);
+    const sameBranches = (a: string[], b: string[]) =>
+      JSON.stringify([...new Set(a)].sort()) ===
+      JSON.stringify([...new Set(b)].sort());
+    const branchesChanged =
+      !!e.id && !sameBranches(branchIds, previous?.branchIds ?? []);
+    if (branchesChanged && !can("employees.assign_branches"))
+      throw Error("Filial biriktirish uchun ruxsat yo‘q.");
     const body = {
       profile,
       active: e.active,
@@ -222,7 +232,9 @@ function makeStore() {
       login: e.access ? e.login : null,
       role_id: e.access ? e.roleId : null,
       branch_id: e.branch,
-      branch_ids: e.access ? [e.branch] : [],
+      ...(!e.id || (e.access && (!previous?.membershipId || branchesChanged))
+        ? { branch_ids: e.access ? branchIds : [] }
+        : {}),
       ...(password ? { temporary_password: password } : {}),
     };
     await clinicRequest(e.id ? `employees/${e.id}` : "employees", {

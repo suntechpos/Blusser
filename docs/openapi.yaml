@@ -2552,7 +2552,7 @@
                     "$ref": "#/components/schemas/EmployeeCreate"
                   },
                   {
-                    "$ref": "#/components/schemas/StaffWrite"
+                    "$ref": "#/components/schemas/StaffCreateWrite"
                   }
                 ]
               }
@@ -11610,8 +11610,7 @@
           "profile",
           "active",
           "access",
-          "branch_id",
-          "branch_ids"
+          "branch_id"
         ],
         "properties": {
           "profile": {
@@ -11634,7 +11633,8 @@
               "format": "uuid"
             },
             "uniqueItems": true,
-            "maxItems": 100
+            "maxItems": 100,
+            "description": "Required on create. On profile PATCH omit to preserve every current membership branch; supplying a different list requires employees.assign_branches. Primary profile branch_id does not replace these assignments."
           },
           "login": {
             "type": [
@@ -11721,7 +11721,8 @@
           },
           "version": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "description": "Opaque integer ETag. Membership role/active/branch changes through legacy and profile writers invalidate it. Fetch a fresh version after a conflict; do not assume an increment of exactly one."
           },
           "branch_ids": {
             "type": "array",
@@ -11741,6 +11742,19 @@
           "branch_ids"
         ],
         "additionalProperties": false
+      },
+      "StaffCreateWrite": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StaffWrite"
+          },
+          {
+            "type": "object",
+            "required": [
+              "branch_ids"
+            ]
+          }
+        ]
       }
     },
     "responses": {

@@ -377,12 +377,12 @@ final class SchedulingApiTest extends FoundationTestCase
     {
         $a = $this->fixture()['a'];
         $db = DB::connection('migration');
-        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 5, '--force' => true]));
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 7, '--force' => true]));
         $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
         $this->assertSame('Asia/Tashkent', $db->table('tenants')->where('id', $a['tenant'])->value('timezone'));
         $this->reference($a);
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 5, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 7, '--force' => true]);
             $this->fail('No destructive rollback.');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('forward migration', $e->getMessage());

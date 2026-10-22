@@ -78,3 +78,54 @@ test("missing employees permission denies direct hash without fetching profiles"
     0,
   );
 });
+
+test("phone edit preserves two access branches without assign_branches authority", async ({
+  page,
+}) => {
+  const { allServerGrants } = await import("./access.fixture");
+  const grants = { ...allServerGrants };
+  delete grants["employees.assign_branches"];
+  const s = await editorSession(page, grants);
+  const e = s.employees.find((e) => e.profile.first === "Aziz")!;
+  e.branch_ids = ["branch-a", "branch-b"];
+  await page.getByRole("button", { name: "Xodimlar", exact: true }).click();
+  await page.getByLabel("Xodimlarni qidirish").fill("Aziz");
+  await page
+    .getByRole("row", { name: "Aziz Karimov profilini ochish" })
+    .click();
+  await page.getByRole("button", { name: "Tahrirlash", exact: true }).click();
+  await page.getByLabel("Telefon *", { exact: true }).fill("+998 90 999 88 77");
+  await page.getByRole("button", { name: "Saqlash", exact: true }).click();
+  await expect(page.getByLabel("Xodimlarni qidirish")).toBeVisible();
+  const patch = s.requests.find(
+    (r) => r.method === "PATCH" && r.path.endsWith("/" + e.id),
+  )!;
+  expect(patch.body).not.toHaveProperty("branch_ids");
+  expect(e.branch_ids).toEqual(["branch-a", "branch-b"]);
+});
+
+test("explicit access branch selection sends only the chosen authorized assignments", async ({
+  page,
+}) => {
+  const s = await editorSession(page);
+  const e = s.employees.find((e) => e.profile.first === "Aziz")!;
+  e.branch_ids = ["branch-a", "branch-b"];
+  await page.getByRole("button", { name: "Xodimlar", exact: true }).click();
+  await page.getByLabel("Xodimlarni qidirish").fill("Aziz");
+  await page
+    .getByRole("row", { name: "Aziz Karimov profilini ochish" })
+    .click();
+  await page.getByRole("button", { name: "Tahrirlash", exact: true }).click();
+  await page
+    .getByRole("checkbox", {
+      name: "Kirish filiali: Qo‘shimcha filial",
+      exact: true,
+    })
+    .uncheck();
+  await page.getByRole("button", { name: "Saqlash", exact: true }).click();
+  await expect(page.getByLabel("Xodimlarni qidirish")).toBeVisible();
+  const patch = s.requests.find(
+    (r) => r.method === "PATCH" && r.path.endsWith("/" + e.id),
+  )!;
+  expect(patch.body.branch_ids).toEqual(["branch-a"]);
+});

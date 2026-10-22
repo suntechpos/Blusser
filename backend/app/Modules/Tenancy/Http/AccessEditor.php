@@ -77,7 +77,7 @@ final class AccessEditor
 
     public function saveEmployee(Request $r, ?string $id = null)
     {
-        $data = $r->validate(['active' => 'required|boolean', 'access' => 'required|boolean', 'login' => 'nullable|string|max:64', 'role_id' => 'nullable|uuid', 'branch_id' => 'required|uuid', 'branch_ids' => 'present|array|max:100', 'branch_ids.*' => 'required|uuid|distinct', 'temporary_password' => 'nullable|string|min:12|max:128',
+        $data = $r->validate(['active' => 'required|boolean', 'access' => 'required|boolean', 'login' => 'nullable|string|max:64', 'role_id' => 'nullable|uuid', 'branch_id' => 'required|uuid', 'branch_ids' => ($id ? 'sometimes' : 'present').'|array|max:100', 'branch_ids.*' => 'required|uuid|distinct', 'temporary_password' => 'nullable|string|min:12|max:128',
             'profile' => 'required|array:first,last,patronymic,phone,dob,gender,address,position,department,hired,specialty,duration,note',
             'profile.first' => 'required|string|max:120', 'profile.last' => 'required|string|max:120', 'profile.phone' => 'required|string|max:30', 'profile.position' => 'required|string|max:100', 'profile.patronymic' => 'nullable|string|max:120', 'profile.dob' => 'nullable|date|before_or_equal:today', 'profile.gender' => 'nullable|in:Erkak,Ayol', 'profile.address' => 'nullable|string|max:500', 'profile.department' => 'nullable|string|max:120', 'profile.hired' => 'nullable|date', 'profile.specialty' => 'nullable|string|max:120', 'profile.duration' => 'nullable|integer|min:5|max:480', 'profile.note' => 'nullable|string|max:2000']);
         if ($data['access']) {
