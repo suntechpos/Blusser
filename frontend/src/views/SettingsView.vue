@@ -25,10 +25,24 @@ import "../components/settings/settings.css";
 import { receptionActions } from "../services/receptionAccess";
 const store = useRolesStore();
 const permissionSections=computed(()=>store.sections.value);
-function permissionLocation(code: string) {
-  const section = store.sections.value.find(s => s.permissions.some(p => p.code === code));
-  return section ? `${section.label} → ${section.permissions.find(p => p.code === code)!.label}` : code;
+const receptionRows = Object.entries(receptionActions).map(([key, action]) => ({key, label: key === 'patient' ? 'Yangi bemor yaratish' : key === 'checkIn' ? 'Kelganini belgilash — “Keldi”' : action.label, codes: [...action.codes] as string[]}));
+function receptionState(codes: string[]) {
+ const n = codes.filter(c => draft.value.permissions.includes(c)).length;
+ return {checked:n === codes.length, partial:n > 0 && n < codes.length};
 }
+function receptionScopes(codes: string[]) { return store.allowedScopes(codes[0]!).filter(scope => codes.every(c => store.allowedScopes(c).includes(scope))); }
+function receptionScope(codes: string[]) { const scopes=codes.map(c=>draft.value.grants.find(g=>g.code===c)?.scope); return scopes.every(s=>s===scopes[0]) ? scopes[0] ?? '' : ''; }
+function toggleReception(codes: string[], on: boolean) {
+ if(saved.value?.protected || saving.value || !hasDraftPermission(draft.value,'reception.view')) return;
+ if(on && codes.some(c=>!store.allowedScopes(c).length)) return;
+ const keep=new Set<string>();
+ for(const row of receptionRows) if(row.codes !== codes && receptionState(row.codes).checked) row.codes.forEach(c=>keep.add(c));
+ for(const section of permissionSections.value) if(section.permissions.some(p=>!codes.includes(p.code)&&draft.value.permissions.includes(p.code))) keep.add(viewCode(section));
+ const grants=new Map(draft.value.grants.map(g=>[g.code,g.scope]));
+ for(const code of codes) { if(on&&!grants.has(code)) grants.set(code,store.allowedScopes(code)[0]!); else if(!on&&!keep.has(code)) grants.delete(code); }
+ draft.value.grants=[...grants].map(([code,scope])=>({code,scope})); draft.value.permissions=[...grants.keys()];
+}
+function setReceptionScope(codes: string[], scope: string) { if(saved.value?.protected||saving.value||!receptionScopes(codes).includes(scope))return; draft.value.grants.forEach(g=>{if(codes.includes(g.code))g.scope=scope;}); }
 const viewCode=(s:{permissions:{code:string}[]})=>s.permissions[0]?.code??'';
 function hasDraftPermission(r:ServerRole,code:string):boolean{const s=permissionSections.value.find(s=>s.permissions.some(p=>p.code===code));return !!s&&r.permissions.includes(viewCode(s))&&(!s.parent||hasDraftPermission(r,s.parent))&&r.permissions.includes(code);}
 function setPermission(r:ServerRole,code:string,on:boolean){const s=permissionSections.value.find(s=>s.permissions.some(p=>p.code===code));if(!s)return;if(on&&(!store.allowedScopes(code).length||(s.parent&&!hasDraftPermission(r,s.parent))))return;const values=new Set(r.permissions);on?values.add(code):values.delete(code);if(code===viewCode(s)&&!on)s.permissions.forEach(p=>values.delete(p.code));for(const child of permissionSections.value)if(child.parent&&!values.has(child.parent))child.permissions.forEach(p=>values.delete(p.code));r.permissions=[...values];r.grants=r.permissions.map(c=>({code:c,scope:r.grants.find(g=>g.code===c)?.scope??store.allowedScopes(c)[0]??''}));}
@@ -343,16 +357,21 @@ onBeforeUnmount(() => {
                         ($event.target as HTMLInputElement).checked,
                       )
                     "
-                  />{{ p.label }}<select v-if="draft.permissions.includes(p.code)" :aria-label="p.label+' doirasi'" :disabled="(!!saved?.protected&&!creating)||saving" v-model="draft.grants.find(g=>g.code===p.code)!.scope"><option v-for="scope in [...new Set([...(store.allowedScopes(p.code)),draft.grants.find(g=>g.code===p.code)?.scope??''])].filter(Boolean)" :key="scope" :value="scope">{{({own:'O‘ziga tegishli',assigned_branches:'Biriktirilgan filiallar',entire_clinic:'Butun klinika'} as Record<string,string>)[scope]}}</option></select></label
+                  />{{ p.label }}<select v-if="draft.permissions.includes(p.code)" :aria-label="p.label+' doirasi'" :disabled="(!!saved?.protected&&!creating)||saving" v-model="draft.grants.find(g=>g.code===p.code)!.scope"><option v-for="scope in (s.id === 'reception' ? store.allowedScopes(p.code) : [...new Set([...(store.allowedScopes(p.code)),draft.grants.find(g=>g.code===p.code)?.scope??''])].filter(Boolean))" :key="scope" :value="scope">{{({own:'O‘ziga tegishli',assigned_branches:'Biriktirilgan filiallar',entire_clinic:'Butun klinika'} as Record<string,string>)[scope]}}</option></select></label
                 >
-                <div v-if="s.id === 'reception'" class="sr-hint sr-reception-links" aria-label="Registratura amallari bog‘liqligi">
-                  <p>Registratura sahifasini ko‘rish amallarni avtomatik yoqmaydi. Quyidagi ruxsatlar tegishli bo‘limlarda boshqariladi:</p>
-                  <p v-for="(action, key) in receptionActions" :key="key">
-                    <b>{{ action.label }}:</b> {{ action.codes.map(permissionLocation).join(' + ') }}
-                    <small>({{ action.codes.join(', ') }})</small>
-                  </p>
-                  <p>Registratura jarayonlari hozir lokal namuna. Haqiqiy API amallari o‘z ruxsatlari va filial doirasi bilan himoyalanadi.</p>
-                </div>
+                <template v-if="s.id === 'reception'">
+                  <label v-for="action in receptionRows" :key="action.key">
+                    <input type="checkbox" :aria-label="action.label" :checked="receptionState(action.codes).checked" :indeterminate="receptionState(action.codes).partial"
+                      :disabled="!!saved?.protected || saving || !hasDraftPermission(draft, 'reception.view') || action.codes.some(code => !store.allowedScopes(code).length && !draft.permissions.includes(code))"
+                      @change="toggleReception(action.codes, ($event.target as HTMLInputElement).checked)" />
+                    {{ action.label }}<small v-if="receptionState(action.codes).partial">Qisman</small>
+                    <select v-if="receptionState(action.codes).checked && receptionScopes(action.codes).length" :aria-label="action.label+' doirasi'" :disabled="!!saved?.protected || saving" :value="receptionScope(action.codes)" @change="setReceptionScope(action.codes, ($event.target as HTMLSelectElement).value)">
+                      <option disabled value="">Turli doiralar</option>
+                      <option v-for="scope in receptionScopes(action.codes)" :key="scope" :value="scope">{{({own:'O‘ziga tegishli',assigned_branches:'Biriktirilgan filiallar',entire_clinic:'Butun klinika'} as Record<string,string>)[scope]}}</option>
+                    </select>
+                  </label>
+                  <p>Umumiy ruxsatlar boshqa yoqilgan amallar uchun saqlanadi.</p>
+                </template>
                 <p v-if="s.parent && !hasDraftPermission(draft, s.parent)">
                   <Info :size="18" />Avval asosiy sahifani ko‘rish ruxsatini
                   yoqing.
