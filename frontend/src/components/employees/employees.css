@@ -1096,3 +1096,30 @@
     transform: translateY(18px);
   }
 }
+
+.employee-pages {
+  grid-column: 1 / -1;
+}
+.employee-access-row,
+.employee-branches > label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.employee-access-row input[type="checkbox"],
+.employee-branches input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+.employee-branches > span,
+.employee-branches > small {
+  display: block;
+  margin: 8px 0;
+}
+.employee-access-row select {
+  width: auto;
+  max-width: 230px;
+  margin-left: auto;
+}

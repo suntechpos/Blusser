@@ -325,7 +325,8 @@ WORKER;
     public function test_invalidation_upgrades_an_installed_000013_and_never_revalidates_tokens_on_rollback(): void
     {
         $db = DB::connection('migration');
-        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
+        $steps = $db->table('migrations')->where('migration', '>=', '2026_10_22_000014')->count();
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => $steps, '--force' => true]));
         try {
             $a = $this->clinic();
             $role = $this->role($a, 'already13', ['patients.view' => 'entire_clinic']);
@@ -334,14 +335,14 @@ WORKER;
             $db->table('tenant_memberships')->where('id', $e['member'])->update(['employee_version' => 9]);
             $loginless = (string) Str::uuid();
             $db->table('employee_profiles')->insert(['id' => $loginless, 'tenant_id' => $a['tenant'], 'profile' => json_encode($e['profile']), 'version' => 12]);
-            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
+            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--path' => 'database/migrations/2026_10_22_000014_invalidate_pre_integrity_employee_etags.php', '--force' => true]));
             $jar = $this->signed('synthetic.a', $a['tenant']);
             $this->assertSame(10, $this->detail($jar, $e)['version']);
             $this->assertSame(10, $db->table('employee_profiles')->where('id', $e['id'])->value('version'));
             $this->assertSame(13, $this->detail($jar, ['id' => $loginless])['version']);
             $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
             $this->assertSame(10, $this->detail($jar, $e)['version']);
-            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
+            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--path' => 'database/migrations/2026_10_22_000014_invalidate_pre_integrity_employee_etags.php', '--force' => true]));
             $this->assertSame(11, $this->detail($jar, $e)['version']);
             $this->assertSame(14, $this->detail($jar, ['id' => $loginless])['version']);
         } finally {

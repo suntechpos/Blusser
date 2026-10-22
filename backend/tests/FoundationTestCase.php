@@ -75,6 +75,12 @@ abstract class FoundationTestCase extends TestCase
         return $ids;
     }
 
+    /** Target a schema version, rather than assuming a fixed number of later migrations. */
+    protected function migrationStepsFrom(string $prefix): int
+    {
+        return DB::connection('migration')->table('migrations')->where('migration', '>=', $prefix)->count();
+    }
+
     protected function actor(string $id): User
     {
         return (new User)->forceFill(['id' => $id, 'credential_version' => 1]);

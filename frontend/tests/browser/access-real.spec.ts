@@ -102,6 +102,11 @@ test("real role CRUD, employee account, password change, live grants and access 
   await page.getByLabel("Ruxsat roli *", { exact: true }).selectOption(role.id);
   const temporary = "Synthetic-new-browser-42!";
   await page.getByLabel("Yangi hisob paroli", { exact: true }).fill(temporary);
+  await page
+    .getByRole("checkbox", { name: "Bo‘lim: Kassa", exact: true })
+    .check();
+  await page.getByLabel("Kassa PIN-kodi", { exact: true }).fill("1122");
+  await page.getByLabel("PIN-kodni tasdiqlash", { exact: true }).fill("1122");
   const staffSaved = page.waitForResponse(
     (r) =>
       r.url().endsWith("/clinic/employees") && r.request().method() === "POST",
@@ -329,4 +334,72 @@ test("real cashier with zero page grants gets a stable no-page state", async ({
       ).status(),
     ).toBe(200);
   }
+});
+
+test("real employee view grants restrict menus, URL and API independently of the shared role", async ({
+  page,
+  browser,
+}) => {
+  await login(page, "accessdemo.admin");
+  const roles = (await (await get(page, "roles")).json()).data;
+  const role = roles.find((r: { code: string }) => r.code === "registrator");
+  const suffix = Date.now().toString(36);
+  const temporary = "Synthetic-page-browser-42!";
+  await page.getByRole("button", { name: "Xodimlar", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Xodim qo‘shish", exact: true })
+    .click();
+  await page.getByLabel("Familiya *", { exact: true }).fill("Pages" + suffix);
+  await page.getByLabel("Ism *", { exact: true }).fill("Multi");
+  await page.getByLabel("Telefon *", { exact: true }).fill("+998 90 000 11 22");
+  await page.getByLabel("Login *", { exact: true }).fill("pages." + suffix);
+  await page.getByLabel("Ruxsat roli *", { exact: true }).selectOption(role.id);
+  await page.getByLabel("Yangi hisob paroli", { exact: true }).fill(temporary);
+  for (const label of ["Registratura", "Kassa"])
+    await page
+      .getByRole("checkbox", { name: "Bo‘lim: " + label, exact: true })
+      .check();
+  await page.getByLabel("Kassa PIN-kodi", { exact: true }).fill("1122");
+  await page.getByLabel("PIN-kodni tasdiqlash", { exact: true }).fill("1122");
+  const response = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/clinic/employees") && r.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Saqlash", exact: true }).click();
+  expect((await response).status()).toBe(201);
+  const ctx = await browser.newContext();
+  const staff = await ctx.newPage();
+  await staff.goto("/");
+  await staff.getByLabel("Login", { exact: true }).fill("pages." + suffix);
+  await staff.getByLabel("Parol", { exact: true }).fill(temporary);
+  await staff.getByRole("button", { name: "Kirish", exact: true }).click();
+  await staff.getByLabel("Joriy parol", { exact: true }).fill(temporary);
+  await staff.getByLabel("Yangi parol", { exact: true }).fill(PASSWORD);
+  await staff
+    .getByLabel("Yangi parolni tasdiqlang", { exact: true })
+    .fill(PASSWORD);
+  await staff
+    .getByRole("button", { name: "Parolni almashtirish", exact: true })
+    .click();
+  const sidebar = staff.locator(".clinic-sidebar");
+  await expect(
+    sidebar.getByRole("button", { name: "Registratura", exact: true }),
+  ).toBeVisible();
+  await expect(
+    sidebar.getByRole("button", { name: "Kassa", exact: true }),
+  ).toBeVisible();
+  await expect(
+    sidebar.getByRole("button", { name: "Bemorlar", exact: true }),
+  ).toHaveCount(0);
+  const me = await (await staff.request.get("/api/v1/auth/me")).json();
+  expect(Object.keys(me.grants).sort()).toEqual([
+    "cashier.view",
+    "reception.view",
+  ]);
+  expect((await get(staff, "patients")).status()).toBe(403);
+  await staff.evaluate(() => (location.hash = "bemorlar"));
+  await expect(
+    staff.getByRole("heading", { name: "403 — Ruxsat yo‘q" }),
+  ).toBeVisible();
+  await ctx.close();
 });
