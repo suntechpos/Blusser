@@ -39,11 +39,11 @@ final class OpenApiContractTest extends TestCase
                     $this->assertArrayHasKey('419', $operation['responses']);
                     $this->assertArrayHasKey('422', $operation['responses']);
                 }
-                foreach ($operation['responses'] as $response) {
+                foreach ($operation['responses'] as $status => $response) {
                     if (isset($response['$ref'])) {
                         $response = $document['components']['responses'][basename($response['$ref'])];
                     }
-                    $this->assertArrayHasKey('Cache-Control', $response['headers']);
+                    $this->assertArrayHasKey('Cache-Control', $response['headers'] ?? [], strtoupper($method).' '.$path.' response '.$status.' must document the no-store policy.');
                 }
             }
         }

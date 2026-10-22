@@ -90,6 +90,6 @@ final class AccessEditor
         $data['name'] = trim($data['profile']['first'].' '.$data['profile']['last']);
         $result = json_decode(app(Governance::class)->call('staff_command', [$id ? Governance::uuid($id) : null, json_encode($data, JSON_THROW_ON_ERROR), $this->key($r, true), $this->version($r)], $r->user(), $this->tenant($r)), true, flags: JSON_THROW_ON_ERROR);
 
-        return response()->json($result,$id ? 200 : 201)->header('ETag','"'.$result['version'].'"');
+        return response()->json($result, $id ? 200 : 201)->header('ETag', '"'.$result['version'].'"');
     }
 }

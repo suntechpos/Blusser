@@ -1901,6 +1901,12 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
               }
             },
             "content": {
@@ -1921,7 +1927,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Duplicate name/login, stale version or idempotency payload conflict."
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -1933,7 +1947,15 @@
             "$ref": "#/components/responses/RateLimited"
           },
           "428": {
-            "description": "Current version required for role mutations/profile mode updates."
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         },
         "requestBody": {
@@ -2098,6 +2120,12 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
               }
             },
             "content": {
@@ -2118,7 +2146,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Duplicate name/login, stale version or idempotency payload conflict."
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2130,7 +2166,15 @@
             "$ref": "#/components/responses/RateLimited"
           },
           "428": {
-            "description": "Current version required for role mutations/profile mode updates."
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         },
         "requestBody": {
@@ -2233,7 +2277,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Duplicate name/login, stale version or idempotency payload conflict."
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2245,7 +2297,15 @@
             "$ref": "#/components/responses/RateLimited"
           },
           "428": {
-            "description": "Current version required for role mutations/profile mode updates."
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         }
       }
@@ -2425,6 +2485,12 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
               }
             },
             "content": {
@@ -2445,7 +2511,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Duplicate name/login, stale version or idempotency payload conflict."
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2457,7 +2531,15 @@
             "$ref": "#/components/responses/RateLimited"
           },
           "428": {
-            "description": "Current version required for role mutations/profile mode updates."
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         },
         "requestBody": {
@@ -2668,7 +2750,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Duplicate name/login, stale version or idempotency payload conflict."
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2680,7 +2770,15 @@
             "$ref": "#/components/responses/RateLimited"
           },
           "428": {
-            "description": "Current version required for role mutations/profile mode updates."
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "200": {
             "description": "Atomic editor operation completed.",
@@ -2689,6 +2787,12 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
               }
             },
             "content": {
@@ -2807,7 +2911,15 @@
             "$ref": "#/components/responses/NotFound"
           },
           "409": {
-            "description": "Duplicate name/login, stale version or idempotency payload conflict."
+            "description": "Duplicate name/login, stale version or idempotency payload conflict.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           },
           "419": {
             "$ref": "#/components/responses/CsrfMismatch"
@@ -2819,7 +2931,15 @@
             "$ref": "#/components/responses/RateLimited"
           },
           "428": {
-            "description": "Current version required for role mutations/profile mode updates."
+            "description": "Current version required for role mutations/profile mode updates.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
           }
         }
       }

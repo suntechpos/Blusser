@@ -74,7 +74,7 @@ final class AccessDemo extends Command
                         throw new \RuntimeException;
                     }
 
-continue;
+                    continue;
                 }
                 $temporary = Str::random(40);
                 $body = ['profile' => ['first' => 'Demo', 'last' => $name, 'position' => $name, 'phone' => '+998900001122', 'hired' => date('Y-m-d'), 'duration' => 30], 'active' => true, 'access' => true, 'login' => $login, 'name' => 'Demo '.$name, 'branch_id' => $branch, 'branch_ids' => [$branch], 'role_id' => $rid, 'password_hash' => Hash::make($temporary)];
