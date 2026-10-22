@@ -24,6 +24,7 @@ import {
   type PatientDraft,
   type BookingDraft,
 } from "../../mocks/reception";
+import { canReception } from "../../services/receptionAccess";
 const props = defineProps<{
   patients: ReceptionPatient[];
   appointments: ReceptionAppointment[];
@@ -33,7 +34,7 @@ const emit = defineEmits<{
   close: [];
   save: [patient: ReceptionPatient | PatientDraft, draft: BookingDraft];
 }>();
-const mode = ref("new"),
+const mode = ref(canReception("patient") ? "new" : "existing"),
   patient = ref<ReceptionPatient | null>(null),
   person = ref(blankPatient()),
   draft = ref({ ...blankBooking(), ...props.preset }),
@@ -82,6 +83,11 @@ function dateMode(next: string) {
     draft.value.date = addDays(localDate(), next === "tomorrow" ? 1 : 0);
 }
 function save() {
+  if (
+    !canReception("book") ||
+    (mode.value === "new" && !canReception("patient"))
+  )
+    return;
   errors.value = {
     ...validateBooking(draft.value, props.appointments),
     ...(mode.value === "new"
@@ -124,6 +130,8 @@ const summary = computed(
           type="button"
           :aria-pressed="mode === 'new'"
           :class="{ active: mode === 'new' }"
+          data-permission="patients.create"
+          :disabled="!canReception('patient')"
           @click="mode = 'new'"
         >
           Yangi bemor</button
@@ -288,6 +296,10 @@ const summary = computed(
         class="rp-button rp-primary"
         type="submit"
         form="reception-booking"
+        data-permission="appointments.create"
+        :disabled="
+          !canReception('book') || (mode === 'new' && !canReception('patient'))
+        "
       >
         <CalendarDays :size="19" /> Qabulga yozish
       </button></template

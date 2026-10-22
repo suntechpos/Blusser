@@ -17,6 +17,7 @@ import {
   type ReceptionAppointment,
   type PatientDraft,
 } from "../../mocks/reception";
+import { canReception } from "../../services/receptionAccess";
 const props = defineProps<{
   patients: ReceptionPatient[];
   appointments: ReceptionAppointment[];
@@ -76,12 +77,15 @@ async function lookup(q: string) {
   return searchPatients(props.patients, q);
 }
 function create() {
+  if (!canReception("patient")) return;
   errors.value = validatePatient(person.value);
   if (Object.keys(errors.value).length) return;
   selected.value = props.createPatient({ ...person.value });
   creating.value = false;
 }
 function arrive() {
+  if (!canReception(todayAppointments.value.length ? "checkIn" : "walkIn"))
+    return;
   errors.value = {};
   if (!selected.value) {
     errors.value.patient = "Bemorni tanlang.";
@@ -122,6 +126,8 @@ function arrive() {
         ><ReceptionPatientSearch v-model="selected" :lookup="lookup" /><button
           v-if="!selected"
           class="rp-link"
+          data-permission="patients.create"
+          :disabled="!canReception('patient')"
           @click="creating = true"
         >
           + Yangi bemor qo‘shish
@@ -212,9 +218,25 @@ function arrive() {
     </div>
     <template #footer
       ><button class="rp-button" @click="emit('close')">Bekor qilish</button
-      ><button v-if="creating" class="rp-button rp-primary" @click="create">
+      ><button
+        v-if="creating"
+        class="rp-button rp-primary"
+        data-permission="patients.create"
+        :disabled="!canReception('patient')"
+        @click="create"
+      >
         Bemorni qo‘shish (lokal)</button
-      ><button v-else class="rp-button rp-primary" @click="arrive">
+      ><button
+        v-else
+        class="rp-button rp-primary"
+        :data-permission="
+          todayAppointments.length ? 'appointments.check_in' : 'visits.create'
+        "
+        :disabled="
+          !canReception(todayAppointments.length ? 'checkIn' : 'walkIn')
+        "
+        @click="arrive"
+      >
         Keldi — navbatga qo‘shish
       </button></template
     ></ReceptionDialog
