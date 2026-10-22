@@ -343,12 +343,12 @@ final class QueuesApiTest extends FoundationTestCase
     {
         $a = $this->reference($this->fixture()['a']);
         $id = $this->command($a, 'walk_in', data: $this->walk($a))['ticket']['id'];
-        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]));
+        $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 3, '--force' => true]));
         $this->assertFalse(DB::selectOne("SELECT has_table_privilege(current_user,'queue_tickets','SELECT') AS ok")->ok);
         $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
         $this->queue($a, 'call', $id, ['expected_version' => 1]);
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 2, '--force' => true]);
+            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 3, '--force' => true]);
             $this->fail();
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('forward migration', $e->getMessage());

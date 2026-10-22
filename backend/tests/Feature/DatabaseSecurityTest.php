@@ -31,7 +31,7 @@ final class DatabaseSecurityTest extends FoundationTestCase
     {
         $tables = DB::select("SELECT relname FROM pg_class WHERE relnamespace='public'::regnamespace AND relrowsecurity AND relforcerowsecurity");
         $names = array_column($tables, 'relname');
-        foreach (['users', 'tenants', 'branches', 'tenant_roles', 'role_permissions', 'tenant_memberships', 'membership_branches', 'services', 'membership_link_requests', 'membership_link_request_branches', 'audit_logs', 'tenant_ceos', 'ceo_recovery_requests', 'patients', 'patient_branches', 'patient_counters', 'patient_idempotency', 'patient_grant_provenance', 'specialties', 'doctor_profiles', 'doctor_services', 'doctor_branches', 'rooms', 'schedule_rules', 'schedule_breaks', 'schedule_exceptions', 'schedule_exception_breaks', 'scheduling_idempotency', 'scheduling_changes', 'appointments', 'visits', 'resource_reservations', 'queue_tickets', 'queue_counters', 'operation_events', 'operation_idempotency'] as $table) {
+        foreach (['users', 'tenants', 'branches', 'tenant_roles', 'role_permissions', 'tenant_memberships', 'membership_branches', 'services', 'membership_link_requests', 'membership_link_request_branches', 'audit_logs', 'tenant_ceos', 'ceo_recovery_requests', 'patients', 'patient_branches', 'patient_counters', 'patient_idempotency', 'patient_grant_provenance', 'specialties', 'doctor_profiles', 'doctor_services', 'doctor_branches', 'rooms', 'schedule_rules', 'schedule_breaks', 'schedule_exceptions', 'schedule_exception_breaks', 'scheduling_idempotency', 'scheduling_changes', 'appointments', 'visits', 'resource_reservations', 'queue_tickets', 'queue_counters', 'operation_events', 'operation_idempotency', 'employee_profiles', 'access_editor_intents'] as $table) {
             $this->assertContains($table, $names);
         }
         $functions = DB::select("SELECT p.proname, p.prosecdef, p.proconfig, r.rolname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_roles r ON r.oid=p.proowner WHERE n.nspname IN ('public','governance') AND p.prosecdef");
@@ -46,7 +46,7 @@ final class DatabaseSecurityTest extends FoundationTestCase
     public function test_missing_context_exposes_no_tenant_data_or_users(): void
     {
         $this->fixture();
-        foreach (['tenants', 'branches', 'tenant_roles', 'role_permissions', 'tenant_memberships', 'membership_branches', 'services', 'audit_logs'] as $table) {
+        foreach (['tenants', 'branches', 'tenant_roles', 'role_permissions', 'tenant_memberships', 'membership_branches', 'services', 'audit_logs', 'employee_profiles'] as $table) {
             $this->assertSame(0, DB::table($table)->count(), $table);
         }
         $this->assertSame(0, DB::table('users')->select('id')->count());

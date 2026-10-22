@@ -1,3 +1,5 @@
+> Historical UI design notes. Runtime persistence/auth now follow [Access control integration](access-control-integration.md); local demo storage descriptions below no longer describe Settings/Employees.
+
 # Sozlamalar → Rollar va ruxsatlar
 
 Frontend lokal namuna rejimi. Header, sidebar, login/logout, Patients API va server sessiya grantlari o‘zgartirilmagan. Sozlamalar uchun mavjud shell ichida `#sozlamalar` navigatsiyasi qo‘shildi. Umumiy va To‘lovlar tablari faqat “Tez orada” holatini ko‘rsatadi.

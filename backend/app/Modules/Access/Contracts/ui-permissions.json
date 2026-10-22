@@ -1,0 +1,920 @@
+[
+  {
+    "code": "cashier.view",
+    "label": "Kassani ko‘rish",
+    "section": "cashier",
+    "section_label": "Kassa",
+    "view": "cashier.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "cashier.shift",
+    "label": "Smena ochish va yopish",
+    "section": "cashier",
+    "section_label": "Kassa",
+    "view": "cashier.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "cashier.pay",
+    "label": "To‘lov qabul qilish",
+    "section": "cashier",
+    "section_label": "Kassa",
+    "view": "cashier.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "cashier.history",
+    "label": "To‘lovlar tarixini ko‘rish",
+    "section": "cashier",
+    "section_label": "Kassa",
+    "view": "cashier.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "cashier.discount",
+    "label": "Chegirma berish",
+    "section": "cashier",
+    "section_label": "Kassa",
+    "view": "cashier.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "cashier.refund",
+    "label": "Pul qaytarish",
+    "section": "cashier",
+    "section_label": "Kassa",
+    "view": "cashier.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "dashboard.view",
+    "label": "Bosh sahifani ko‘rish",
+    "section": "dashboard",
+    "section_label": "Bosh sahifa",
+    "view": "dashboard.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "reception.view",
+    "label": "Registraturani ko‘rish",
+    "section": "reception",
+    "section_label": "Registratura",
+    "view": "reception.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "patients.view",
+    "label": "Bemorlarni ko‘rish",
+    "section": "patients",
+    "section_label": "Bemorlar",
+    "view": "patients.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "patients.create",
+    "label": "Bemor qo‘shish",
+    "section": "patients",
+    "section_label": "Bemorlar",
+    "view": "patients.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "patients.update",
+    "label": "Bemorni tahrirlash",
+    "section": "patients",
+    "section_label": "Bemorlar",
+    "view": "patients.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "patients.archive",
+    "label": "Arxivlash",
+    "section": "patients",
+    "section_label": "Bemorlar",
+    "view": "patients.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "patients.restore",
+    "label": "Arxivdan tiklash",
+    "section": "patients",
+    "section_label": "Bemorlar",
+    "view": "patients.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "patients.export",
+    "label": "Bemorlar eksporti",
+    "section": "patients",
+    "section_label": "Bemorlar",
+    "view": "patients.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "appointments.view",
+    "label": "Qabullarni ko‘rish",
+    "section": "appointments",
+    "section_label": "Qabullar",
+    "view": "appointments.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "appointments.create",
+    "label": "Qabul yaratish",
+    "section": "appointments",
+    "section_label": "Qabullar",
+    "view": "appointments.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "appointments.update",
+    "label": "Qabulni tahrirlash va holatini o‘zgartirish",
+    "section": "appointments",
+    "section_label": "Qabullar",
+    "view": "appointments.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "appointments.export",
+    "label": "Qabullar eksporti",
+    "section": "appointments",
+    "section_label": "Qabullar",
+    "view": "appointments.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "appointments.check_in",
+    "label": "Kelganini belgilash",
+    "section": "appointments",
+    "section_label": "Qabullar",
+    "view": "appointments.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "appointments.cancel",
+    "label": "Qabulni bekor qilish",
+    "section": "appointments",
+    "section_label": "Qabullar",
+    "view": "appointments.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "appointments.no_show",
+    "label": "Kelmaganini belgilash",
+    "section": "appointments",
+    "section_label": "Qabullar",
+    "view": "appointments.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.view",
+    "label": "Navbatlarni ko‘rish",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.call",
+    "label": "Chaqirish",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.start",
+    "label": "Qabulni boshlash",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "display.view",
+    "label": "Tablolarni ko‘rish",
+    "section": "display",
+    "section_label": "Tablo boshqaruvi",
+    "view": "display.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "display.create",
+    "label": "Ekran qo‘shish",
+    "section": "display",
+    "section_label": "Tablo boshqaruvi",
+    "view": "display.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "display.update",
+    "label": "Ekranni sozlash",
+    "section": "display",
+    "section_label": "Tablo boshqaruvi",
+    "view": "display.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "display.delete",
+    "label": "Ekranni o‘chirish",
+    "section": "display",
+    "section_label": "Tablo boshqaruvi",
+    "view": "display.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "display.preview",
+    "label": "TV ko‘rinishini ochish",
+    "section": "display",
+    "section_label": "Tablo boshqaruvi",
+    "view": "display.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "workspace.view",
+    "label": "Shifokor kabinetini ko‘rish",
+    "section": "workspace",
+    "section_label": "Shifokor kabineti",
+    "view": "workspace.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "workspace.consult",
+    "label": "Ko‘rik ma’lumotlarini saqlash",
+    "section": "workspace",
+    "section_label": "Shifokor kabineti",
+    "view": "workspace.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "workspace.prescribe",
+    "label": "Retsept yozish",
+    "section": "workspace",
+    "section_label": "Shifokor kabineti",
+    "view": "workspace.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "workspace.refer",
+    "label": "Yo‘llanma berish",
+    "section": "workspace",
+    "section_label": "Shifokor kabineti",
+    "view": "workspace.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "workspace.upload",
+    "label": "Fayl biriktirish",
+    "section": "workspace",
+    "section_label": "Shifokor kabineti",
+    "view": "workspace.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "workspace.complete",
+    "label": "Qabulni yakunlash",
+    "section": "workspace",
+    "section_label": "Shifokor kabineti",
+    "view": "workspace.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "workspace.export",
+    "label": "Natijani PDF / chop etish",
+    "section": "workspace",
+    "section_label": "Shifokor kabineti",
+    "view": "workspace.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.view",
+    "label": "Laboratoriyani ko‘rish",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.sample",
+    "label": "Namuna olish",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.start",
+    "label": "Tahlilni boshlash",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.result",
+    "label": "Natija kiritish",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.review",
+    "label": "Tekshirishga yuborish",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.return",
+    "label": "Qayta ishlashga qaytarish",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.confirm",
+    "label": "Natijani tasdiqlash",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.amend",
+    "label": "Tuzatish kiritish",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "laboratory.export",
+    "label": "PDF / chop etish",
+    "section": "laboratory",
+    "section_label": "Laboratoriya",
+    "view": "laboratory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "diagnostics.view",
+    "label": "Diagnostikani ko‘rish",
+    "section": "diagnostics",
+    "section_label": "UZI va Diagnostika",
+    "view": "diagnostics.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "diagnostics.start",
+    "label": "Tekshiruvni boshlash",
+    "section": "diagnostics",
+    "section_label": "UZI va Diagnostika",
+    "view": "diagnostics.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "diagnostics.result",
+    "label": "Natija va fayllar kiritish",
+    "section": "diagnostics",
+    "section_label": "UZI va Diagnostika",
+    "view": "diagnostics.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "diagnostics.confirm",
+    "label": "Natijani tasdiqlash",
+    "section": "diagnostics",
+    "section_label": "UZI va Diagnostika",
+    "view": "diagnostics.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "diagnostics.amend",
+    "label": "Tuzatish kiritish",
+    "section": "diagnostics",
+    "section_label": "UZI va Diagnostika",
+    "view": "diagnostics.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "diagnostics.export",
+    "label": "PDF / chop etish",
+    "section": "diagnostics",
+    "section_label": "UZI va Diagnostika",
+    "view": "diagnostics.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "services.view",
+    "label": "Xizmatlarni ko‘rish",
+    "section": "services",
+    "section_label": "Xizmatlar",
+    "view": "services.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "services.create",
+    "label": "Xizmat qo‘shish",
+    "section": "services",
+    "section_label": "Xizmatlar",
+    "view": "services.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "services.update",
+    "label": "Xizmatni tahrirlash",
+    "section": "services",
+    "section_label": "Xizmatlar",
+    "view": "services.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "services.delete",
+    "label": "Xizmatni faolsizlantirish / faollashtirish",
+    "section": "services",
+    "section_label": "Xizmatlar",
+    "view": "services.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "categories.view",
+    "label": "Kategoriyalarni ko‘rish",
+    "section": "categories",
+    "section_label": "Xizmat kategoriyalari",
+    "view": "categories.view",
+    "parent": "services.view",
+    "ui_only": true
+  },
+  {
+    "code": "categories.create",
+    "label": "Kategoriya qo‘shish",
+    "section": "categories",
+    "section_label": "Xizmat kategoriyalari",
+    "view": "categories.view",
+    "parent": "services.view",
+    "ui_only": true
+  },
+  {
+    "code": "categories.update",
+    "label": "Kategoriyani tahrirlash",
+    "section": "categories",
+    "section_label": "Xizmat kategoriyalari",
+    "view": "categories.view",
+    "parent": "services.view",
+    "ui_only": true
+  },
+  {
+    "code": "categories.status",
+    "label": "Kategoriya holatini o‘zgartirish",
+    "section": "categories",
+    "section_label": "Xizmat kategoriyalari",
+    "view": "categories.view",
+    "parent": "services.view",
+    "ui_only": true
+  },
+  {
+    "code": "categories.export",
+    "label": "Xizmatlar CSV eksporti",
+    "section": "categories",
+    "section_label": "Xizmat kategoriyalari",
+    "view": "categories.view",
+    "parent": "services.view",
+    "ui_only": true
+  },
+  {
+    "code": "finance.view",
+    "label": "Moliya sahifasini ko‘rish",
+    "section": "finance",
+    "section_label": "Moliya",
+    "view": "finance.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "inventory.view",
+    "label": "Ombor sahifasini ko‘rish",
+    "section": "inventory",
+    "section_label": "Ombor",
+    "view": "inventory.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "employees.view",
+    "label": "Xodimlarni ko‘rish",
+    "section": "employees",
+    "section_label": "Xodimlar",
+    "view": "employees.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "employees.create",
+    "label": "Xodim qo‘shish",
+    "section": "employees",
+    "section_label": "Xodimlar",
+    "view": "employees.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "employees.update",
+    "label": "Xodimni tahrirlash",
+    "section": "employees",
+    "section_label": "Xodimlar",
+    "view": "employees.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "employees.assign_role",
+    "label": "Ruxsat rolini biriktirish",
+    "section": "employees",
+    "section_label": "Xodimlar",
+    "view": "employees.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "employee_schedule.view",
+    "label": "Ish jadvalini ko‘rish",
+    "section": "employee_schedule",
+    "section_label": "Xodim ish jadvali",
+    "view": "employee_schedule.view",
+    "parent": "employees.view",
+    "ui_only": true
+  },
+  {
+    "code": "employee_schedule.update",
+    "label": "Jadval va istisnolarni boshqarish",
+    "section": "employee_schedule",
+    "section_label": "Xodim ish jadvali",
+    "view": "employee_schedule.view",
+    "parent": "employees.view",
+    "ui_only": true
+  },
+  {
+    "code": "branches.view",
+    "label": "Filiallar sahifasini ko‘rish",
+    "section": "branches",
+    "section_label": "Filiallar",
+    "view": "branches.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "rooms.view",
+    "label": "Xonalarni ko‘rish",
+    "section": "rooms",
+    "section_label": "Bo‘limlar va Xonalar",
+    "view": "rooms.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "rooms.create",
+    "label": "Xona qo‘shish",
+    "section": "rooms",
+    "section_label": "Bo‘limlar va Xonalar",
+    "view": "rooms.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "rooms.update",
+    "label": "Xonani tahrirlash",
+    "section": "rooms",
+    "section_label": "Bo‘limlar va Xonalar",
+    "view": "rooms.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "departments.view",
+    "label": "Bo‘limlarni ko‘rish",
+    "section": "departments",
+    "section_label": "Bo‘limlar boshqaruvi",
+    "view": "departments.view",
+    "parent": "rooms.view",
+    "ui_only": true
+  },
+  {
+    "code": "departments.create",
+    "label": "Bo‘lim qo‘shish",
+    "section": "departments",
+    "section_label": "Bo‘limlar boshqaruvi",
+    "view": "departments.view",
+    "parent": "rooms.view",
+    "ui_only": true
+  },
+  {
+    "code": "departments.update",
+    "label": "Bo‘limni tahrirlash",
+    "section": "departments",
+    "section_label": "Bo‘limlar boshqaruvi",
+    "view": "departments.view",
+    "parent": "rooms.view",
+    "ui_only": true
+  },
+  {
+    "code": "departments.status",
+    "label": "Bo‘lim / xona holatini o‘zgartirish",
+    "section": "departments",
+    "section_label": "Bo‘limlar boshqaruvi",
+    "view": "departments.view",
+    "parent": "rooms.view",
+    "ui_only": true
+  },
+  {
+    "code": "reports.view",
+    "label": "Hisobotlar sahifasini ko‘rish",
+    "section": "reports",
+    "section_label": "Hisobotlar",
+    "view": "reports.view",
+    "parent": null,
+    "ui_only": true
+  },
+  {
+    "code": "roles.view",
+    "label": "Rollarni ko‘rish",
+    "section": "roles",
+    "section_label": "Sozlamalar — rollar",
+    "view": "roles.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "roles.create",
+    "label": "Rol qo‘shish",
+    "section": "roles",
+    "section_label": "Sozlamalar — rollar",
+    "view": "roles.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "roles.update",
+    "label": "Rolni tahrirlash",
+    "section": "roles",
+    "section_label": "Sozlamalar — rollar",
+    "view": "roles.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "roles.delete",
+    "label": "Rolni o‘chirish",
+    "section": "roles",
+    "section_label": "Sozlamalar — rollar",
+    "view": "roles.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "roles.manage_permissions",
+    "label": "Ruxsatlarni boshqarish",
+    "section": "roles",
+    "section_label": "Sozlamalar — rollar",
+    "view": "roles.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "employees.delete",
+    "label": "Kirishni faolsizlantirish",
+    "section": "employees",
+    "section_label": "Xodimlar",
+    "view": "employees.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "employees.assign_branches",
+    "label": "Filiallarni biriktirish",
+    "section": "employees",
+    "section_label": "Xodimlar",
+    "view": "employees.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "employees.lookup_identity",
+    "label": "Mavjud hisobni tekshirish",
+    "section": "employees",
+    "section_label": "Xodimlar",
+    "view": "employees.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "employees.reset_password",
+    "label": "Vaqtinchalik parolni almashtirish",
+    "section": "employees",
+    "section_label": "Xodimlar",
+    "view": "employees.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "audit.view",
+    "label": "Audit jurnalini ko‘rish",
+    "section": "audit",
+    "section_label": "Audit jurnali",
+    "view": "audit.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "patients.link_branch",
+    "label": "Bemorni filialga bog‘lash",
+    "section": "patients",
+    "section_label": "Bemorlar",
+    "view": "patients.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "doctors.view",
+    "label": "Shifokor profillarini ko‘rish",
+    "section": "doctors",
+    "section_label": "Shifokor profillari",
+    "view": "doctors.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "doctors.create",
+    "label": "Shifokor profili yaratish",
+    "section": "doctors",
+    "section_label": "Shifokor profillari",
+    "view": "doctors.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "doctors.update",
+    "label": "Shifokor profilini tahrirlash",
+    "section": "doctors",
+    "section_label": "Shifokor profillari",
+    "view": "doctors.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "schedules.view",
+    "label": "Qabul jadvallarini ko‘rish",
+    "section": "schedules",
+    "section_label": "Qabul jadvallari",
+    "view": "schedules.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "schedules.create",
+    "label": "Qabul jadvali yaratish",
+    "section": "schedules",
+    "section_label": "Qabul jadvallari",
+    "view": "schedules.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "schedules.update",
+    "label": "Qabul jadvalini tahrirlash",
+    "section": "schedules",
+    "section_label": "Qabul jadvallari",
+    "view": "schedules.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "visits.view",
+    "label": "Tashriflarni ko‘rish",
+    "section": "visits",
+    "section_label": "Tashriflar",
+    "view": "visits.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "visits.create",
+    "label": "Tashrif yaratish",
+    "section": "visits",
+    "section_label": "Tashriflar",
+    "view": "visits.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.create",
+    "label": "Navbat chiptasi yaratish",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.recall",
+    "label": "Qayta chaqirish",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.complete",
+    "label": "Navbatni yakunlash",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.skip",
+    "label": "Navbatni o‘tkazib yuborish",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.requeue",
+    "label": "Navbatga qaytarish",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  },
+  {
+    "code": "queues.cancel",
+    "label": "Navbatni bekor qilish",
+    "section": "queues",
+    "section_label": "Navbatlar",
+    "view": "queues.view",
+    "parent": null,
+    "ui_only": false
+  }
+]

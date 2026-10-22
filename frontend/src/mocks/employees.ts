@@ -77,6 +77,9 @@ export interface Employee {
   role: string;
   /** Stable local demo role ID; legacy role label is retained for migration. */
   roleId?: string;
+  version?: number;
+  membershipId?: string | null;
+  branchIds?: string[];
   specialty: string;
   duration: number;
   note: string;

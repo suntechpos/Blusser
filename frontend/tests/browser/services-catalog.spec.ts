@@ -48,7 +48,7 @@ test("three reference screenshots and catalog counts; shared shell; no API opera
   await page.keyboard.press("Escape");
   expect(
     requests.filter(
-      (r) => r.path.includes("/clinic/") && !r.path.includes("/context"),
+      (r) => r.path.includes("/clinic/") && !r.path.includes("/context") && !r.path.includes("/branches"),
     ),
   ).toEqual([]);
 });

@@ -41,14 +41,15 @@ final class ClinicController
             if ($role !== null) {
                 $query->where('id', $role);
             }
-            $rows = $query->select('id', 'code', 'name', 'active', 'protected')->orderBy('id')->offset($offset)->limit(50)->get();
+            $rows = $query->select('id', 'code', 'name', 'active', 'protected', 'note', 'version')->orderBy('id')->offset($offset)->limit(50)->get();
             foreach ($rows as $row) {
+                $row->employee_count = (int) DB::selectOne('SELECT governance.role_assignments(?) AS total', [$row->id])->total;
                 $row->grants = DB::table('role_permissions as rp')->join('permissions as p', 'p.id', '=', 'rp.permission_id')->where('rp.tenant_id', $this->currentTenant())->where('rp.role_id', $row->id)->select('p.code', 'rp.scope')->orderBy('p.code')->get();
             }
             if ($role !== null) {
                 abort_if($rows->isEmpty(), 404);
 
-                return response()->json($rows->first());
+                return response()->json($rows->first())->header('ETag', '"'.$rows->first()->version.'"');
             }
 
             return response()->json(['data' => $rows]);
@@ -60,7 +61,15 @@ final class ClinicController
         return $this->context($request, function () {
             app(Permissions::class)->requireEntireClinic('roles.view');
             $rows = DB::table('permissions')->select('code', 'allowed_scopes')->orderBy('code')->get();
+            $labels = collect(json_decode(file_get_contents(app_path('Modules/Access/Contracts/ui-permissions.json')), true, flags: JSON_THROW_ON_ERROR))->keyBy('code');
             foreach ($rows as $row) {
+                $meta = $labels->get($row->code);
+                $row->label = $meta['label'] ?? $row->code;
+                $row->section = $meta['section'] ?? explode('.', $row->code)[0];
+                $row->section_label = $meta['section_label'] ?? $row->section;
+                $row->view = $meta['view'] ?? ($row->section.'.view');
+                $row->parent = $meta['parent'] ?? null;
+                $row->ui_only = $meta['ui_only'] ?? false;
                 $row->allowed_scopes = explode(',', trim($row->allowed_scopes, '{}'));
             }
 
@@ -70,20 +79,19 @@ final class ClinicController
 
     public function saveRole(Request $request, ?string $role = null)
     {
-        $data = $request->validate(['code' => 'required|string|max:64', 'name' => 'required|string|max:255', 'grants' => 'present|array|max:100', 'grants.*.code' => 'required|string|max:100|distinct', 'grants.*.scope' => 'required|in:own,assigned_branches,entire_clinic']);
-
-        return response()->json(['id' => $this->clinic->saveRole($request->user(), $this->tenant($request), $role, $data['code'], $data['name'], $data['grants'])], $role === null ? 201 : 200);
+        return app(AccessEditor::class)->role($request, $role);
     }
 
     public function deleteRole(Request $request, string $role)
     {
-        $this->clinic->deleteRole($request->user(), $this->tenant($request), $role);
-
-        return response()->noContent();
+        return app(AccessEditor::class)->role($request, $role, true);
     }
 
     public function employees(Request $request, ?string $employee = null)
     {
+        if ($request->query('format') === 'profile') {
+            return app(AccessEditor::class)->employees($request, $employee);
+        }
         if ($employee !== null) {
             Governance::uuid($employee);
         }
@@ -99,6 +107,9 @@ final class ClinicController
 
     public function createEmployee(Request $request)
     {
+        if ($request->has('profile')) {
+            return app(AccessEditor::class)->saveEmployee($request);
+        }
         $data = $request->validate(['login' => 'required|string|max:64', 'name' => 'required|string|max:255', 'temporary_password' => 'required|string|min:12|max:128', 'role_id' => 'required|uuid', 'branch_ids' => 'sometimes|array|max:100', 'branch_ids.*' => 'required|uuid|distinct']);
 
         return response()->json(['id' => $this->clinic->createEmployee($request->user(), $this->tenant($request), $data['login'], $data['name'], $data['temporary_password'], $data['role_id'], $data['branch_ids'] ?? [])], 201);
@@ -106,6 +117,9 @@ final class ClinicController
 
     public function assignEmployee(Request $request, string $employee)
     {
+        if ($request->has('profile')) {
+            return app(AccessEditor::class)->saveEmployee($request, $employee);
+        }
         $data = $request->validate(['role_id' => 'sometimes|required|uuid', 'branch_ids' => 'sometimes|required|array|max:100', 'branch_ids.*' => 'required|uuid|distinct', 'active' => 'sometimes|required|boolean']);
         abort_if($data === [], 422, 'No changes supplied.');
         $this->clinic->assignEmployee($request->user(), $this->tenant($request), $employee, $data['role_id'] ?? null, $data['branch_ids'] ?? null, $data['active'] ?? null);
@@ -139,6 +153,9 @@ final class ClinicController
 
     public function requestLink(Request $request)
     {
+        if ($request->has('employee_id')) {
+            return app(AccessEditor::class)->linkEmployee($request);
+        }
         $data = $request->validate(['login' => 'required|string|max:64', 'role_id' => 'required|uuid', 'branch_ids' => 'sometimes|array|max:100', 'branch_ids.*' => 'required|uuid|distinct']);
         $this->limit($request, 'link');
 

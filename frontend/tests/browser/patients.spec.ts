@@ -489,7 +489,7 @@ test.describe.serial("real Sanctum / PostgreSQL Patients flows", () => {
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.locator("tbody tr")).toHaveCount(0);
-    await expect(page.getByRole("alert")).toContainText("ruxsat yo‘q");
+    await expect(page.getByRole("heading", { name: "403 — Ruxsat yo‘q", exact: true })).toBeVisible();
   });
   test("logout cannot be undone by a delayed auth response", async ({
     page,
@@ -555,8 +555,7 @@ test.describe.serial("real Sanctum / PostgreSQL Patients flows", () => {
         .filter({ hasText: "Server bilan bog‘lanib bo‘lmadi" }),
     ).toBeVisible();
     await expect(page.locator("tbody tr")).toHaveCount(0);
-    await expect(page.locator(".patients")).not.toContainText(
-      "Synthetic concurrent writer",
-    );
+    await expect(page.locator(".patients")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText("Synthetic concurrent writer");
   });
 });

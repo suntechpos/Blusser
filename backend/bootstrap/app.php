@@ -3,6 +3,7 @@
 use App\Http\Middleware\FirstPartySession;
 use App\Http\Middleware\FullIdentity;
 use App\Http\Middleware\NoStore;
+use App\Modules\Access\Console\AccessDemo;
 use App\Modules\Access\Services\GovernanceDenied;
 use App\Modules\Patients\Console\BackfillCeoPermissions;
 use App\Modules\Platform\Console\CreatePlatformOperator;
@@ -18,7 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         api: __DIR__.'/../routes/api.php',
     )
-    ->withCommands([CreatePlatformOperator::class, BackfillCeoPermissions::class])
+    ->withCommands([AccessDemo::class, CreatePlatformOperator::class, BackfillCeoPermissions::class])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
         $middleware->trimStrings(except: ['password', 'password_confirmation', 'current_password', 'temporary_password', 'token']);
@@ -32,7 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->dontFlash(['password', 'password_confirmation', 'current_password', 'temporary_password', 'token']);
         $exceptions->render(function (GovernanceDenied $exception, Request $request) {
             $status = match ($exception->reason) {
-                'credentials' => 401, 'rate_limited' => 429, 'conflict' => 409, 'not_found' => 404, 'invalid_input' => 422, default => 403
+                'precondition' => 428, 'credentials' => 401, 'rate_limited' => 429, 'conflict' => 409, 'not_found' => 404, 'invalid_input' => 422, default => 403
             };
 
             return response()->json(['message' => 'Operation not authorized or unavailable.'], $status);
