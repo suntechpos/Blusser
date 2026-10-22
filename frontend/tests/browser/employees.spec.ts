@@ -129,3 +129,74 @@ test("explicit access branch selection sends only the chosen authorized assignme
   )!;
   expect(patch.body.branch_ids).toEqual(["branch-a"]);
 });
+
+test("employee page combinations persist and cashier PIN stays blank on reopen", async ({
+  page,
+}) => {
+  const s = await editorSession(page);
+  await page.getByRole("button", { name: "Xodimlar", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Xodim qo‘shish", exact: true })
+    .click();
+  await page.getByLabel("Familiya *", { exact: true }).fill("MultiPage");
+  await page.getByLabel("Ism *", { exact: true }).fill("Worker");
+  await page.getByLabel("Telefon *", { exact: true }).fill("+998 90 123 45 67");
+  await page
+    .getByRole("switch", { name: "Tizimga kirishga ruxsat berish" })
+    .click();
+  for (const label of [
+    "Registratura",
+    "Kassa",
+    "UZI va Diagnostika",
+    "Shifokor kabineti",
+    "Navbatlar",
+    "Tablo boshqaruvi",
+  ])
+    await page
+      .getByRole("checkbox", { name: "Bo‘lim: " + label, exact: true })
+      .check();
+  await expect(
+    page.getByLabel("Kassa PIN-kodi", { exact: true }),
+  ).toHaveAttribute("type", "password");
+  await page.getByLabel("Kassa PIN-kodi", { exact: true }).fill("1122");
+  await page.getByLabel("PIN-kodni tasdiqlash", { exact: true }).fill("1122");
+  await page.getByRole("button", { name: "Saqlash", exact: true }).click();
+  await expect(page.getByLabel("Xodimlarni qidirish")).toBeVisible();
+  const req = s.requests.find(
+    (r) => r.method === "POST" && r.path.endsWith("/employees"),
+  )!;
+  expect(
+    req.body.page_grants.map((g: { code: string }) => g.code).sort(),
+  ).toEqual(
+    [
+      "reception.view",
+      "cashier.view",
+      "diagnostics.view",
+      "workspace.view",
+      "queues.view",
+      "display.view",
+    ].sort(),
+  );
+  expect(req.body.cashier_pin).toBe("1122");
+  expect(req.body.access).toBe(false);
+  await page.reload();
+  await page.getByLabel("Xodimlarni qidirish").fill("MultiPage");
+  await page
+    .getByRole("row", { name: "Worker MultiPage profilini ochish" })
+    .click();
+  await page.getByRole("button", { name: "Tahrirlash", exact: true }).click();
+  await expect(page.getByLabel("Kassa PIN-kodi", { exact: true })).toHaveValue(
+    "",
+  );
+  await expect(
+    page.getByRole("checkbox", { name: "Bo‘lim: Kassa", exact: true }),
+  ).toBeChecked();
+  await page.getByRole("button", { name: "Saqlash", exact: true }).click();
+  await expect(page.getByLabel("Xodimlarni qidirish")).toBeVisible();
+  expect(s.requests.find((r) => r.method === "PATCH")!.body).not.toHaveProperty(
+    "cashier_pin",
+  );
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
+    "1122",
+  );
+});

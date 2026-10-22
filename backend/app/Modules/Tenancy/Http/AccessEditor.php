@@ -78,6 +78,8 @@ final class AccessEditor
     public function saveEmployee(Request $r, ?string $id = null)
     {
         $data = $r->validate(['active' => 'required|boolean', 'access' => 'required|boolean', 'login' => 'nullable|string|max:64', 'role_id' => 'nullable|uuid', 'branch_id' => 'required|uuid', 'branch_ids' => ($id ? 'sometimes' : 'present').'|array|max:100', 'branch_ids.*' => 'required|uuid|distinct', 'temporary_password' => 'nullable|string|min:12|max:128',
+            'page_grants' => 'sometimes|array|max:100', 'page_grants.*' => 'array:code,scope', 'page_grants.*.code' => 'required|string|max:100|distinct', 'page_grants.*.scope' => 'required|in:own,assigned_branches,entire_clinic',
+            'cashier_pin' => ['nullable', 'string', 'regex:/\A[0-9]{4}\z/D', 'confirmed'], 'cashier_pin_confirmation' => 'nullable|string',
             'profile' => 'required|array:first,last,patronymic,phone,dob,gender,address,position,department,hired,specialty,duration,note',
             'profile.first' => 'required|string|max:120', 'profile.last' => 'required|string|max:120', 'profile.phone' => 'required|string|max:30', 'profile.position' => 'required|string|max:100', 'profile.patronymic' => 'nullable|string|max:120', 'profile.dob' => 'nullable|date|before_or_equal:today', 'profile.gender' => 'nullable|in:Erkak,Ayol', 'profile.address' => 'nullable|string|max:500', 'profile.department' => 'nullable|string|max:120', 'profile.hired' => 'nullable|date', 'profile.specialty' => 'nullable|string|max:120', 'profile.duration' => 'nullable|integer|min:5|max:480', 'profile.note' => 'nullable|string|max:2000']);
         if ($data['access']) {
@@ -87,6 +89,11 @@ final class AccessEditor
         if (isset($data['temporary_password'])) {
             $data['password_hash'] = Hash::make($data['temporary_password']);
         }unset($data['temporary_password']);
+        if (isset($data['cashier_pin'])) {
+            $data['cashier_pin_hash'] = Hash::driver('argon2id')->make($data['cashier_pin']);
+            $data['pin_fingerprint'] = hash_hmac('sha256', $data['cashier_pin'], config('app.key'));
+        }
+        unset($data['cashier_pin'], $data['cashier_pin_confirmation']);
         $data['name'] = trim($data['profile']['first'].' '.$data['profile']['last']);
         $result = json_decode(app(Governance::class)->call('staff_command', [$id ? Governance::uuid($id) : null, json_encode($data, JSON_THROW_ON_ERROR), $this->key($r, true), $this->version($r)], $r->user(), $this->tenant($r)), true, flags: JSON_THROW_ON_ERROR);
 

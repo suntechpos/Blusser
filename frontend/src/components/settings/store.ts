@@ -45,6 +45,8 @@ interface ServerEmployee {
   profile: Partial<Employee>;
   version: number;
   branch_ids: string[];
+  page_grants?: { code: string; scope: string }[] | null;
+  cashier_pin_set?: boolean;
 }
 export type EditorEmployee = Employee & {
   version?: number;
@@ -134,6 +136,8 @@ function makeStore() {
       version: r.version,
       membershipId: r.membership_id,
       branchIds: r.branch_ids,
+      pageGrants: r.page_grants,
+      cashierPinSet: r.cashier_pin_set,
     }));
   }
   async function refresh(kind: "roles" | "employees") {
@@ -195,7 +199,11 @@ function makeStore() {
       catalog.value.find((p) => p.code === code)?.allowed_scopes ?? []
     ).filter((s) => own === "entire_clinic" || s === own);
   }
-  async function saveEmployee(e: EditorEmployee, password?: string) {
+  async function saveEmployee(
+    e: EditorEmployee,
+    password?: string,
+    pin?: { value: string; confirmation: string },
+  ) {
     if (!can(e.id ? "employees.update" : "employees.create"))
       throw Error("Bu amal uchun ruxsat yo‘q.");
     const profile = Object.fromEntries(
@@ -227,6 +235,10 @@ function makeStore() {
       throw Error("Filial biriktirish uchun ruxsat yo‘q.");
     const body = {
       profile,
+      ...(e.pageGrants != null ? { page_grants: e.pageGrants } : {}),
+      ...(pin
+        ? { cashier_pin: pin.value, cashier_pin_confirmation: pin.confirmation }
+        : {}),
       active: e.active,
       access: e.access,
       login: e.access ? e.login : null,
@@ -237,14 +249,18 @@ function makeStore() {
         : {}),
       ...(password ? { temporary_password: password } : {}),
     };
-    await clinicRequest(e.id ? `employees/${e.id}` : "employees", {
-      method: e.id ? "PATCH" : "POST",
-      body,
-      etag: e.id ? `"${e.version}"` : undefined,
-    });
+    const saved = await clinicRequest<{ id: string }>(
+      e.id ? `employees/${e.id}` : "employees",
+      {
+        method: e.id ? "PATCH" : "POST",
+        body,
+        etag: e.id ? `"${e.version}"` : undefined,
+      },
+    );
     await loadEmployees();
     await loadRoles();
     await revalidateSession();
+    return saved.data.id;
   }
   return {
     state,

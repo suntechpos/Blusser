@@ -76,19 +76,30 @@ async function resetAccount() {
   }
 }
 const successNotice = ref("");
-async function linkAccount(e: Employee) {
+async function linkAccount(
+  e: Employee,
+  pin?: { value: string; confirmation: string },
+) {
   if (saving.value) return;
   saving.value = true;
   try {
+    const id = await rolesStore.saveEmployee(
+      { ...e, access: false, login: "", roleId: "" },
+      undefined,
+      pin,
+    );
+    const saved = rolesStore.state.value.employees.find(
+      (row) => row.id === id,
+    )!;
     await clinicRequest("links", {
       method: "POST",
       body: {
         login: e.login,
         role_id: e.roleId,
-        branch_ids: [e.branch],
-        ...(e.id ? { employee_id: e.id } : {}),
+        branch_ids: e.branchIds ?? [e.branch],
+        employee_id: id,
       },
-      etag: e.id ? `"${e.version}"` : undefined,
+      etag: `"${saved.version}"`,
     });
     screen.value = "list";
     successNotice.value =
@@ -154,12 +165,16 @@ function form(e: Employee | null = null) {
   editing.value = e ? clone(e) : null;
   screen.value = "form";
 }
-async function save(e: Employee, password?: string) {
+async function save(
+  e: Employee,
+  password?: string,
+  pin?: { value: string; confirmation: string },
+) {
   if (saving.value) return;
   saving.value = true;
   serverErrors.value = {};
   try {
-    await rolesStore.saveEmployee(e, password);
+    await rolesStore.saveEmployee(e, password, pin);
     screen.value = "list";
     saveError.value = "";
   } catch (err) {

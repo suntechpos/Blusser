@@ -23,7 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([ClinicRoles::class, AccessDemo::class, CreatePlatformOperator::class, BackfillCeoPermissions::class])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
-        $middleware->trimStrings(except: ['password', 'password_confirmation', 'current_password', 'temporary_password', 'token']);
+        $middleware->trimStrings(except: ['password', 'password_confirmation', 'current_password', 'temporary_password', 'cashier_pin', 'cashier_pin_confirmation', 'token']);
         $middleware->append(NoStore::class);
         $middleware->prependToPriorityList(AuthenticatesRequests::class, FirstPartySession::class);
         $middleware->alias(['first-party' => FirstPartySession::class, 'full-identity' => FullIdentity::class]);
@@ -31,7 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->dontReport([GovernanceDenied::class]);
-        $exceptions->dontFlash(['password', 'password_confirmation', 'current_password', 'temporary_password', 'token']);
+        $exceptions->dontFlash(['password', 'password_confirmation', 'current_password', 'temporary_password', 'cashier_pin', 'cashier_pin_confirmation', 'token']);
         $exceptions->render(function (GovernanceDenied $exception, Request $request) {
             $status = match ($exception->reason) {
                 'precondition' => 428, 'credentials' => 401, 'rate_limited' => 429, 'conflict' => 409, 'not_found' => 404, 'invalid_input' => 422, default => 403

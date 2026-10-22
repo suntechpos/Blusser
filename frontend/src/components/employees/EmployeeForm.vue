@@ -6,7 +6,6 @@ import {
   blankEmployee,
   clone,
   positions,
-  departments,
   today,
   type Employee,
 } from "../../mocks/employees";
@@ -21,13 +20,14 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   cancel: [];
-  save: [Employee, string?];
-  link: [Employee];
+  save: [Employee, string?, { value: string; confirmation: string }?];
+  link: [Employee, { value: string; confirmation: string }?];
 }>();
 const draft = ref(clone(props.employee ?? blankEmployee()));
 if (!props.employee) {
   draft.value.branch = session.branches[0]?.id ?? "";
   draft.value.roleId = "";
+  draft.value.pageGrants = [];
   draft.value.branchIds = draft.value.branch ? [draft.value.branch] : [];
 }
 const errors = ref<Record<string, string>>({});
@@ -40,6 +40,75 @@ watch(
 );
 const password = ref("");
 const showPassword = ref(false);
+const cashierPin = ref("");
+const cashierPinConfirmation = ref("");
+const showPin = ref(false);
+const pageOptions = computed(() =>
+  rolesStore.sections.value.map((section) => ({
+    code: section.permissions[0]!.code,
+    label: section.label,
+    parent: section.parent,
+  })),
+);
+const pageGrants = computed(
+  () =>
+    draft.value.pageGrants ??
+    rolesStore.state.value.roles
+      .find((r) => r.id === draft.value.roleId)
+      ?.grants.filter((g) => g.code.endsWith(".view")) ??
+    [],
+);
+const scopeLabels: Record<string, string> = {
+  own: "O‘ziga tegishli",
+  assigned_branches: "Biriktirilgan filiallar",
+  entire_clinic: "Butun klinika",
+};
+function setPageScope(code: string, scope: string) {
+  if (
+    !can("employees.assign_role") ||
+    !rolesStore.allowedScopes(code).includes(scope)
+  )
+    return;
+  draft.value.pageGrants = pageGrants.value.map((g) => ({
+    ...g,
+    scope: g.code === code ? scope : g.scope,
+  }));
+}
+const cashierSelected = computed(() =>
+  pageGrants.value.some((g) => g.code === "cashier.view"),
+);
+function togglePage(code: string, on: boolean) {
+  if (!can("employees.assign_role")) return;
+  const grants = new Map(pageGrants.value.map((g) => [g.code, g.scope]));
+  const option = pageOptions.value.find((p) => p.code === code);
+  if (on) {
+    for (const c of [option?.parent, code].filter((c): c is string => !!c)) {
+      const scopes = rolesStore.allowedScopes(c);
+      if (!scopes.length) return;
+      if (!grants.has(c))
+        grants.set(
+          c,
+          scopes.includes("assigned_branches")
+            ? "assigned_branches"
+            : scopes[0]!,
+        );
+    }
+  } else {
+    grants.delete(code);
+    for (const child of pageOptions.value.filter((p) => p.parent === code))
+      grants.delete(child.code);
+  }
+  draft.value.pageGrants = [...grants].map(([code, scope]) => ({
+    code,
+    scope,
+  }));
+}
+watch(cashierSelected, (selected) => {
+  if (!selected) {
+    cashierPin.value = "";
+    cashierPinConfirmation.value = "";
+  }
+});
 let preview = "";
 watch(
   () => draft.value.active,
@@ -56,6 +125,8 @@ watch(
 onBeforeUnmount(() => {
   if (preview) URL.revokeObjectURL(preview);
   password.value = "";
+  cashierPin.value = "";
+  cashierPinConfirmation.value = "";
 });
 function photo(event: Event) {
   const input = event.target as HTMLInputElement;
@@ -85,7 +156,7 @@ function generate() {
     "",
   );
 }
-function save() {
+function save(link = false) {
   const d = draft.value;
   const e: Record<string, string> = {};
   for (const key of ["last", "first", "phone", "position", "branch"] as const)
@@ -102,10 +173,21 @@ function save() {
     if (!d.login.trim()) e.login = "Loginni kiriting.";
     if (!rolesStore.state.value.roles.some((r) => r.id === d.roleId))
       e.role = "Ruxsat rolini tanlang.";
-    if (!props.employee?.membershipId && password.value.length < 12)
+    if (!link && !props.employee?.membershipId && password.value.length < 12)
       e.password = "Yangi hisob paroli kamida 12 belgi bo‘lsin.";
     if (password.value && password.value.length < 12)
       e.password = "Kamida 12 belgi kiriting.";
+  }
+  if (
+    cashierSelected.value &&
+    (!props.employee?.cashierPinSet ||
+      cashierPin.value ||
+      cashierPinConfirmation.value)
+  ) {
+    if (!/^[0-9]{4}$/.test(cashierPin.value))
+      e.cashier_pin = "4 raqamli PIN-kod kiriting.";
+    if (cashierPin.value !== cashierPinConfirmation.value)
+      e.cashier_pin_confirmation = "PIN-kodlar mos emas.";
   }
   errors.value = e;
   if (Object.keys(e).length) return;
@@ -121,11 +203,20 @@ function save() {
   if (d.position !== "Shifokor") d.specialty = "";
   const secret = password.value;
   password.value = "";
-  emit("save", clone(d), secret || undefined);
+  if (cashierSelected.value && cashierPin.value && d.pageGrants == null)
+    d.pageGrants = clone(pageGrants.value);
+  const pin =
+    cashierSelected.value && cashierPin.value
+      ? { value: cashierPin.value, confirmation: cashierPinConfirmation.value }
+      : undefined;
+  cashierPin.value = "";
+  cashierPinConfirmation.value = "";
+  if (link) emit("link", clone(d), pin);
+  else emit("save", clone(d), secret || undefined, pin);
 }
 </script>
 <template>
-  <form class="employees-form" novalidate @submit.prevent="save">
+  <form class="employees-form" novalidate @submit.prevent="save()">
     <fieldset :disabled="saving" style="display: contents">
       <div class="e-breadcrumb">
         <button type="button" @click="emit('cancel')">Xodimlar</button> /
@@ -254,11 +345,99 @@ function save() {
                 ><small v-if="errors.branch" class="e-error">{{
                   errors.branch
                 }}</small></label
-              ><label
-                >Bo‘lim<select v-model="draft.department" aria-label="Bo‘lim">
-                  <option value="">Tanlang</option>
-                  <option v-for="d in departments" :key="d">{{ d }}</option>
-                </select></label
+              >
+              <div class="e-label employee-pages">
+                <span>Ishlashga ruxsat berilgan bo‘limlar</span>
+                <label
+                  v-for="page in pageOptions"
+                  :key="page.code"
+                  class="employee-access-row"
+                >
+                  <input
+                    type="checkbox"
+                    :aria-label="'Bo‘lim: ' + page.label"
+                    :checked="pageGrants.some((g) => g.code === page.code)"
+                    :disabled="
+                      !can('employees.assign_role') ||
+                      (!rolesStore.allowedScopes(page.code).length &&
+                        !pageGrants.some((g) => g.code === page.code))
+                    "
+                    @change="
+                      togglePage(
+                        page.code,
+                        ($event.target as HTMLInputElement).checked,
+                      )
+                    "
+                  />
+                  {{ page.label }}
+                  <select
+                    v-if="pageGrants.some((g) => g.code === page.code)"
+                    :aria-label="page.label + ' kirish doirasi'"
+                    :disabled="!can('employees.assign_role')"
+                    :value="pageGrants.find((g) => g.code === page.code)?.scope"
+                    @change="
+                      setPageScope(
+                        page.code,
+                        ($event.target as HTMLSelectElement).value,
+                      )
+                    "
+                  >
+                    <option
+                      v-for="scope in rolesStore.allowedScopes(page.code)"
+                      :key="scope"
+                      :value="scope"
+                    >
+                      {{ scopeLabels[scope] }}
+                    </option>
+                  </select>
+                </label>
+                <small class="e-hint"
+                  >Tanlov sahifani ko‘rishga ruxsat beradi. Amallar ruxsat roli
+                  orqali boshqariladi. Klinik bo‘lim va lavozim bundan
+                  alohida.</small
+                >
+              </div>
+              <div v-if="cashierSelected" class="e-label employee-pages">
+                <label
+                  >Kassa PIN-kodi<input
+                    v-model="cashierPin"
+                    aria-label="Kassa PIN-kodi"
+                    :type="showPin ? 'text' : 'password'"
+                    inputmode="numeric"
+                    maxlength="4"
+                    autocomplete="new-password"
+                /></label>
+                <label
+                  >PIN-kodni tasdiqlash<input
+                    v-model="cashierPinConfirmation"
+                    aria-label="PIN-kodni tasdiqlash"
+                    :type="showPin ? 'text' : 'password'"
+                    inputmode="numeric"
+                    maxlength="4"
+                    autocomplete="new-password"
+                /></label>
+                <button
+                  type="button"
+                  class="e-button"
+                  @click="showPin = !showPin"
+                >
+                  {{ showPin ? "PINni yashirish" : "PINni ko‘rsatish" }}
+                </button>
+                <small v-if="employee?.cashierPinSet" class="e-hint"
+                  >Yangi PIN kiritilmasa, amaldagi PIN saqlanadi.</small
+                >
+                <small
+                  v-if="errors.cashier_pin || errors.cashier_pin_confirmation"
+                  class="e-error"
+                  >{{
+                    errors.cashier_pin || errors.cashier_pin_confirmation
+                  }}</small
+                >
+              </div>
+              <label
+                >Klinik bo‘lim (ixtiyoriy)<input
+                  v-model="draft.department"
+                  aria-label="Klinik bo‘lim (ixtiyoriy)" /></label
               ><label
                 >Ishga kirgan sana<DateField
                   v-model="draft.hired"
@@ -361,7 +540,7 @@ function save() {
                   errors.role
                 }}</small></label
               >
-              <div class="e-label">
+              <div class="e-label employee-branches">
                 <span>Kirish filiallari</span>
                 <label
                   v-for="branch in branches"
@@ -431,7 +610,8 @@ function save() {
               "
               type="button"
               class="e-button"
-              @click="emit('link', clone(draft))"
+              :disabled="!draft.access"
+              @click="save(true)"
             >
               Mavjud hisobni bog‘lash
             </button>

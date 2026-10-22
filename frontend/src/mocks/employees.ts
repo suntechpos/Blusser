@@ -80,6 +80,8 @@ export interface Employee {
   version?: number;
   membershipId?: string | null;
   branchIds?: string[];
+  pageGrants?: { code: string; scope: string }[] | null;
+  cashierPinSet?: boolean;
   specialty: string;
   duration: number;
   note: string;

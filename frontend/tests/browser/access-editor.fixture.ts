@@ -31,6 +31,8 @@ export async function editorSession(page: Page, grants = allServerGrants) {
       membership_id: role ? "m-" + e.id : null,
       user_id: role ? "u-" + e.id : null,
       role_id: role?.id ?? null,
+      page_grants: null as { code: string; scope: string }[] | null,
+      cashier_pin_set: false,
       role_name: role?.name ?? null,
       login: role ? e.login : null,
       name: e.first + " " + e.last,
@@ -191,6 +193,8 @@ export async function editorSession(page: Page, grants = allServerGrants) {
         access: body.access,
         profile: { ...body.profile, branch: body.branch_id },
         branch_ids: body.branch_ids ?? old?.branch_ids ?? [],
+        page_grants: body.page_grants ?? old?.page_grants ?? null,
+        cashier_pin_set: !!body.cashier_pin || !!old?.cashier_pin_set,
         version: (old?.version ?? 0) + 1,
       };
       if (old) Object.assign(old, row);

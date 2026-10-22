@@ -245,4 +245,98 @@ final class AccessIntegrationTest extends FoundationTestCase
         }
         $this->assertSame(1, DB::connection('migration')->table('employee_profiles')->count());
     }
+
+    public function test_employee_page_combinations_pin_and_live_effective_access_are_private_and_atomic(): void
+    {
+        [$tid, $ceo, $branch, $jar] = $this->setupClinic();
+        $rid = $this->role($jar, 'page-limited', ['patients.view', 'patients.create']);
+        $db = DB::connection('migration');
+        $originalGrants = $db->table('role_permissions')->where('role_id', $rid)->get()->toJson();
+        foreach ([['reception.view', 'cashier.view'], ['diagnostics.view', 'workspace.view'], ['queues.view', 'display.view']] as $i => $codes) {
+            $body = $this->profile($branch, null, false);
+            $body['page_grants'] = array_map(fn ($code) => ['code' => $code, 'scope' => 'assigned_branches'], $codes);
+            if ($i === 0) {
+                $body['cashier_pin'] = '1122';
+                $body['cashier_pin_confirmation'] = '1122';
+            }
+            $id = $this->command($jar, 'POST', '/api/v1/clinic/employees', $body)->assertCreated()->json('id');
+            $this->browser($jar, 'GET', '/api/v1/clinic/employees/'.$id.'?format=profile')->assertOk()->assertJsonPath('page_grants', $body['page_grants'])->assertJsonMissingPath('cashier_pin')->assertJsonMissingPath('pin_hash');
+            if ($i !== 0) {
+                continue;
+            }
+            $hash = $db->table('employee_cashier_secrets')->where('employee_id', $id)->value('pin_hash');
+            $this->assertTrue(Hash::driver('argon2id')->check('1122', $hash));
+            unset($body['cashier_pin'], $body['cashier_pin_confirmation']);
+            $body['access'] = true;
+            $body['login'] = 'page.worker';
+            $body['role_id'] = $rid;
+            $body['branch_ids'] = [$branch];
+            $body['temporary_password'] = self::TEMPORARY;
+            $this->command($jar, 'PATCH', '/api/v1/clinic/employees/'.$id, $body, 1)->assertOk();
+            $this->assertSame($hash, $db->table('employee_cashier_secrets')->where('employee_id', $id)->value('pin_hash'));
+            $staff = [];
+            $this->login($staff, 'page.worker', self::TEMPORARY)->assertOk();
+            $this->browser($staff, 'POST', '/api/v1/auth/password', ['current_password' => self::TEMPORARY, 'password' => self::PASSWORD, 'password_confirmation' => self::PASSWORD])->assertOk();
+            $this->select($staff, $tid);
+            $me = $this->browser($staff, 'GET', '/api/v1/auth/me')->assertOk()->json('grants');
+            ksort($me);
+            $this->assertSame(['cashier.view' => 'assigned_branches', 'reception.view' => 'assigned_branches'], $me);
+            $this->browser($staff, 'GET', '/api/v1/clinic/patients')->assertForbidden();
+            $this->browser($staff, 'GET', '/api/v1/clinic/roles')->assertForbidden();
+            $peerBody = $body;
+            $peerBody['login'] = 'page.peer';
+            $peerBody['cashier_pin'] = '5566';
+            $peerBody['cashier_pin_confirmation'] = '5566';
+            $this->command($jar, 'POST', '/api/v1/clinic/employees', $peerBody)->assertCreated();
+            $peer = [];
+            $this->login($peer, 'page.peer', self::TEMPORARY)->assertOk();
+            $this->browser($peer, 'POST', '/api/v1/auth/password', ['current_password' => self::TEMPORARY, 'password' => self::PASSWORD, 'password_confirmation' => self::PASSWORD])->assertOk();
+            $this->select($peer, $tid);
+            unset($body['temporary_password']);
+            $body['cashier_pin'] = '3344';
+            $body['cashier_pin_confirmation'] = '3344';
+            $this->command($jar, 'PATCH', '/api/v1/clinic/employees/'.$id, $body, 2)->assertOk();
+            $this->assertTrue(Hash::driver('argon2id')->check('3344', $db->table('employee_cashier_secrets')->where('employee_id', $id)->value('pin_hash')));
+            $body['cashier_pin_confirmation'] = '9999';
+            $this->command($jar, 'PATCH', '/api/v1/clinic/employees/'.$id, $body, 3)->assertUnprocessable();
+            unset($body['cashier_pin'], $body['cashier_pin_confirmation']);
+            $body['page_grants'] = [['code' => 'patients.view', 'scope' => 'own']];
+            $this->command($jar, 'PATCH', '/api/v1/clinic/employees/'.$id, $body, 3)->assertOk();
+            $this->browser($staff, 'GET', '/api/v1/auth/me')->assertUnauthorized();
+            $peerMe = $this->browser($peer, 'GET', '/api/v1/auth/me')->assertOk()->json('grants');
+            ksort($peerMe);
+            $this->assertSame($me, $peerMe);
+        }
+        $this->assertSame($originalGrants, $db->table('role_permissions')->where('role_id', $rid)->get()->toJson());
+        $this->assertSame(2, $db->table('tenant_memberships')->where('role_id', $rid)->count());
+        $audit = $db->table('audit_logs')->get()->toJson();
+        $this->assertStringNotContainsString('1122', $audit);
+        $this->assertStringNotContainsString('$argon2id$', $audit);
+    }
+
+    public function test_page_grants_and_pin_validation_cannot_escape_delegation_or_partially_write(): void
+    {
+        [$tid, $ceo, $branch, $jar] = $this->setupClinic();
+        $body = $this->profile($branch, null, false);
+        $body['page_grants'] = [['code' => 'patients.view', 'scope' => 'own']];
+        $id = $this->command($jar, 'POST', '/api/v1/clinic/employees', $body)->assertCreated()->json('id');
+        $body['page_grants'] = [['code' => 'patients.create', 'scope' => 'own']];
+        $this->command($jar, 'PATCH', '/api/v1/clinic/employees/'.$id, $body, 1)->assertUnprocessable();
+        $body['page_grants'] = [['code' => 'cashier.view', 'scope' => 'own']];
+        $this->command($jar, 'PATCH', '/api/v1/clinic/employees/'.$id, $body, 1)->assertUnprocessable();
+        $rid = $this->role($jar, 'limited-editor', ['employees.view', 'employees.create', 'employees.update', 'employees.assign_role', 'employees.assign_branches', 'patients.view']);
+        $editor = $this->profile($branch, $rid);
+        $editor['login'] = 'limited.page.editor';
+        $this->command($jar, 'POST', '/api/v1/clinic/employees', $editor)->assertCreated();
+        $limited = [];
+        $this->login($limited, 'limited.page.editor', self::TEMPORARY)->assertOk();
+        $this->browser($limited, 'POST', '/api/v1/auth/password', ['current_password' => self::TEMPORARY, 'password' => self::PASSWORD, 'password_confirmation' => self::PASSWORD])->assertOk();
+        $this->select($limited, $tid);
+        $body['cashier_pin'] = '1122';
+        $body['cashier_pin_confirmation'] = '1122';
+        $this->command($limited, 'PATCH', '/api/v1/clinic/employees/'.$id, $body, 1)->assertForbidden();
+        $this->browser($jar, 'GET', '/api/v1/clinic/employees/'.$id.'?format=profile')->assertOk()->assertJsonPath('version', 1)->assertJsonPath('page_grants', [['code' => 'patients.view', 'scope' => 'own']])->assertJsonPath('cashier_pin_set', false);
+        $this->assertSame(0, DB::connection('migration')->table('employee_cashier_secrets')->where('employee_id', $id)->count());
+        $this->assertSqlState('42501', fn () => DB::connection('pgsql')->table('employee_cashier_secrets')->get());
+    }
 }
