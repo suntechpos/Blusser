@@ -2,7 +2,6 @@
 import { createServicesCatalog } from "./servicesCatalog.ts";
 import { localDate } from "./reception.ts";
 export const cashierConfig = {
-  pin: "1122",
   cashier: { id: "demo-kamron", name: "Kamron" },
   clinic: "Shifo Med Klinikasi",
   branch: "Asosiy filial",

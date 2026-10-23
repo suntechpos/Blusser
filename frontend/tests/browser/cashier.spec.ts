@@ -13,7 +13,7 @@ async function open(p: Page) {
 }
 async function pin(p: Page) {
   await p.getByRole("button", { name: "Kassaga kirish", exact: true }).click();
-  await dialog(p).getByLabel("4 xonali demo PIN").fill("1122");
+  await dialog(p).getByLabel("4 xonali PIN").fill("1122");
   await dialog(p).getByRole("button", { name: "Kirish", exact: true }).click();
 }
 async function start(p: Page, opening = "200000") {
@@ -71,7 +71,7 @@ test("landing is private, PIN only on click; keypad/keyboard/backspace, wrong PI
     .getByRole("button", { name: "Kassaga kirish", exact: true })
     .click();
   await expect(dialog(page).locator(".cs-pin-dots span")).toHaveCount(4);
-  await dialog(page).getByLabel("4 xonali demo PIN").fill("0000");
+  await dialog(page).getByLabel("4 xonali PIN").fill("0000");
   await page.keyboard.press("Enter");
   await expect(dialog(page).getByRole("alert")).toContainText("PIN noto‘g‘ri");
   await dialog(page).getByRole("button", { name: "1", exact: true }).click();
@@ -111,8 +111,12 @@ test("landing is private, PIN only on click; keypad/keyboard/backspace, wrong PI
     after.shifts.find((s: { closedAt: string | null }) => !s.closedAt).id,
   ).toBe(id);
   expect(
-    requests.filter((r) => /cash|payment|refund/.test(r.path)),
-  ).toHaveLength(0);
+    requests
+      .filter((r) => /cash|payment|refund/.test(r.path))
+      .map((r) => [r.method, r.path]),
+  ).toEqual(
+    Array.from({ length: 3 }, () => ["POST", "/api/v1/clinic/cashier/unlock"]),
+  );
 });
 test("cash change, immutable receipt, double click, print failure retains payment and next patient", async ({
   page,

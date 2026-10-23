@@ -61,7 +61,7 @@ test("consistent fixtures: four pending, linked immutable history; seed closing 
     cardNet: 480000,
   });
   assert.equal(openShift(s), undefined);
-  assert.equal(cashierConfig.pin, "1122");
+  assert.equal(Object.hasOwn(cashierConfig, "pin"), false);
 });
 test("whole-so‘m parsing, discounts and deterministic allocations conserve money", () => {
   assert.equal(amount("350 000"), 350000);

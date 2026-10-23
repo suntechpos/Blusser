@@ -37,6 +37,10 @@ export async function receptionSession(page: Page, grants:Record<string,string>=
       must_change_password: false,
       active_tenant_id: "clinic-a",
     };
+    if (path.endsWith('/clinic/cashier/unlock')) {
+      if (!grants['cashier.view']) return route.fulfill({status:403});
+      return route.fulfill(req.postDataJSON()?.cashier_pin === '1122' ? {status:204} : {status:422,json:{code:'invalid_pin'}});
+    }
     if (path.endsWith("/auth/logout")) {
       signedIn = false;
       return route.fulfill({ status: 204 });
