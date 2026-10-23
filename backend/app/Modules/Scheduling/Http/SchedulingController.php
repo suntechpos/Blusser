@@ -13,6 +13,9 @@ final class SchedulingController
 
     public function index(Request $request)
     {
+        if ($request->route('resourceKind') === 'services') {
+            $this->allow($request->query(), ['page', 'per_page', 'q', 'status', 'from', 'to']);
+        }
         $filters = $this->filters($request);
 
         return response()->json($this->scheduling->listing($request->user(), $this->tenant($request), $request->route('resourceKind'), $filters));
@@ -47,7 +50,7 @@ final class SchedulingController
         validator(['key' => $key], ['key' => 'required|uuid'])->validate();
         $kind = $request->route('resourceKind');
         $rules = match ($kind) {
-            'specialties' => ['code' => 'required|string|max:64', 'name' => 'required|string|max:255', 'active' => 'required|boolean'],
+            'services', 'specialties' => ['code' => 'required|string|max:64', 'name' => 'required|string|max:255', 'active' => 'required|boolean'],
             'doctors' => ['membership_id' => 'required|uuid', 'specialty_id' => 'required|uuid', 'branch_ids' => 'required|array|min:1|max:100', 'branch_ids.*' => 'required|uuid|distinct', 'service_ids' => 'required|array|min:1|max:100', 'service_ids.*' => 'required|uuid|distinct', 'active' => 'required|boolean'],
             'rooms' => ['branch_id' => 'required|uuid', 'number' => 'required|string|max:255', 'service_type' => 'required|string|max:255', 'active' => 'required|boolean', 'availability' => 'required|in:available,unavailable'],
             'schedules' => $this->scheduleRules(),

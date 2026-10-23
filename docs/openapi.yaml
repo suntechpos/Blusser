@@ -6039,7 +6039,42 @@
                       }
                     },
                     "meta": {
-                      "$ref": "#/components/schemas/Meta"
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "per_page": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "unavailable_reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            null,
+                            "configuration_unavailable",
+                            "no_schedule",
+                            "schedule_closed",
+                            "room_unavailable",
+                            "no_free_slots"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "per_page",
+                        "total"
+                      ]
                     }
                   },
                   "required": [
@@ -6072,7 +6107,7 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
-        "description": "Availability hints filtered against current active doctor/room reservations, NOT bookings or a guarantee of future availability. Active doctor, membership, role, specialty, branch, service and room required. A date exception overrides the entire doctor/branch day: closed removes it; replace supplies its sole replacement window. Room compatibility is the explicit same-branch room selected in an approved schedule; service_type is descriptive, not a service ID. Duration uses doctor_service override when present, otherwise schedule slot_minutes. At most 31 local calendar days. DST ambiguous/nonexistent slot boundaries or intervals return 422. UTC Z output ordered by starts_at, room_id, ends_at. Offset pagination; booking/reschedule atomically revalidate and reserve."
+        "description": "Availability hints filtered against current active doctor/room reservations, NOT bookings or a guarantee of future availability. Active doctor, membership, role, specialty, branch, service and room required. A date exception overrides the entire doctor/branch day: closed removes it; replace supplies its sole replacement window. Room compatibility is the explicit same-branch room selected in an approved schedule; service_type is descriptive, not a service ID. Duration uses doctor_service override when present, otherwise schedule slot_minutes. At most 31 local calendar days. DST ambiguous/nonexistent slot boundaries or intervals return 422. UTC Z output ordered by starts_at, room_id, ends_at. Offset pagination; booking/reschedule atomically revalidate and reserve. Empty availability additionally reports meta.unavailable_reason: configuration_unavailable, no_schedule, schedule_closed, room_unavailable, or no_free_slots; null when slots exist. This is a scoped read-only hint, never a booking authorization."
       }
     },
     "/api/v1/clinic/specialties": {
@@ -9599,6 +9634,216 @@
         },
         "operationId": "getReceptionBookingOptions"
       }
+    },
+    "/api/v1/clinic/appointments/configuration-services": {
+      "get": {
+        "operationId": "bookingConfigurationServicesGet",
+        "summary": "Booking-only service listing",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BookingConfigurationService"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Uses existing services.view (entire_clinic); creation additionally requires services.create (entire_clinic). Audited and idempotent scheduling governance boundary. No grants or existing service changes."
+      },
+      "post": {
+        "operationId": "bookingConfigurationServicesPost",
+        "summary": "Booking-only service creation",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "doctors.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized scheduling response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingConfigurationService"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpecialtyInput"
+              }
+            }
+          }
+        },
+        "description": "Uses existing services.view (entire_clinic); creation additionally requires services.create (entire_clinic). Audited and idempotent scheduling governance boundary. No grants or existing service changes."
+      }
     }
   },
   "components": {
@@ -12114,6 +12359,33 @@
             ]
           }
         ]
+      },
+      "BookingConfigurationService": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "code",
+          "name",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
       }
     },
     "responses": {

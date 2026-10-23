@@ -25,16 +25,17 @@ final class Availability
             $size = (int) ($filters['per_page'] ?? 50);
             $context = DB::selectOne('SELECT governance.scheduling_availability_context(?,?,?) AS value', [$doctor, $filters['branch_id'], $filters['service_id']])->value;
             $slots = [];
+            $reason = 'configuration_unavailable';
             if ($context !== null) {
                 $context = json_decode($context, true, flags: JSON_THROW_ON_ERROR);
-                $slots = $this->slots($doctor, $filters, $context);
+                $slots = $this->slots($doctor, $filters, $context, $reason);
             }
 
-            return ['data' => array_slice($slots, ($page - 1) * $size, $size), 'meta' => ['page' => $page, 'per_page' => $size, 'total' => count($slots)]];
+            return ['data' => array_slice($slots, ($page - 1) * $size, $size), 'meta' => ['page' => $page, 'per_page' => $size, 'total' => count($slots), 'unavailable_reason' => $reason]];
         });
     }
 
-    private function slots(string $doctor, array $filters, array $context): array
+    private function slots(string $doctor, array $filters, array $context, ?string &$reason): array
     {
         $zone = new DateTimeZone($context['timezone']);
         $utc = new DateTimeZone('UTC');
@@ -59,18 +60,24 @@ final class Availability
         }
         $rooms = $roomQuery->pluck('id')->all();
         $slots = [];
+        $hasWindow = false;
+        $hasRoomWindow = false;
+        $closed = false;
         for (; $day <= $last; $day = $day->modify('+1 day')) {
             $date = $day->format('Y-m-d');
             $exception = $exceptions[$date] ?? null;
             if ($exception) {
+                $closed = $closed || $exception->kind === 'closed';
                 $windows = $exception->kind === 'closed' ? [] : [$exception];
             } else {
                 $windows = $rules->filter(fn ($r) => $r->weekday === (int) $day->format('N') && $r->effective_from <= $date && ($r->effective_to === null || $r->effective_to >= $date));
             }
             foreach ($windows as $window) {
+                $hasWindow = true;
                 if (! in_array($window->room_id, $rooms, true)) {
                     continue;
                 }
+                $hasRoomWindow = true;
                 $breaks = DB::table($exception ? 'schedule_exception_breaks' : 'schedule_breaks')->where($exception ? 'schedule_exception_id' : 'schedule_rule_id', $window->id)->get();
                 $minutes = $context['duration_minutes'] ?? $window->slot_minutes;
                 $start = new DateTimeImmutable($date.' '.$window->local_start, $utc);
@@ -94,6 +101,8 @@ final class Availability
             }
         }
         usort($slots, fn ($a, $b) => [$a['starts_at'], $a['room_id'], $a['ends_at']] <=> [$b['starts_at'], $b['room_id'], $b['ends_at']]);
+
+        $reason = $slots !== [] ? null : (! $hasWindow ? ($closed ? 'schedule_closed' : 'no_schedule') : (! $hasRoomWindow ? 'room_unavailable' : 'no_free_slots'));
 
         return $slots;
     }

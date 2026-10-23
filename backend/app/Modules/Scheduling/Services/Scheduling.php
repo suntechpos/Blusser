@@ -5,6 +5,7 @@ namespace App\Modules\Scheduling\Services;
 use App\Modules\Access\Permissions;
 use App\Modules\Access\Services\Governance;
 use App\Modules\Identity\Models\User;
+use App\Modules\Scheduling\Models\BookingService;
 use App\Modules\Scheduling\Models\DoctorProfile;
 use App\Modules\Scheduling\Models\Room;
 use App\Modules\Scheduling\Models\ScheduleException;
@@ -18,7 +19,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class Scheduling
 {
-    private const MODELS = ['specialties' => Specialty::class, 'doctors' => DoctorProfile::class, 'rooms' => Room::class, 'schedules' => ScheduleRule::class, 'schedule-exceptions' => ScheduleException::class];
+    private const MODELS = ['services' => BookingService::class, 'specialties' => Specialty::class, 'doctors' => DoctorProfile::class, 'rooms' => Room::class, 'schedules' => ScheduleRule::class, 'schedule-exceptions' => ScheduleException::class];
 
     public function context(User $actor, string $tenant, Closure $callback): mixed
     {
@@ -36,7 +37,7 @@ final class Scheduling
     public function section(string $kind): string
     {
         return match ($kind) {
-            'specialties', 'doctors' => 'doctors', 'rooms' => 'rooms', default => 'schedules',
+            'services' => 'services', 'specialties', 'doctors' => 'doctors', 'rooms' => 'rooms', default => 'schedules',
         };
     }
 
@@ -44,6 +45,9 @@ final class Scheduling
     {
         return $this->context($actor, $tenant, function () use ($kind, $filters) {
             abort_if(app(Permissions::class)->scope($this->section($kind).'.view') === null, 403);
+            if ($kind === 'services') {
+                app(Permissions::class)->requireEntireClinic('services.view');
+            }
             $query = (new (self::MODELS[$kind]))->newQuery()->whereRaw('tenant_id=public.context_tenant()')->orderBy('created_at')->orderBy('id');
             if (isset($filters['branch_id'])) {
                 if ($kind === 'doctors') {
@@ -64,13 +68,13 @@ final class Scheduling
             if (isset($filters['q'])) {
                 $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['q']).'%';
                 match ($kind) {
-                    'specialties' => $query->where('name', 'ilike', $term),
+                    'services', 'specialties' => $query->where('name', 'ilike', $term),
                     'rooms' => $query->where('number', 'ilike', $term),
                     default => $query->whereRaw('id::text ILIKE ?', [$term]),
                 };
             }
             if (isset($filters['status']) && $filters['status'] !== 'all') {
-                abort_unless(in_array($kind, ['specialties', 'doctors', 'rooms'], true), 422);
+                abort_unless(in_array($kind, ['services', 'specialties', 'doctors', 'rooms'], true), 422);
                 $query->where('active', $filters['status'] === 'active');
             }
             foreach (['from' => '>=', 'to' => '<'] as $key => $operator) {

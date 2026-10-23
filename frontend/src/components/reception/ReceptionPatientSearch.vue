@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from "vue";
 import { Search, X, Check, UserRoundSearch } from "lucide-vue-next";
+import { bookingError } from "../../services/receptionBooking";
 import type { PatientResults } from "../../services/receptionBooking";
 import { initials, type ReceptionPatient } from "../../mocks/reception";
 const props = defineProps<{
@@ -34,10 +35,10 @@ async function search() {
         ? Math.max(results.length, 1)
         : results.perPage;
     }
-  } catch {
+  } catch (e) {
     if (token === sequence) {
       rows.value = [];
-      error.value = "Qidiruv amalga oshmadi. Qayta urinib ko‘ring.";
+      error.value = bookingError(e);
     }
   } finally {
     if (token === sequence) loading.value = false;

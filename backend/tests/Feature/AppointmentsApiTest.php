@@ -112,6 +112,74 @@ final class AppointmentsApiTest extends FoundationTestCase
         return $jar;
     }
 
+    public function test_booking_configuration_uses_real_governed_records_and_patient_retry_is_not_atomic(): void
+    {
+        ['a' => $a, 'b' => $b] = $this->fixture();
+        $jar = $this->clinicSession($a);
+        $serviceBody = ['code' => 'reception-service', 'name' => 'Reception consultation', 'active' => true];
+        $key = (string) Str::uuid();
+        $service = $this->browser($jar, 'POST', '/api/v1/clinic/appointments/configuration-services', $serviceBody, key: $key)->assertCreated()->json();
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments/configuration-services', $serviceBody, key: $key)->assertCreated()->assertJsonPath('id', $service['id']);
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments/configuration-services', [...$serviceBody, 'name' => 'Changed'], key: $key)->assertConflict();
+        $this->browser($jar, 'GET', '/api/v1/clinic/appointments/configuration-services')->assertOk()->assertJsonFragment(['id' => $service['id']])->assertJsonMissing(['id' => $b['service']]);
+        $a['service'] = $service['id'];
+        $specialty = $this->browser($jar, 'POST', '/api/v1/clinic/specialties', ['code' => 'reception', 'name' => 'Reception specialty', 'active' => true], key: (string) Str::uuid())->assertCreated()->json();
+        $doctor = $this->browser($jar, 'POST', '/api/v1/clinic/doctors', ['membership_id' => $a['membership'], 'specialty_id' => $specialty['id'], 'branch_ids' => [$a['branch']], 'service_ids' => [$a['service']], 'active' => true], key: (string) Str::uuid())->assertCreated()->json();
+        $room = $this->browser($jar, 'POST', '/api/v1/clinic/rooms', ['branch_id' => $a['branch'], 'number' => 'R1', 'service_type' => 'consultation', 'active' => true, 'availability' => 'available'], key: (string) Str::uuid())->assertCreated()->json();
+        $a = [...$a, 'doctor' => $doctor, 'room' => $room];
+        $this->assertSame([], $this->slots($a)['data']);
+        $this->assertSame('no_schedule', $this->slots($a)['meta']['unavailable_reason']);
+        $this->browser($jar, 'POST', '/api/v1/clinic/schedules', $this->rule($a), key: (string) Str::uuid())->assertCreated();
+        $this->assertNotEmpty($this->slots($a)['data']);
+        $this->browser($jar, 'GET', '/api/v1/clinic/appointments/booking-options?branch_id='.$a['branch'])->assertOk()->assertJsonFragment(['name' => 'Reception consultation']);
+        $body = ['name' => 'Surname Given Patronymic', 'date_of_birth' => '1994-03-12', 'phone' => null, 'gender' => null, 'branch_id' => $a['branch']];
+        $patientKey = (string) Str::uuid();
+        $patient = $this->browser($jar, 'POST', '/api/v1/clinic/patients', $body, key: $patientKey)->assertCreated()->json();
+        $this->browser($jar, 'POST', '/api/v1/clinic/patients', $body, key: $patientKey)->assertCreated()->assertJsonPath('id', $patient['id']);
+        $a['patient'] = $patient;
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments', [...$this->data($a), 'starts_at' => '2030-01-07T08:00:00+05:00', 'ends_at' => '2030-01-07T08:30:00+05:00'], key: (string) Str::uuid())->assertConflict();
+        $this->assertSame(1, DB::connection('migration')->table('patients')->where('tenant_id', $a['tenant'])->count());
+        $appointmentKey = (string) Str::uuid();
+        $appointment = $this->browser($jar, 'POST', '/api/v1/clinic/appointments', $this->data($a), key: $appointmentKey)->assertCreated()->json();
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments', $this->data($a), key: $appointmentKey)->assertCreated()->assertJsonPath('id', $appointment['id']);
+        $this->browser($jar, 'GET', '/api/v1/clinic/patients/'.$patient['id'])->assertOk()->assertJsonPath('name', $body['name']);
+        $this->browser($jar, 'GET', '/api/v1/clinic/appointments/'.$appointment['id'])->assertOk();
+        foreach ([$patient['name'], $patient['patient_number']] as $q) {
+            $this->browser($jar, 'GET', '/api/v1/clinic/patients?q='.urlencode($q))->assertOk()->assertJsonFragment(['id' => $patient['id']]);
+        }
+        $this->grant($a, 'services.create', null);
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments/configuration-services', ['code' => 'denied', 'name' => 'Denied', 'active' => true], key: (string) Str::uuid())->assertForbidden();
+        $this->grant($a, 'patients.create', null);
+        $this->browser($jar, 'POST', '/api/v1/clinic/patients', $body, key: (string) Str::uuid())->assertForbidden();
+        $this->browser($jar, 'GET', '/api/v1/clinic/patients?q='.$patient['patient_number'])->assertOk()->assertJsonFragment(['id' => $patient['id']]);
+        $this->grant($a, 'services.view', null);
+        $this->browser($jar, 'GET', '/api/v1/clinic/appointments/configuration-services')->assertForbidden();
+        $this->browser($jar, 'GET', '/api/v1/clinic/appointments/booking-options?branch_id='.$a['branch'])->assertForbidden();
+    }
+
+    public function test_booking_service_configuration_upgrade_preserves_existing_data_and_runtime_boundary(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $created = $this->command($a);
+        $body = ['code' => 'upgrade-service', 'name' => 'Preserved service', 'active' => true];
+        $service = $this->scheduleCommand($a, 'services', $body);
+        $migration = require database_path('migrations/2026_10_23_000018_add_booking_service_configuration.php');
+        $previous = DB::getDefaultConnection();
+        DB::setDefaultConnection('migration');
+        try {
+            $migration->down();
+            $this->assertTrue(DB::table('services')->where('id', $service['id'])->exists());
+            $migration->up();
+            $this->assertTrue(DB::table('services')->where('id', $service['id'])->exists());
+            $this->assertTrue(DB::table('appointments')->where('id', $created['id'])->exists());
+        } finally {
+            DB::setDefaultConnection($previous);
+        }
+        $this->assertSame($created['id'], app(Appointments::class)->show($this->actor($a['user']), $a['tenant'], 'appointments', $created['id'])['id']);
+        $this->assertSqlState('42501', fn () => DB::connection('pgsql')->table('services')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $a['tenant'], 'code' => 'forged', 'name' => 'Forbidden']));
+        $this->assertSame('Second service', $this->scheduleCommand($a, 'services', ['code' => 'second-service', 'name' => 'Second service', 'active' => true])['name']);
+    }
+
     private function data(array $a, string $time = '09:00'): array
     {
         $end = (new \DateTimeImmutable('2030-01-07T'.$time.':00+05:00'))->modify('+30 minutes')->format('c');
