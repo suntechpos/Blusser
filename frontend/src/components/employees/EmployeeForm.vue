@@ -2,6 +2,7 @@
 import { computed, ref, onBeforeUnmount, watch } from "vue";
 import DateField from "./DateField.vue";
 import PinDigits from "./PinDigits.vue";
+import PagePermissions from "./PagePermissions.vue";
 import {
   UserRound,
   Upload,
@@ -73,11 +74,6 @@ const pageGrants = computed(
       ?.grants.filter((g) => g.code.endsWith(".view")) ??
     [],
 );
-const scopeLabels: Record<string, string> = {
-  own: "O‘ziga tegishli",
-  assigned_branches: "Biriktirilgan filiallar",
-  entire_clinic: "Butun klinika",
-};
 function setPageScope(code: string, scope: string) {
   if (
     !can("employees.assign_role") ||
@@ -361,57 +357,14 @@ function save(link = false) {
                   errors.branch
                 }}</small></label
               >
-              <div class="e-label employee-pages">
-                <span>Ishlashga ruxsat berilgan bo‘limlar</span>
-                <label
-                  v-for="page in pageOptions"
-                  :key="page.code"
-                  class="employee-access-row"
-                >
-                  <input
-                    type="checkbox"
-                    :aria-label="'Bo‘lim: ' + page.label"
-                    :checked="pageGrants.some((g) => g.code === page.code)"
-                    :disabled="
-                      !can('employees.assign_role') ||
-                      (!rolesStore.allowedScopes(page.code).length &&
-                        !pageGrants.some((g) => g.code === page.code))
-                    "
-                    @change="
-                      togglePage(
-                        page.code,
-                        ($event.target as HTMLInputElement).checked,
-                      )
-                    "
-                  />
-                  {{ page.label }}
-                  <select
-                    v-if="pageGrants.some((g) => g.code === page.code)"
-                    :aria-label="page.label + ' kirish doirasi'"
-                    :disabled="!can('employees.assign_role')"
-                    :value="pageGrants.find((g) => g.code === page.code)?.scope"
-                    @change="
-                      setPageScope(
-                        page.code,
-                        ($event.target as HTMLSelectElement).value,
-                      )
-                    "
-                  >
-                    <option
-                      v-for="scope in rolesStore.allowedScopes(page.code)"
-                      :key="scope"
-                      :value="scope"
-                    >
-                      {{ scopeLabels[scope] }}
-                    </option>
-                  </select>
-                </label>
-                <small class="e-hint"
-                  >Tanlov sahifani ko‘rishga ruxsat beradi. Amallar ruxsat roli
-                  orqali boshqariladi. Klinik bo‘lim va lavozim bundan
-                  alohida.</small
-                >
-              </div>
+              <PagePermissions
+                :options="pageOptions"
+                :grants="pageGrants"
+                :editable="can('employees.assign_role')"
+                :allowed-scopes="rolesStore.allowedScopes"
+                @toggle="togglePage"
+                @scope="setPageScope"
+              />
               <section
                 v-if="cashierSelected"
                 class="employee-pages employee-pin-card"
