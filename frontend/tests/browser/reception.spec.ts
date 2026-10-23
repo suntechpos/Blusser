@@ -303,13 +303,75 @@ test("appointment table paginates on server, filters status/search and reveals a
   await page.getByLabel("Holat", { exact: true }).selectOption("");
   await page.getByLabel("Ro‘yxatdan bemor qidirish").fill("no-such-name");
   await expect(page.locator("tbody")).toContainText("Bemor topilmadi");
-  await page.getByLabel("Ro‘yxatdan bemor qidirish").fill("");
+  // saved() clears this search: its debounce must not undo the revealed page.
+  await page.getByLabel("Ro‘yxatdan bemor qidirish").fill("Aliyeva");
   await open(page);
   await prepare(page, "2026-10-28", "17:30");
+  s.state.listDelay = 200;
   await submit(page);
   await expect(dialog(page)).toHaveCount(0);
   await expect(page.locator("tbody .rp-new-booking")).toContainText("17:30");
   await expect(page.locator(".rp-pagination")).toContainText("17–18");
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-28");
+  await expect(page.getByLabel("Ro‘yxatdan bemor qidirish")).toHaveValue("");
+
+  await page.reload();
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-28");
+  await expect(page.locator("tbody tr")).toHaveCount(8);
+
+  // Hold an old page response until a newer status filter has finished.
+  // Releasing it must not restore its rows, counts, or page number.
+  let release!: () => void;
+  let requested!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  let holdNextPage = true;
+  await page.route("**/api/v1/clinic/appointments?**", async (route) => {
+    const url = new URL(route.request().url());
+    if (
+      holdNextPage &&
+      url.searchParams.get("page") === "2" &&
+      url.searchParams.get("per_page") === "8"
+    ) {
+      holdNextPage = false;
+      requested();
+      await held;
+    }
+    await route.fallback();
+  });
+  await page
+    .getByRole("button", { name: "Keyingi sahifa", exact: true })
+    .click();
+  await started;
+  await page.getByLabel("Holat", { exact: true }).selectOption("completed");
+  await expect(page.locator("tbody")).toContainText("Bemor topilmadi");
+  const oldResponse = page.waitForResponse((r) => {
+    const url = new URL(r.url());
+    return (
+      url.pathname.endsWith("/appointments") &&
+      url.searchParams.get("page") === "2" &&
+      url.searchParams.get("per_page") === "8"
+    );
+  });
+  release();
+  await (await oldResponse).finished();
+  // Specifically wait for all reads spawned by the released stale response.
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator("tbody")).toContainText("Bemor topilmadi");
+  await expect(page.locator(".rp-pagination")).toContainText("0–0 / 0");
+  await expect(
+    page.getByRole("button", { name: "Sahifa 1", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Holat", { exact: true }).selectOption("");
+  await expect(page.locator("tbody tr")).toHaveCount(8);
+  await page
+    .getByRole("button", { name: "Keyingi sahifa", exact: true })
+    .click();
+  await expect(page.locator(".rp-pagination")).toContainText("9–16");
 });
 
 test("schedule-derived service duration is displayed from authoritative slot timestamps", async ({

@@ -34,6 +34,7 @@ export async function bookingSession(
     delay: 0,
     empty: false,
     patientDelay: 0,
+    listDelay: 0,
     duration: 30 as number | null,
     rows: [] as any[],
   };
@@ -218,6 +219,9 @@ export async function bookingSession(
       );
       const p = Number(url.searchParams.get("page") || 1),
         size = Number(url.searchParams.get("per_page") || 8);
+      // A later navigation may overtake this already running server read.
+      if (state.listDelay)
+        await new Promise((r) => setTimeout(r, state.listDelay));
       return route.fulfill({
         json: {
           data: data.slice((p - 1) * size, p * size),

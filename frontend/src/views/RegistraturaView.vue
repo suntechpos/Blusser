@@ -202,8 +202,21 @@ function filters() {
     ...(query.value.trim() ? { q: query.value.trim() } : {}),
   };
 }
+// A view change invalidates a pending response before a debounced read starts.
+let listRevision = 0;
+let changingList = false;
+function updateListState(update: () => void) {
+  const previous = changingList;
+  changingList = true;
+  try {
+    update();
+  } finally {
+    changingList = previous;
+  }
+}
 async function load() {
   const serial = ++listSerial;
+  const revision = listRevision;
   loading.value = true;
   error.value = "";
   rows.value = [];
@@ -220,12 +233,13 @@ async function load() {
     return;
   }
   try {
+    const criteria = filters();
     const r = await clinicRequest<{
       data: BookingAppointment[];
       meta: { total: number };
     }>("appointments", {
       params: {
-        ...filters(),
+        ...criteria,
         page: page.value,
         per_page: 8,
         ...(status.value || tab.value !== "all"
@@ -240,7 +254,7 @@ async function load() {
           "appointments",
           {
             params: {
-              ...filters(),
+              ...criteria,
               per_page: 1,
               ...(status === "all" ? {} : { status }),
             },
@@ -249,15 +263,20 @@ async function load() {
         return [status, r.data.meta.total] as const;
       }),
     );
-    if (alive && serial === listSerial) {
+    if (alive && serial === listSerial && revision === listRevision) {
       rows.value = projected;
       total.value = r.data.meta.total;
       counts.value = Object.fromEntries(totals);
     }
+    // Reveal navigation uses its own completed response, not refs temporarily
+    // cleared by another load (for example the branch catalog finishing).
+    return { rows: projected, total: r.data.meta.total };
   } catch (e) {
-    if (alive && serial === listSerial) error.value = errorText(e);
+    if (alive && serial === listSerial && revision === listRevision)
+      error.value = errorText(e);
   } finally {
-    if (alive && serial === listSerial) loading.value = false;
+    if (alive && serial === listSerial && revision === listRevision)
+      loading.value = false;
   }
 }
 watch(
@@ -270,18 +289,41 @@ watch(
     session.epoch,
   ],
   () => {
-    page.value = 1;
+    listRevision++;
+    clearTimeout(searchTimer);
+    if (changingList) return;
+    updateListState(() => {
+      page.value = 1;
+    });
     void load();
   },
+  { flush: "sync" },
 );
-watch(page, () => void load());
-watch(query, () => {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    page.value = 1;
+watch(
+  page,
+  () => {
+    if (changingList) return;
+    listRevision++;
+    clearTimeout(searchTimer);
     void load();
-  }, 300);
-});
+  },
+  { flush: "sync" },
+);
+watch(
+  query,
+  () => {
+    listRevision++;
+    clearTimeout(searchTimer);
+    if (changingList) return;
+    searchTimer = setTimeout(() => {
+      updateListState(() => {
+        page.value = 1;
+      });
+      void load();
+    }, 300);
+  },
+  { flush: "sync" },
+);
 watch(
   branch,
   async (bid) => {
@@ -412,16 +454,27 @@ function openBooking(partial: BookingPreset = {}) {
 }
 async function saved(appointment: BookingAppointment, date: string) {
   booking.value = false;
-  listDate.value = date;
-  branch.value = appointment.branch_id;
-  tab.value = "all";
-  query.value = "";
-  doctor.value = "";
-  status.value = "";
-  page.value = 1;
+  listRevision++;
+  clearTimeout(searchTimer);
+  // These are one booking-reveal transition, not independent user filter edits.
+  updateListState(() => {
+    listDate.value = date;
+    branch.value = appointment.branch_id;
+    tab.value = "all";
+    query.value = "";
+    doctor.value = "";
+    status.value = "";
+    page.value = 1;
+  });
+  rows.value = [];
+  total.value = 0;
+  error.value = "";
+  loading.value = true;
   highlight.value = appointment.id;
   toast.value = "Bemor qabulga muvaffaqiyatli yozildi.";
   await nextTick();
+  const revision = listRevision;
+  const current = () => alive && revision === listRevision;
   try {
     const range = dayRange(date, zone.value);
     if (Date.parse(appointment.starts_at) > Date.parse(range.from)) {
@@ -436,20 +489,30 @@ async function saved(appointment: BookingAppointment, date: string) {
           },
         },
       );
-      page.value = Math.floor(earlier.data.meta.total / 8) + 1;
+      if (!current()) return;
+      updateListState(() => {
+        page.value = Math.floor(earlier.data.meta.total / 8) + 1;
+      });
     }
-    await load();
+    let result = await load();
+    if (!current()) return;
     while (
-      !error.value &&
-      !rows.value.some((row) => row.id === appointment.id) &&
-      page.value < pageCount.value
+      result &&
+      !result.rows.some((row) => row.id === appointment.id) &&
+      page.value < Math.ceil(result.total / 8)
     ) {
-      page.value++;
-      await load();
+      updateListState(() => {
+        page.value++;
+      });
+      result = await load();
+      if (!current()) return;
     }
     await loadSide();
   } catch (e) {
-    error.value = errorText(e);
+    if (current()) {
+      error.value = errorText(e);
+      loading.value = false;
+    }
   }
 }
 function bookSlot(slot: BookingSlot) {
