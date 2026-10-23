@@ -71,7 +71,7 @@ final class Patients
         $query = Patient::query()->whereRaw('tenant_id = public.context_tenant()')->orderBy('created_at')->orderBy('id');
         if (isset($filters['q'])) {
             $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['q']).'%';
-            $query->where(fn ($q) => $q->where('name', 'ilike', $term)->orWhere('patient_number', 'ilike', $term)->orWhere('phone', 'ilike', $term));
+            $query->where(fn ($q) => $q->where('name', 'ilike', $term)->orWhere('patient_number', 'ilike', $term)->orWhere('phone', 'ilike', $term)->orWhereRaw('id::text ILIKE ?', [$term]));
         }
         if (isset($filters['branch_id'])) {
             // RLS on BOTH relations: an unknown/unassigned branch cannot reveal matches.

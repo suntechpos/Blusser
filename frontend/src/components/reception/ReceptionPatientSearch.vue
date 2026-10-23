@@ -1,23 +1,39 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from "vue";
 import { Search, X, Check, UserRoundSearch } from "lucide-vue-next";
+import type { PatientResults } from "../../services/receptionBooking";
 import { initials, type ReceptionPatient } from "../../mocks/reception";
 const props = defineProps<{
-  lookup: (query: string) => Promise<ReceptionPatient[]>;
+  lookup: (
+    query: string,
+    page?: number,
+  ) => Promise<ReceptionPatient[] | PatientResults>;
 }>();
 const selected = defineModel<ReceptionPatient | null>({ required: true });
 const query = ref(""),
   rows = ref<ReceptionPatient[]>([]),
   loading = ref(false),
   error = ref("");
+const resultPage = ref(1),
+  total = ref(0),
+  perPage = ref(8);
+let timer: ReturnType<typeof setTimeout>;
 let sequence = 0;
+const number = (p: ReceptionPatient) =>
+  (p as ReceptionPatient & { patientNumber?: string }).patientNumber ?? p.id;
 async function search() {
   const token = ++sequence;
   error.value = "";
   loading.value = true;
   try {
-    const results = await props.lookup(query.value);
-    if (token === sequence) rows.value = results;
+    const results = await props.lookup(query.value, resultPage.value);
+    if (token === sequence) {
+      rows.value = Array.isArray(results) ? results : results.data;
+      total.value = Array.isArray(results) ? results.length : results.total;
+      perPage.value = Array.isArray(results)
+        ? Math.max(results.length, 1)
+        : results.perPage;
+    }
   } catch {
     if (token === sequence) {
       rows.value = [];
@@ -29,16 +45,23 @@ async function search() {
 }
 watch(query, () => {
   selected.value = null;
-  void search();
+  resultPage.value = 1;
+  sequence++;
+  rows.value = [];
+  loading.value = true;
+  clearTimeout(timer);
+  timer = setTimeout(() => void search(), 300);
 });
 onMounted(() => void search());
 onBeforeUnmount(() => {
   sequence++;
+  clearTimeout(timer);
 });
 function clear() {
   selected.value = null;
-  query.value = "";
-  void search();
+  resultPage.value = 1;
+  if (query.value) query.value = "";
+  else void search();
 }
 </script>
 <template>
@@ -73,7 +96,7 @@ function clear() {
         <div>
           <strong>{{ selected.name }}</strong
           ><small
-            >{{ selected.id }} · {{ selected.dob }} ·
+            >{{ number(selected) }} · {{ selected.dob }} ·
             {{ selected.phone || "Telefon kiritilmagan" }}</small
           >
         </div>
@@ -81,6 +104,7 @@ function clear() {
       </div>
       <div v-else class="rp-search-results">
         <button
+          data-permission="patients.view"
           v-for="p in rows"
           :key="p.id"
           type="button"
@@ -90,15 +114,41 @@ function clear() {
           ><span
             ><strong>{{ p.name }}</strong
             ><small
-              >{{ p.id }} · {{ p.dob }} ·
+              >{{ number(p) }} · {{ p.dob }} ·
               {{ p.phone || "Telefon kiritilmagan" }}</small
             ></span
           >
         </button>
         <p v-if="!rows.length" class="rp-empty">Bemor topilmadi</p>
       </div>
+      <div v-if="!selected && total > perPage" class="rp-pagination">
+        <button
+          type="button"
+          class="rp-button"
+          :disabled="resultPage === 1 || loading"
+          @click="
+            resultPage--;
+            search();
+          "
+        >
+          Oldingi bemorlar
+        </button>
+        <span>{{ resultPage }} / {{ Math.ceil(total / perPage) }}</span>
+        <button
+          type="button"
+          class="rp-button"
+          :disabled="resultPage * perPage >= total || loading"
+          @click="
+            resultPage++;
+            search();
+          "
+        >
+          Keyingi bemorlar
+        </button>
+      </div>
       <button
         v-if="selected"
+        data-permission="patients.view"
         class="rp-link rp-other-patient"
         type="button"
         @click="clear"

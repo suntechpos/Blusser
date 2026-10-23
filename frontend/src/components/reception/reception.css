@@ -1187,3 +1187,26 @@
 .rp-timeline-row {
   border-left: 1px solid #e3ebf7;
 }
+
+.rp-badge.scheduled {
+  color: #0867eb;
+  background: #eaf3ff;
+}
+.rp-new-booking {
+  background: #edf7ff;
+}
+.rp-date-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.rp-date-context label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rp-date-context .e-date-field {
+  min-width: 145px;
+}

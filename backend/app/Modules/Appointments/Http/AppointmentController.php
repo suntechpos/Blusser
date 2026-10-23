@@ -15,6 +15,14 @@ final class AppointmentController
         return response()->json($this->appointments->listing($request->user(), $this->tenant($request), $this->kind($request), $this->filters($request), $request->route('patient')));
     }
 
+    public function bookingOptions(Request $request)
+    {
+        $this->allow($request->query(), ['branch_id', 'page', 'per_page']);
+        $data = $request->validate(['branch_id' => 'required|uuid', 'page' => 'sometimes|integer|min:1|max:100000', 'per_page' => 'sometimes|integer|between:1,100']);
+
+        return response()->json($this->appointments->bookingOptions($request->user(), $this->tenant($request), $data));
+    }
+
     public function show(Request $request)
     {
         return response()->json($this->appointments->show($request->user(), $this->tenant($request), $this->kind($request), $this->id($request)));
@@ -59,7 +67,7 @@ final class AppointmentController
     {
         $date = ['required', 'date', 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/'];
         $rules = match ($action) {
-            'create' => ['patient_id' => 'required|uuid', 'doctor_id' => 'required|uuid', 'branch_id' => 'required|uuid', 'service_id' => 'required|uuid', 'room_id' => 'required|uuid', 'starts_at' => $date, 'ends_at' => [...$date, 'after:starts_at']],
+            'create' => ['patient_id' => 'required|uuid', 'doctor_id' => 'required|uuid', 'branch_id' => 'required|uuid', 'service_id' => 'required|uuid', 'room_id' => 'required|uuid', 'starts_at' => $date, 'ends_at' => [...$date, 'after:starts_at'], 'note' => 'sometimes|nullable|string|max:2000'],
             'walk_in' => ['patient_id' => 'required|uuid', 'doctor_id' => 'required|uuid', 'branch_id' => 'required|uuid', 'service_id' => 'required|uuid'],
             'reschedule' => ['doctor_id' => 'required|uuid', 'branch_id' => 'required|uuid', 'room_id' => 'required|uuid', 'starts_at' => $date, 'ends_at' => [...$date, 'after:starts_at'], 'expected_version' => 'required|integer|min:1'],
             default => ['expected_version' => 'required|integer|min:1', 'reason_code' => 'sometimes|string|max:64'],

@@ -1,59 +1,162 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onBeforeUnmount } from "vue";
+import axios from "axios";
 import { CalendarDays, Search } from "lucide-vue-next";
 import DateField from "../employees/DateField.vue";
 import ReceptionDialog from "./ReceptionDialog.vue";
-import ReceptionPatientForm from "./ReceptionPatientForm.vue";
 import ReceptionPatientSearch from "./ReceptionPatientSearch.vue";
-import {
-  blankPatient,
-  blankBooking,
-  branches,
-  departments,
-  doctors,
-  services,
-  availability,
-  validatePatient,
-  validateBooking,
-  localDate,
-  uzDate,
-  addDays,
-  searchPatients,
-  type ReceptionPatient,
-  type ReceptionAppointment,
-  type PatientDraft,
-  type BookingDraft,
-} from "../../mocks/reception";
+import { uzDate, type ReceptionPatient } from "../../mocks/reception";
 import { canReception } from "../../services/receptionAccess";
-const props = defineProps<{
-  patients: ReceptionPatient[];
-  appointments: ReceptionAppointment[];
-  preset?: Partial<BookingDraft>;
-}>();
+import { session } from "../../services/session";
+import { clinicRequest, errorText } from "../../services/api";
+import {
+  bookingCatalog,
+  bookingAvailability,
+  findBookingPatients,
+  localDay,
+  localTime,
+  nextDay,
+  type BookingDoctor,
+  type BookingSlot,
+  type BookingPreset,
+  type BookingPatient,
+  type BookingAppointment,
+} from "../../services/receptionBooking";
+const props = defineProps<{ preset?: BookingPreset }>();
 const emit = defineEmits<{
   close: [];
-  save: [patient: ReceptionPatient | PatientDraft, draft: BookingDraft];
+  saved: [appointment: BookingAppointment, date: string];
 }>();
-const mode = ref(canReception("patient") ? "new" : "existing"),
-  patient = ref<ReceptionPatient | null>(null),
-  person = ref(blankPatient()),
-  draft = ref({ ...blankBooking(), ...props.preset }),
-  errors = ref<Record<string, string>>({});
+const branches = computed(() => session.branches.filter((b) => b.active));
+const patient = ref<ReceptionPatient | null>(null),
+  doctors = ref<BookingDoctor[]>([]),
+  zone = ref("");
+const draft = ref({
+  branchId:
+    props.preset?.branchId || session.branch || branches.value[0]?.id || "",
+  departmentId: "",
+  doctorId: "",
+  serviceId: "",
+  date: props.preset?.date || "",
+  time: "",
+  note: "",
+});
+const errors = ref<Record<string, string>>({}),
+  error = ref(""),
+  catalogError = ref(""),
+  slotsError = ref(""),
+  loading = ref(false),
+  loadingSlots = ref(false),
+  saving = ref(false);
+const slots = ref<BookingSlot[]>([]),
+  selectedSlot = ref<BookingSlot>(),
+  future = ref(props.preset?.date ? "other" : "today");
+let catalogSequence = 0,
+  slotSequence = 0,
+  alive = true,
+  initial = true;
+onBeforeUnmount(() => {
+  alive = false;
+  catalogSequence++;
+  slotSequence++;
+});
+const departments = computed(() => [
+  ...new Map(
+    doctors.value.map((d) => [
+      d.specialty_id,
+      { id: d.specialty_id, name: d.specialty_name },
+    ]),
+  ).values(),
+]);
 const eligibleDoctors = computed(() =>
-  doctors.filter(
-    (d) =>
-      d.branches.includes(draft.value.branchId) &&
-      d.departmentId === draft.value.departmentId,
-  ),
+  doctors.value.filter((d) => d.specialty_id === draft.value.departmentId),
 );
-const schedule = computed(() => availability(draft.value, props.appointments));
-const future = ref("today");
+const chosenDoctor = computed(() =>
+  doctors.value.find((d) => d.id === draft.value.doctorId),
+);
+const services = computed(
+  () =>
+    chosenDoctor.value?.services.map((s) => ({
+      id: s.id,
+      name: s.name,
+      duration: s.duration_minutes,
+    })) ?? [],
+);
+const durationLabel = computed(() => {
+  const override = services.value.find(
+    (s) => s.id === draft.value.serviceId,
+  )?.duration;
+  if (override) return override + " daqiqa";
+  const durations = [
+    ...new Set(
+      slots.value.map(
+        (s) => (Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60000,
+      ),
+    ),
+  ];
+  return durations.length
+    ? durations.join(" / ") + " daqiqa"
+    : "Jadval bo‘yicha";
+});
+const today = computed(() =>
+  zone.value ? localDay(Date.now(), zone.value) : "",
+);
+const patientWarning = computed(() =>
+  patient.value &&
+  !(patient.value as BookingPatient).branchIds?.includes(draft.value.branchId)
+    ? "Bemor tanlangan filialga biriktirilmagan. Filial biriktirishini alohida tekshiring."
+    : "",
+);
 watch(
   () => draft.value.branchId,
-  () => {
-    if (!eligibleDoctors.value.some((d) => d.id === draft.value.doctorId))
-      draft.value.doctorId = "";
+  async (branch) => {
+    const serial = ++catalogSequence;
+    doctors.value = [];
+    slots.value = [];
+    selectedSlot.value = undefined;
+    draft.value.departmentId = "";
+    draft.value.doctorId = "";
+    draft.value.serviceId = "";
+    zone.value = branches.value.find((b) => b.id === branch)?.timezone || "";
+    loading.value = true;
+    catalogError.value = "";
+    if (!branch) {
+      loading.value = false;
+      return;
+    }
+    try {
+      const result = await bookingCatalog(branch);
+      if (!alive || serial !== catalogSequence) return;
+      doctors.value = result.doctors;
+      zone.value = result.timezone;
+      if (!draft.value.date)
+        draft.value.date = localDay(Date.now(), zone.value);
+      if (initial) {
+        const doctor = doctors.value.find(
+          (d) => d.id === props.preset?.doctorId,
+        );
+        if (doctor) {
+          draft.value.departmentId = doctor.specialty_id;
+          draft.value.doctorId = doctor.id;
+          if (doctor.services.some((s) => s.id === props.preset?.serviceId))
+            draft.value.serviceId = props.preset!.serviceId!;
+        }
+        future.value =
+          draft.value.date === today.value
+            ? "today"
+            : draft.value.date === nextDay(today.value)
+              ? "tomorrow"
+              : "other";
+        initial = false;
+      }
+    } catch (e) {
+      if (alive && serial === catalogSequence)
+        catalogError.value = errorText(e);
+    } finally {
+      if (alive && serial === catalogSequence) loading.value = false;
+    }
   },
+  { immediate: true },
 );
 watch(
   () => draft.value.departmentId,
@@ -63,64 +166,137 @@ watch(
   },
 );
 watch(
-  () => [
-    draft.value.branchId,
-    draft.value.departmentId,
-    draft.value.doctorId,
-    draft.value.date,
-    draft.value.serviceId,
-  ],
+  () => draft.value.doctorId,
   () => {
-    if (
-      !schedule.value.slots.some((s) => s.time === draft.value.time && !s.busy)
-    )
-      draft.value.time = "";
+    if (!services.value.some((s) => s.id === draft.value.serviceId))
+      draft.value.serviceId = "";
   },
 );
+async function loadSlots() {
+  const serial = ++slotSequence;
+  slots.value = [];
+  selectedSlot.value = undefined;
+  draft.value.time = "";
+  slotsError.value = "";
+  const d = { ...draft.value },
+    tz = zone.value;
+  if (!d.doctorId || !d.serviceId || !d.date || !tz || d.date < today.value) {
+    loadingSlots.value = false;
+    return;
+  }
+  loadingSlots.value = true;
+  try {
+    const result = await bookingAvailability(
+      d.doctorId,
+      d.branchId,
+      d.serviceId,
+      d.date,
+      tz,
+    );
+    if (!alive || serial !== slotSequence) return;
+    slots.value = result;
+    if (props.preset?.slot && !error.value) {
+      const preset = result.find(
+        (s) =>
+          s.starts_at === props.preset?.slot?.starts_at &&
+          s.room_id === props.preset?.slot?.room_id,
+      );
+      if (preset) chooseSlot(preset);
+    }
+  } catch (e) {
+    if (alive && serial === slotSequence) slotsError.value = errorText(e);
+  } finally {
+    if (alive && serial === slotSequence) loadingSlots.value = false;
+  }
+}
+watch(
+  () => [
+    draft.value.branchId,
+    draft.value.doctorId,
+    draft.value.serviceId,
+    draft.value.date,
+    zone.value,
+  ],
+  loadSlots,
+);
+function chooseSlot(slot: BookingSlot) {
+  selectedSlot.value = slot;
+  draft.value.time = localTime(slot.starts_at, zone.value);
+}
 function dateMode(next: string) {
   future.value = next;
-  if (next !== "other")
-    draft.value.date = addDays(localDate(), next === "tomorrow" ? 1 : 0);
+  if (next !== "other" && zone.value)
+    draft.value.date = nextDay(today.value, next === "tomorrow" ? 1 : 0);
+  else if (next === "other") {
+    const el = document.querySelector<HTMLInputElement>(
+      "#reception-booking input[type=date]",
+    );
+    el?.focus();
+    try {
+      el?.showPicker?.();
+    } catch {
+      /* Keyboard entry remains available. */
+    }
+  }
 }
-function save() {
+async function save() {
+  if (!canReception("book") || saving.value) return;
+  errors.value = {};
+  if (!patient.value) errors.value.patient = "Bemorni tanlang.";
+  for (const field of [
+    "branchId",
+    "departmentId",
+    "doctorId",
+    "serviceId",
+  ] as const)
+    if (!draft.value[field]) errors.value[field] = "Tanlang.";
+  if (!draft.value.date || draft.value.date < today.value)
+    errors.value.date = "O‘tgan sanaga qabul yaratib bo‘lmaydi.";
   if (
-    !canReception("book") ||
-    (mode.value === "new" && !canReception("patient"))
+    !selectedSlot.value ||
+    Date.parse(selectedSlot.value.starts_at) <= Date.now()
   )
-    return;
-  errors.value = {
-    ...validateBooking(draft.value, props.appointments),
-    ...(mode.value === "new"
-      ? validatePatient(person.value)
-      : !patient.value
-        ? { patient: "Bemorni tanlang." }
-        : {}),
-  };
-  if (!Object.keys(errors.value).length)
-    emit("save", mode.value === "new" ? { ...person.value } : patient.value!, {
-      ...draft.value,
+    errors.value.time = "Bo‘sh vaqtni tanlang.";
+  if (Object.keys(errors.value).length || patientWarning.value) return;
+  const submittedDate = draft.value.date;
+  saving.value = true;
+  error.value = "";
+  try {
+    const response = await clinicRequest<BookingAppointment>("appointments", {
+      method: "POST",
+      body: {
+        patient_id: patient.value!.id,
+        doctor_id: draft.value.doctorId,
+        branch_id: draft.value.branchId,
+        service_id: draft.value.serviceId,
+        room_id: selectedSlot.value!.room_id,
+        starts_at: selectedSlot.value!.starts_at,
+        ends_at: selectedSlot.value!.ends_at,
+        note: draft.value.note || null,
+      },
     });
+    if (alive && response.status === 201)
+      emit("saved", response.data, submittedDate);
+  } catch (e) {
+    if (!alive) return;
+    if (axios.isAxiosError(e) && e.response?.status === 409) {
+      error.value = "Bu vaqt hozir band qilindi. Boshqa vaqtni tanlang.";
+      await loadSlots();
+    } else error.value = errorText(e);
+  } finally {
+    if (alive) saving.value = false;
+  }
 }
-const matching = computed(() =>
-  person.value.phone.replace(/\D/g, "").length >= 7
-    ? searchPatients(props.patients, person.value.phone)
-    : [],
-);
-async function lookup(q: string) {
-  await new Promise((resolve) => setTimeout(resolve, 120));
-  return searchPatients(props.patients, q);
-}
-const summary = computed(
-  () => doctors.find((d) => d.id === draft.value.doctorId)?.fullName,
-);
+const summary = computed(() => chosenDoctor.value?.name);
 </script>
 <template>
   <ReceptionDialog
     title="Qabulga yozish"
     subtitle="Bemor, shifokor va qulay vaqtni tanlang"
-    @close="emit('close')"
+    @close="!saving && emit('close')"
     ><form
       id="reception-booking"
+      data-permission="appointments.create"
       class="rp-dialog-body"
       novalidate
       @submit.prevent="save"
@@ -128,44 +304,30 @@ const summary = computed(
       <div class="rp-segment" aria-label="Bemor turi">
         <button
           type="button"
-          :aria-pressed="mode === 'new'"
-          :class="{ active: mode === 'new' }"
-          data-permission="patients.create"
-          :disabled="!canReception('patient')"
-          @click="mode = 'new'"
+          disabled
+          title="Yangi bemorni ro‘yxatga olish keyingi bosqichda"
         >
-          Yangi bemor</button
-        ><button
+          Yangi bemor
+        </button>
+        <button
           type="button"
-          :aria-pressed="mode === 'existing'"
-          :class="{ active: mode === 'existing' }"
-          @click="mode = 'existing'"
+          class="active"
+          aria-pressed="true"
+          data-permission="patients.view"
         >
           <Search :size="18" /> Oldin kelgan bemor
         </button>
       </div>
-      <section v-if="mode === 'new'">
-        <h3>Bemor ma’lumotlari</h3>
-        <ReceptionPatientForm v-model="person" :errors="errors" />
-        <div v-if="matching.length" class="rp-match" role="status">
-          Shu telefon bilan mos bemorlar bor. Bu aynan shu bemor degani
-          emas.<button class="rp-link" type="button" @click="mode = 'existing'">
-            Mos bemorlarni tanlash</button
-          ><button
-            v-for="p in matching"
-            :key="p.id"
-            class="rp-link"
-            type="button"
-            @click="
-              patient = p;
-              mode = 'existing';
-            "
-          >
-            {{ p.name }} · {{ p.id }}
-          </button>
-        </div>
-      </section>
-      <ReceptionPatientSearch v-else v-model="patient" :lookup="lookup" />
+      <p class="rp-hint">Yangi bemorni ro‘yxatga olish keyingi bosqichda.</p>
+      <p v-if="error" class="rp-error" role="alert">{{ error }}</p>
+      <p v-if="catalogError" class="rp-error" role="alert">
+        {{ catalogError }}
+      </p>
+      <ReceptionPatientSearch v-model="patient" :lookup="findBookingPatients" />
+      <p v-if="patientWarning" class="rp-error" role="alert">
+        {{ patientWarning }}
+      </p>
+      <p v-if="loading" role="status">Qabul ma’lumotlari yuklanmoqda…</p>
       <p v-if="errors.patient" class="rp-error" role="alert">
         {{ errors.patient }}
       </p>
@@ -184,6 +346,7 @@ const summary = computed(
           ><label
             >Bo‘lim <span>*</span
             ><select v-model="draft.departmentId" aria-label="Bo‘lim *">
+              <option value="">Bo‘limni tanlang</option>
               <option v-for="d in departments" :key="d.id" :value="d.id">
                 {{ d.name }}
               </option></select
@@ -195,7 +358,7 @@ const summary = computed(
             ><select v-model="draft.doctorId" aria-label="Shifokor *">
               <option value="">Shifokorni tanlang</option>
               <option v-for="d in eligibleDoctors" :key="d.id" :value="d.id">
-                {{ d.fullName }}
+                {{ d.name }}
               </option></select
             ><small v-if="errors.doctorId" class="rp-error">{{
               errors.doctorId
@@ -203,8 +366,10 @@ const summary = computed(
           ><label
             >Qabul turi <span>*</span
             ><select v-model="draft.serviceId" aria-label="Qabul turi *">
+              <option value="">Qabul turini tanlang</option>
               <option v-for="s in services" :key="s.id" :value="s.id">
-                {{ s.name }} · {{ s.duration }} daqiqa
+                {{ s.name }} ·
+                {{ s.duration ? s.duration + " daqiqa" : "Jadval bo‘yicha" }}
               </option></select
             ><small v-if="errors.serviceId" class="rp-error">{{
               errors.serviceId
@@ -233,7 +398,7 @@ const summary = computed(
           <DateField
             label="Qabul sanasi"
             v-model="draft.date"
-            :min="localDate()"
+            :min="today"
             @update:model-value="future = 'other'"
           />
           <p class="rp-hint">Kalendardan istalgan kelajakdagi sanani tanlang</p>
@@ -243,34 +408,39 @@ const summary = computed(
           <h3>Bo‘sh vaqtlar <span>*</span></h3>
           <p class="rp-hint">
             {{ uzDate(draft.date) }} ·
-            {{ services.find((s) => s.id === draft.serviceId)?.duration }}
-            daqiqa
+            {{ durationLabel }}
           </p>
-          <p v-if="!schedule.scheduled" class="rp-empty">
-            Bu kun uchun shifokor jadvali belgilanmagan.
+          <p v-if="loadingSlots" class="rp-empty" role="status">
+            Bo‘sh vaqtlar yuklanmoqda…
           </p>
-          <template v-else
-            ><p v-if="!schedule.slots.some((s) => !s.busy)" class="rp-empty">
-              Bo‘sh joy qolmagan. Boshqa sana yoki shifokorni tanlang.
-            </p>
-            <div class="rp-slots">
-              <button
-                v-for="s in schedule.slots"
-                :key="s.time"
-                type="button"
-                :disabled="s.busy"
-                :aria-pressed="draft.time === s.time"
-                :aria-label="`${s.time}${s.busy ? ' — Band' : ''}`"
-                :class="{ active: draft.time === s.time }"
-                @click="draft.time = s.time"
-              >
-                {{ s.time }} <span v-if="draft.time === s.time">✓</span>
-              </button>
-            </div>
-            <p class="rp-hint">
-              ○ Bo‘sh <span class="rp-busy-dot">● Band</span>
-            </p></template
-          ><small v-if="errors.time" class="rp-error">{{ errors.time }}</small>
+          <p v-else-if="slotsError" class="rp-error" role="alert">
+            {{ slotsError }}
+            <button type="button" class="rp-link" @click="loadSlots">
+              Qayta urinish
+            </button>
+          </p>
+          <p v-else-if="!draft.doctorId || !draft.serviceId" class="rp-empty">
+            Shifokor va qabul turini tanlang.
+          </p>
+          <p v-else-if="!slots.length" class="rp-empty">
+            Bu sanada qabul mavjud emas.
+          </p>
+          <div v-else class="rp-slots">
+            <button
+              v-for="s in slots"
+              :key="s.starts_at + s.room_id"
+              type="button"
+              :aria-label="localTime(s.starts_at, zone)"
+              :aria-pressed="selectedSlot === s"
+              :class="{ active: selectedSlot === s }"
+              :disabled="saving"
+              @click="chooseSlot(s)"
+            >
+              {{ localTime(s.starts_at, zone) }}
+              <span v-if="selectedSlot === s">✓</span>
+            </button>
+          </div>
+          <small v-if="errors.time" class="rp-error">{{ errors.time }}</small>
         </div>
       </section>
       <label class="rp-note"
@@ -285,12 +455,18 @@ const summary = computed(
           >{{ uzDate(draft.date) }} · {{ draft.time }} · {{ summary }}</span
         >
       </div>
-      <p class="rp-hint rp-local-hint">
-        Namuna rejimi: yozuv faqat shu sahifa xotirasida saqlanadi.
+      <p class="rp-hint">
+        Bo‘sh vaqtlar joriy bandlikka bog‘liq. Saqlash vaqtida qayta
+        tekshiriladi.
       </p>
     </form>
     <template #footer
-      ><button class="rp-button" type="button" @click="emit('close')">
+      ><button
+        class="rp-button"
+        type="button"
+        :disabled="saving"
+        @click="emit('close')"
+      >
         Bekor qilish</button
       ><button
         class="rp-button rp-primary"
@@ -298,10 +474,15 @@ const summary = computed(
         form="reception-booking"
         data-permission="appointments.create"
         :disabled="
-          !canReception('book') || (mode === 'new' && !canReception('patient'))
+          !canReception('book') ||
+          saving ||
+          loading ||
+          loadingSlots ||
+          !!patientWarning
         "
       >
-        <CalendarDays :size="19" /> Qabulga yozish
+        <CalendarDays :size="19" />
+        {{ saving ? "Saqlanmoqda…" : "Qabulga yozish" }}
       </button></template
     ></ReceptionDialog
   >
