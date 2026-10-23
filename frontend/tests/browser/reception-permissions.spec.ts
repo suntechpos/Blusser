@@ -39,7 +39,7 @@ test("booking an existing patient does not grant new-patient creation", async ({
     .click();
   await expect(
     page.getByRole("button", { name: "Yangi bemor", exact: true }),
-  ).toBeHidden();
+  ).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Oldin kelgan bemor", exact: false }),
   ).toBeVisible();

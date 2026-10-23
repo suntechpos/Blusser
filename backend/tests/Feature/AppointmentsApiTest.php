@@ -8,6 +8,7 @@ use App\Modules\Patients\Services\Patients;
 use App\Modules\Queues\Services\Queues;
 use App\Modules\Scheduling\Services\Availability;
 use App\Modules\Scheduling\Services\Scheduling;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -137,6 +138,104 @@ final class AppointmentsApiTest extends FoundationTestCase
         unset($d['room_id'],$d['starts_at'],$d['ends_at']);
 
         return $d;
+    }
+
+    public function test_reception_registrator_session_books_future_date_with_note_and_reads_filtered_rows(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $rule = [...$this->rule($a), 'weekday' => 3, 'effective_from' => '2026-10-01', 'effective_to' => '2031-12-31'];
+        $this->scheduleCommand($a, 'schedules', $rule);
+        $db = DB::connection('migration');
+        $db->table('doctor_services')->where('doctor_id', $a['doctor']['id'])->update(['duration_minutes' => 30]);
+        $needed = ['reception.view', 'appointments.view', 'appointments.create', 'patients.view', 'doctors.view', 'rooms.view', 'services.view', 'schedules.view'];
+        $db->table('role_permissions')->where('role_id', $a['role'])->whereNotIn('permission_id', $db->table('permissions')->whereIn('code', $needed)->pluck('id'))->delete();
+        foreach ($needed as $permission) {
+            $this->grant($a, $permission, $permission === 'services.view' ? 'entire_clinic' : 'assigned_branches');
+        }
+        $db->table('tenant_roles')->where('id', $a['role'])->update(['name' => 'Registrator']);
+        $jar = $this->clinicSession($a);
+        $options = $this->browser($jar, 'GET', '/api/v1/clinic/appointments/booking-options?branch_id='.$a['branch'])->assertOk();
+        $this->browser($jar, 'GET', '/api/v1/clinic/patients?q='.$a['patient']['id'])->assertOk()->assertJsonPath('meta.total', 1);
+        $options->assertJsonPath('data.0.name', 'Synthetic a')->assertJsonPath('data.0.services.0.duration_minutes', 30)->assertJsonPath('timezone', 'Asia/Tashkent');
+        $payload = [...$this->data($a, '10:30'), 'starts_at' => '2026-10-28T05:30:00Z', 'ends_at' => '2026-10-28T06:00:00Z', 'note' => 'Kelajakdagi qabul'];
+        $key = (string) Str::uuid();
+        $created = $this->browser($jar, 'POST', '/api/v1/clinic/appointments', $payload, key: $key)->assertCreated()->assertJsonPath('note', 'Kelajakdagi qabul')->json();
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments', $payload, key: $key)->assertCreated()->assertJsonPath('id', $created['id']);
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments', $payload, key: (string) Str::uuid())->assertConflict();
+        $this->assertSame(1, $db->table('appointments')->count());
+        $this->assertSame('2026-10-28 05:30:00+00', $db->table('appointments')->value('starts_at'));
+        $query = http_build_query(['branch_id' => $a['branch'], 'from' => '2026-10-27T19:00:00Z', 'to' => '2026-10-28T19:00:00Z', 'q' => 'Synthetic patient', 'status' => 'scheduled', 'per_page' => 8]);
+        $this->browser($jar, 'GET', '/api/v1/clinic/appointments?'.$query)->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $created['id']);
+        $this->browser($jar, 'GET', '/api/v1/clinic/appointments?from=2026-10-22T19:00:00Z&to=2026-10-23T19:00:00Z')->assertOk()->assertJsonPath('meta.total', 0);
+        $this->browser($jar, 'GET', '/api/v1/clinic/appointments/'.$created['id'])->assertOk()->assertJsonPath('note', 'Kelajakdagi qabul');
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments', [...$payload, 'note' => str_repeat('x', 2001)], key: (string) Str::uuid())->assertUnprocessable();
+        $this->assertSame(1, $db->table('patients')->count());
+    }
+
+    public function test_reception_booking_options_are_permission_tenant_and_branch_scoped(): void
+    {
+        $f = $this->fixture();
+        $a = $this->reference($f['a']);
+        $b = $this->reference($f['b']);
+        $jar = $this->clinicSession($a);
+        $url = '/api/v1/clinic/appointments/booking-options?branch_id=';
+        $this->browser($jar, 'GET', $url.$a['branch'].'&per_page=1&page=1')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $a['doctor']['id']);
+        $this->browser($jar, 'GET', $url.$a['branch'].'&per_page=1&page=2')->assertOk()->assertJsonCount(0, 'data');
+        $this->browser($jar, 'GET', $url.$b['branch'])->assertNotFound();
+        $other = $this->branch($a);
+        DB::connection('migration')->table('membership_branches')->where('branch_id', $other)->delete();
+        $this->grant($a, 'doctors.view', 'assigned_branches');
+        $this->browser($jar, 'GET', $url.$other)->assertForbidden();
+        $this->grant($a, 'schedules.view', null);
+        $this->browser($jar, 'GET', $url.$a['branch'])->assertForbidden();
+    }
+
+    public function test_reception_note_upgrade_preserves_existing_booking_and_refuses_note_loss(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $created = $this->command($a);
+        $migration = require database_path('migrations/2026_10_23_000017_add_reception_booking_details.php');
+        $previous = DB::getDefaultConnection();
+        DB::setDefaultConnection('migration');
+        try {
+            $migration->down();
+            $migration->up();
+            $row = DB::table('appointments')->where('id', $created['id'])->first();
+            $this->assertSame($a['patient']['id'], $row->patient_id);
+            $this->assertSame($a['doctor']['id'], $row->doctor_id);
+            $this->assertNull($row->note);
+            DB::table('appointments')->where('id', $created['id'])->update(['note' => 'Preserve me']);
+            try {
+                $migration->down();
+                $this->fail('Clinical note loss must be refused.');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('notes exist', $e->getMessage());
+            }
+        } finally {
+            DB::setDefaultConnection($previous);
+        }
+        $this->assertSame('Preserve me', app(Appointments::class)->show($this->actor($a['user']), $a['tenant'], 'appointments', $created['id'])['note']);
+    }
+
+    public function test_reception_can_book_an_actual_today_slot_but_not_a_past_instant(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $db = DB::connection('migration');
+        $now = CarbonImmutable::parse($db->selectOne('SELECT clock_timestamp() AS instant')->instant);
+        $zone = $now->setTimezone('UTC')->hour < 22 ? 'UTC' : 'Asia/Tashkent';
+        $local = $now->setTimezone($zone);
+        $db->table('branches')->where('id', $a['branch'])->update(['timezone' => $zone]);
+        $db->table('doctor_services')->where('doctor_id', $a['doctor']['id'])->update(['duration_minutes' => 1]);
+        $rule = [...$this->rule($a), 'weekday' => $local->isoWeekday(), 'local_start' => '00:00', 'local_end' => '23:59', 'slot_minutes' => 1, 'effective_from' => $local->toDateString(), 'effective_to' => $local->toDateString(), 'breaks' => []];
+        $this->scheduleCommand($a, 'schedules', $rule);
+        $start = $now->addMinutes(3)->startOfMinute();
+        $this->assertSame($local->toDateString(), $start->setTimezone($zone)->toDateString());
+        $payload = [...$this->data($a), 'starts_at' => $start->utc()->toISOString(), 'ends_at' => $start->addMinute()->utc()->toISOString()];
+        $jar = $this->clinicSession($a);
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments', $payload, key: (string) Str::uuid())->assertCreated();
+        $past = $now->subMinutes(3)->startOfMinute();
+        $this->browser($jar, 'POST', '/api/v1/clinic/appointments', [...$payload, 'starts_at' => $past->utc()->toISOString(), 'ends_at' => $past->addMinute()->utc()->toISOString()], key: (string) Str::uuid())->assertConflict();
+        $this->assertSame(1, $db->table('appointments')->count());
     }
 
     public function test_real_http_booking_reschedule_checkin_attendance_history_and_csrf(): void

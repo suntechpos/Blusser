@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onBeforeUnmount, nextTick } from "vue";
 import {
   Users,
   CalendarDays,
@@ -10,7 +10,6 @@ import {
   UserRoundPlus,
   Search,
   Eye,
-  Check,
   MoreHorizontal,
   Filter,
   ChevronLeft,
@@ -20,182 +19,512 @@ import {
 import BookingDialog from "../components/reception/BookingDialog.vue";
 import ArrivalDialog from "../components/reception/ArrivalDialog.vue";
 import ReceptionDialog from "../components/reception/ReceptionDialog.vue";
+import DateField from "../components/employees/DateField.vue";
 import {
   createReceptionState,
-  doctors,
-  branches,
-  departments,
-  services,
-  statusLabels,
+  doctors as demoDoctors,
   initials,
-  localDate,
   uzDate,
   nextPatient,
   checkIn,
-  validatePatient,
-  validateBooking,
-  timeText,
-  minutes,
   blankBooking,
   availability,
   type ReceptionPatient,
   type ReceptionAppointment,
   type PatientDraft,
-  type BookingDraft,
 } from "../mocks/reception";
 import "../components/reception/reception.css";
 import { canReception } from "../services/receptionAccess";
+import { can, session } from "../services/session";
+import { clinicRequest, errorText } from "../services/api";
+import type { Patient } from "../services/operations";
+import {
+  bookingCatalog,
+  bookingAvailability,
+  localDay,
+  localTime,
+  dayRange,
+  type BookingDoctor,
+  type BookingAppointment,
+  type BookingSlot,
+  type BookingPreset,
+} from "../services/receptionBooking";
+// Preserve the separate legacy arrival demo; it never supplies the API table.
 const state = ref(createReceptionState());
-const tab = ref("all"),
+const branches = computed(() => session.branches.filter((b) => b.active));
+const branch = ref(session.branch || branches.value[0]?.id || "");
+const zone = computed(
+  () => branches.value.find((b) => b.id === branch.value)?.timezone || "",
+);
+const today = computed(() =>
+  zone.value ? localDay(Date.now(), zone.value) : "",
+);
+const listDate = ref(today.value),
+  tab = ref("all"),
   query = ref(""),
-  specialty = ref(""),
   doctor = ref(""),
   status = ref(""),
   page = ref(1),
   toast = ref("");
-const booking = ref(false),
+const doctors = ref<BookingDoctor[]>([]),
+  catalogError = ref(""),
+  loading = ref(false),
+  error = ref(""),
+  total = ref(0),
+  highlight = ref("");
+interface Row extends BookingAppointment {
+  date: string;
+  time: string;
+  patientName: string;
+  patientNumber: string;
+  phone: string;
+  dob: string;
+  doctorName: string;
+  serviceName: string;
+}
+const rows = ref<Row[]>([]),
+  booking = ref(false),
   arrival = ref(false),
   preset = ref<ReceptionAppointment>(),
-  bookingPreset = ref<Partial<BookingDraft>>({}),
-  detail = ref<ReceptionAppointment>(),
+  bookingPreset = ref<BookingPreset>({}),
+  detail = ref<Row>(),
   menu = ref("");
-const scheduleDoctor = ref("karimov");
-const today = localDate();
-const todays = computed(() =>
-  state.value.appointments.filter((a) => a.date === today),
-);
-const listDate = ref(today);
-const listed = computed(() =>
-  state.value.appointments.filter((a) => a.date === listDate.value),
-);
-function tabCounts(appointments: ReceptionAppointment[]) {
-  return [
-    { id: "all", name: "Barcha bemorlar", count: appointments.length },
-    {
-      id: "walk_in",
-      name: "Jonli navbat",
-      count: appointments.filter(
-        (a) => a.kind === "walk_in" && a.status === "waiting",
-      ).length,
-    },
-    {
-      id: "booked",
-      name: "Oldindan yozilgan",
-      count: appointments.filter((a) => a.status === "booked").length,
-    },
-    {
-      id: "in_progress",
-      name: "Qabulda",
-      count: appointments.filter((a) => a.status === "in_progress").length,
-    },
-    {
-      id: "completed",
-      name: "Yakunlangan",
-      count: appointments.filter((a) => a.status === "completed").length,
-    },
-  ];
-}
-const tabs = computed(() => tabCounts(listed.value));
-const todayTabs = computed(() => tabCounts(todays.value));
-
+const counts = ref<Record<string, number>>({}),
+  scheduleDoctor = ref(""),
+  scheduleService = ref(""),
+  scheduleRows = ref<Row[]>([]),
+  freeSlots = ref<BookingSlot[]>([]),
+  scheduleError = ref(""),
+  scheduleLoading = ref(false);
+let alive = true,
+  listSerial = 0,
+  catalogSerial = 0,
+  sideSerial = 0,
+  searchTimer: ReturnType<typeof setTimeout>;
+onBeforeUnmount(() => {
+  alive = false;
+  listSerial++;
+  catalogSerial++;
+  sideSerial++;
+  clearTimeout(searchTimer);
+});
+const statusLabels: Record<string, string> = {
+  scheduled: "Yozilgan",
+  checked_in: "Kelgan",
+  in_progress: "Qabulda",
+  completed: "Yakunlangan",
+  cancelled: "Bekor qilingan",
+  no_show: "Kelmagan",
+};
+const tabs = computed(() => [
+  { id: "all", name: "Barcha bemorlar", count: counts.value.all ?? 0 },
+  { id: "walk_in", name: "Jonli navbat", count: "—" },
+  {
+    id: "scheduled",
+    name: "Oldindan yozilgan",
+    count: counts.value.scheduled ?? 0,
+  },
+  { id: "in_progress", name: "Qabulda", count: counts.value.in_progress ?? 0 },
+  { id: "completed", name: "Yakunlangan", count: counts.value.completed ?? 0 },
+]);
 const stats = computed(() => [
   {
-    name: "Bugungi bemorlar",
-    value: String(todayTabs.value[0]!.count),
+    name: "Tanlangan sana qabullari",
+    value: String(counts.value.all ?? 0),
     icon: Users,
     tone: "blue",
   },
   {
     name: "Oldindan yozilgan",
-    value: String(todayTabs.value[2]!.count),
+    value: String(counts.value.scheduled ?? 0),
     icon: CalendarDays,
     tone: "green",
   },
-  {
-    name: "Jonli navbat",
-    value: String(todayTabs.value[1]!.count),
-    icon: Stethoscope,
-    tone: "amber",
-  },
+  { name: "Jonli navbat", value: "—", icon: Stethoscope, tone: "amber" },
   {
     name: "Qabulda",
-    value: String(todayTabs.value[3]!.count),
+    value: String(counts.value.in_progress ?? 0),
     icon: Clock3,
     tone: "rose",
   },
   {
     name: "Yakunlangan",
-    value: String(todayTabs.value[4]!.count),
+    value: String(counts.value.completed ?? 0),
     icon: CheckCircle2,
     tone: "violet",
   },
   { name: "Tushum", value: "—", icon: Coins, tone: "teal" },
 ]);
-const person = (a: ReceptionAppointment) =>
-  state.value.patients.find((p) => p.id === a.patientId)!;
-const physician = (a: ReceptionAppointment) =>
-  doctors.find((d) => d.id === a.doctorId)!;
-const visible = computed(() =>
-  listed.value
-    .filter(
-      (a) =>
-        (tab.value === "all" ||
-          (tab.value === "walk_in"
-            ? a.kind === "walk_in" && a.status === "waiting"
-            : a.status === tab.value)) &&
-        (!specialty.value || physician(a).departmentId === specialty.value) &&
-        (!doctor.value || a.doctorId === doctor.value) &&
-        (!status.value || a.status === status.value) &&
-        `${person(a).name} ${person(a).id} ${person(a).phone}`
-          .toLocaleLowerCase()
-          .includes(query.value.toLocaleLowerCase()),
-    )
-    .sort((a, b) => a.time.localeCompare(b.time)),
-);
-const pageCount = computed(() =>
-  Math.max(1, Math.ceil(visible.value.length / 8)),
-);
-const rows = computed(() =>
-  visible.value.slice((page.value - 1) * 8, page.value * 8),
-);
-watch([tab, query, specialty, doctor, status], () => (page.value = 1), {
-  flush: "sync",
+const person = (a: Row) => ({
+  name: a.patientName,
+  id: a.patientNumber,
+  phone: a.phone,
+  dob: a.dob,
 });
-watch(pageCount, (n) => {
-  if (page.value > n) page.value = n;
+const physician = (a: Row) => ({
+  name: a.doctorName,
+  fullName: a.doctorName,
+  specialty: a.serviceName,
 });
-const schedule = computed(() => {
-  const doc = doctors.find((d) => d.id === scheduleDoctor.value)!;
-  const available = availability(
-    { ...blankBooking(), doctorId: doc.id, departmentId: doc.departmentId },
-    state.value.appointments,
-  );
-  const times = [
-    ...new Set([
-      ...available.slots.map((s) => s.time),
-      ...todays.value.filter((a) => a.doctorId === doc.id).map((a) => a.time),
-    ]),
-  ].sort();
-  return times.map((time) => ({
-    time,
-    appointment: todays.value.find(
-      (a) => a.doctorId === doc.id && a.time === time,
-    ),
-    busy: todays.value.some(
-      (a) =>
-        a.doctorId === doc.id &&
-        minutes(time) >= minutes(a.time) &&
-        minutes(time) <
-          minutes(a.time) +
-            (services.find((s) => s.id === a.serviceId)?.duration ?? 30),
-    ),
-    scheduled: available.scheduled,
-  }));
+async function present(appointments: BookingAppointment[]): Promise<Row[]> {
+  const patients = new Map<string, Patient>();
+  if (can("patients.view"))
+    await Promise.all(
+      [...new Set(appointments.map((a) => a.patient_id))].map(async (id) => {
+        const r = await clinicRequest<Patient>(`patients/${id}`);
+        patients.set(id, r.data);
+      }),
+    );
+  return appointments.map((a) => {
+    const p = patients.get(a.patient_id),
+      d = doctors.value.find((d) => d.id === a.doctor_id),
+      tz =
+        branches.value.find((b) => b.id === a.branch_id)?.timezone ||
+        zone.value;
+    return {
+      ...a,
+      date: localDay(a.starts_at, tz),
+      time: localTime(a.starts_at, tz),
+      patientName: p?.name ?? "Bemor ma’lumoti uchun ruxsat kerak",
+      patientNumber: p?.patient_number ?? "—",
+      phone: p?.phone ?? "",
+      dob: p?.date_of_birth ?? "",
+      doctorName: d?.name ?? "Shifokor ma’lumoti uchun ruxsat kerak",
+      serviceName: d?.services.find((s) => s.id === a.service_id)?.name ?? "—",
+    };
+  });
+}
+function filters() {
+  return {
+    branch_id: branch.value,
+    ...dayRange(listDate.value, zone.value),
+    ...(doctor.value ? { doctor_id: doctor.value } : {}),
+    ...(query.value.trim() ? { q: query.value.trim() } : {}),
+  };
+}
+// A view change invalidates a pending response before a debounced read starts.
+let listRevision = 0;
+let changingList = false;
+function updateListState(update: () => void) {
+  const previous = changingList;
+  changingList = true;
+  try {
+    update();
+  } finally {
+    changingList = previous;
+  }
+}
+async function load() {
+  const serial = ++listSerial;
+  const revision = listRevision;
+  loading.value = true;
+  error.value = "";
+  rows.value = [];
+  total.value = 0;
+  if (
+    !can("appointments.view") ||
+    !branch.value ||
+    !zone.value ||
+    !listDate.value
+  ) {
+    loading.value = false;
+    error.value =
+      "Qabullarni ko‘rish uchun ruxsat va filial vaqt mintaqasi kerak.";
+    return;
+  }
+  try {
+    const criteria = filters();
+    const r = await clinicRequest<{
+      data: BookingAppointment[];
+      meta: { total: number };
+    }>("appointments", {
+      params: {
+        ...criteria,
+        page: page.value,
+        per_page: 8,
+        ...(status.value || tab.value !== "all"
+          ? { status: status.value || tab.value }
+          : {}),
+      },
+    });
+    const projected = await present(r.data.data);
+    const totals = await Promise.all(
+      ["all", "scheduled", "in_progress", "completed"].map(async (status) => {
+        const r = await clinicRequest<{ meta: { total: number } }>(
+          "appointments",
+          {
+            params: {
+              ...criteria,
+              per_page: 1,
+              ...(status === "all" ? {} : { status }),
+            },
+          },
+        );
+        return [status, r.data.meta.total] as const;
+      }),
+    );
+    if (alive && serial === listSerial && revision === listRevision) {
+      rows.value = projected;
+      total.value = r.data.meta.total;
+      counts.value = Object.fromEntries(totals);
+    }
+    // Reveal navigation uses its own completed response, not refs temporarily
+    // cleared by another load (for example the branch catalog finishing).
+    return { rows: projected, total: r.data.meta.total };
+  } catch (e) {
+    if (alive && serial === listSerial && revision === listRevision)
+      error.value = errorText(e);
+  } finally {
+    if (alive && serial === listSerial && revision === listRevision)
+      loading.value = false;
+  }
+}
+watch(
+  () => [
+    branch.value,
+    listDate.value,
+    doctor.value,
+    status.value,
+    tab.value,
+    session.epoch,
+  ],
+  () => {
+    listRevision++;
+    clearTimeout(searchTimer);
+    if (changingList) return;
+    updateListState(() => {
+      page.value = 1;
+    });
+    void load();
+  },
+  { flush: "sync" },
+);
+watch(
+  page,
+  () => {
+    if (changingList) return;
+    listRevision++;
+    clearTimeout(searchTimer);
+    void load();
+  },
+  { flush: "sync" },
+);
+watch(
+  query,
+  () => {
+    listRevision++;
+    clearTimeout(searchTimer);
+    if (changingList) return;
+    searchTimer = setTimeout(() => {
+      updateListState(() => {
+        page.value = 1;
+      });
+      void load();
+    }, 300);
+  },
+  { flush: "sync" },
+);
+watch(
+  branch,
+  async (bid) => {
+    const serial = ++catalogSerial;
+    doctors.value = [];
+    scheduleDoctor.value = "";
+    doctor.value = "";
+    catalogError.value = "";
+    if (!listDate.value && zone.value) listDate.value = today.value;
+    if (
+      !bid ||
+      !can("doctors.view") ||
+      !can("rooms.view") ||
+      !can("schedules.view") ||
+      !can("services.view") ||
+      !can("appointments.view")
+    ) {
+      void load();
+      return;
+    }
+    try {
+      const result = await bookingCatalog(bid);
+      if (alive && serial === catalogSerial) {
+        doctors.value = result.doctors;
+        scheduleDoctor.value = result.doctors[0]?.id ?? "";
+        await load();
+      }
+    } catch (e) {
+      if (alive && serial === catalogSerial) catalogError.value = errorText(e);
+    }
+  },
+  { immediate: true },
+);
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 8)));
+const sideDoctor = computed(() =>
+  doctors.value.find((d) => d.id === scheduleDoctor.value),
+);
+watch(scheduleDoctor, () => {
+  scheduleService.value = sideDoctor.value?.services[0]?.id ?? "";
 });
-function openBooking(partial: Partial<BookingDraft> = {}) {
+async function loadSide() {
+  const serial = ++sideSerial;
+  scheduleRows.value = [];
+  freeSlots.value = [];
+  scheduleError.value = "";
+  scheduleLoading.value = true;
+  const d = scheduleDoctor.value,
+    service = scheduleService.value,
+    bid = branch.value,
+    date = listDate.value,
+    tz = zone.value;
+  if (!d || !date || !tz || !can("appointments.view")) {
+    scheduleLoading.value = false;
+    return;
+  }
+  try {
+    const appointments: BookingAppointment[] = [];
+    for (let p = 1; ; p++) {
+      const r = await clinicRequest<{
+        data: BookingAppointment[];
+        meta: { total: number };
+      }>("appointments", {
+        params: {
+          branch_id: bid,
+          doctor_id: d,
+          ...dayRange(date, tz),
+          page: p,
+          per_page: 100,
+        },
+      });
+      appointments.push(...r.data.data);
+      if (appointments.length >= r.data.meta.total || !r.data.data.length)
+        break;
+    }
+    const projected = await present(appointments);
+    const available =
+      service && canReception("book")
+        ? await bookingAvailability(d, bid, service, date, tz)
+        : [];
+    if (alive && serial === sideSerial) {
+      scheduleRows.value = projected;
+      freeSlots.value = available;
+    }
+  } catch (e) {
+    if (alive && serial === sideSerial) scheduleError.value = errorText(e);
+  } finally {
+    if (alive && serial === sideSerial) scheduleLoading.value = false;
+  }
+}
+watch(
+  () => [
+    scheduleDoctor.value,
+    scheduleService.value,
+    listDate.value,
+    branch.value,
+    session.epoch,
+  ],
+  loadSide,
+);
+const schedule = computed(() =>
+  [
+    ...scheduleRows.value.map((a) => ({
+      time: a.time,
+      start: a.starts_at,
+      appointment: a,
+      slot: undefined as BookingSlot | undefined,
+      busy: true,
+      scheduled: true,
+    })),
+    ...freeSlots.value.map((s) => ({
+      time: localTime(s.starts_at, zone.value),
+      start: s.starts_at,
+      appointment: undefined as Row | undefined,
+      slot: s,
+      busy: false,
+      scheduled: true,
+    })),
+  ].sort((a, b) => a.start.localeCompare(b.start)),
+);
+function openBooking(partial: BookingPreset = {}) {
   if (!canReception("book")) return;
-  bookingPreset.value = partial;
+  bookingPreset.value = {
+    branchId: branch.value,
+    date: listDate.value,
+    ...partial,
+  };
   booking.value = true;
+}
+async function saved(appointment: BookingAppointment, date: string) {
+  booking.value = false;
+  listRevision++;
+  clearTimeout(searchTimer);
+  // These are one booking-reveal transition, not independent user filter edits.
+  updateListState(() => {
+    listDate.value = date;
+    branch.value = appointment.branch_id;
+    tab.value = "all";
+    query.value = "";
+    doctor.value = "";
+    status.value = "";
+    page.value = 1;
+  });
+  rows.value = [];
+  total.value = 0;
+  error.value = "";
+  loading.value = true;
+  highlight.value = appointment.id;
+  toast.value = "Bemor qabulga muvaffaqiyatli yozildi.";
+  await nextTick();
+  const revision = listRevision;
+  const current = () => alive && revision === listRevision;
+  try {
+    const range = dayRange(date, zone.value);
+    if (Date.parse(appointment.starts_at) > Date.parse(range.from)) {
+      const earlier = await clinicRequest<{ meta: { total: number } }>(
+        "appointments",
+        {
+          params: {
+            branch_id: appointment.branch_id,
+            from: range.from,
+            to: appointment.starts_at,
+            per_page: 1,
+          },
+        },
+      );
+      if (!current()) return;
+      updateListState(() => {
+        page.value = Math.floor(earlier.data.meta.total / 8) + 1;
+      });
+    }
+    let result = await load();
+    if (!current()) return;
+    while (
+      result &&
+      !result.rows.some((row) => row.id === appointment.id) &&
+      page.value < Math.ceil(result.total / 8)
+    ) {
+      updateListState(() => {
+        page.value++;
+      });
+      result = await load();
+      if (!current()) return;
+    }
+    await loadSide();
+  } catch (e) {
+    if (current()) {
+      error.value = errorText(e);
+      loading.value = false;
+    }
+  }
+}
+function bookSlot(slot: BookingSlot) {
+  openBooking({
+    doctorId: scheduleDoctor.value,
+    departmentId: sideDoctor.value?.specialty_id,
+    serviceId: scheduleService.value,
+    slot,
+  });
+}
+function showAppointment(_a: ReceptionAppointment) {
+  toast.value = "Kelish jarayoni — faqat lokal namuna.";
 }
 function openArrival(a?: ReceptionAppointment) {
   if (
@@ -215,39 +544,6 @@ function createPatient(d: PatientDraft) {
   state.value.patients.push(p);
   return p;
 }
-function showAppointment(appointment: ReceptionAppointment) {
-  listDate.value = appointment.date;
-  tab.value = "all";
-  query.value = "";
-  doctor.value = "";
-  specialty.value = "";
-  status.value = "";
-  page.value =
-    Math.floor(visible.value.findIndex((a) => a.id === appointment.id) / 8) + 1;
-}
-function saveBooking(p: ReceptionPatient | PatientDraft, d: BookingDraft) {
-  if (!canReception("book") || (!("id" in p) && !canReception("patient")))
-    return;
-  // Revalidate against current state before either local record is inserted.
-  if (Object.keys(validateBooking(d, state.value.appointments)).length) return;
-  if (!("id" in p) && Object.keys(validatePatient(p)).length) return;
-  const patient =
-    "id" in p
-      ? state.value.patients.find((x) => x.id === p.id)
-      : createPatient(p);
-  if (!patient) return;
-  const appointment: ReceptionAppointment = {
-    ...d,
-    id: `A-${state.value.appointments.length + 1}`,
-    patientId: patient.id,
-    status: "booked",
-    kind: "scheduled",
-  };
-  state.value.appointments.push(appointment);
-  showAppointment(appointment);
-  booking.value = false;
-  toast.value = "Qabulga yozildi — faqat lokal namuna ro‘yxatida.";
-}
 function arrive(
   p: ReceptionPatient,
   id: string | null,
@@ -263,13 +559,13 @@ function arrive(
   } else {
     if (
       state.value.appointments.some(
-        (a) => a.patientId === p.id && a.date === today,
+        (a) => a.patientId === p.id && a.date === today.value,
       )
     ) {
       toast.value = "Bugungi mavjud qabulni tanlang. Bemor qayta qo‘shilmadi.";
       return;
     }
-    const d = doctors.find(
+    const d = demoDoctors.find(
       (d) => d.id === doctorId && d.branches.includes(branchId),
     );
     if (
@@ -287,7 +583,7 @@ function arrive(
       branchId,
       departmentId: d.departmentId,
       serviceId: "initial",
-      date: today,
+      date: today.value,
       time: new Date().toTimeString().slice(0, 5),
       status: "waiting",
       kind: "walk_in",
@@ -301,10 +597,7 @@ function arrive(
   arrival.value = false;
   toast.value = "Keldi — navbatga qo‘shildi (faqat lokal namuna).";
 }
-function bookSlot(time: string) {
-  const doc = doctors.find((d) => d.id === scheduleDoctor.value)!;
-  openBooking({ doctorId: doc.id, departmentId: doc.departmentId, time });
-}
+
 function focusSearch() {
   document.getElementById("reception-query")?.focus();
 }
@@ -317,8 +610,8 @@ function focusSearch() {
           Registratura
           <small
             class="rp-demo-badge"
-            title="O‘zgarishlar faqat sahifa xotirasida saqlanadi"
-            >Lokal namuna</small
+            title="Qabullar serverdan olinadi. Kelish va jonli navbat alohida lokal namuna."
+            >Qabullar API</small
           >
         </h1>
         <p>Bemorlarni ro‘yxatga olish, qabulga yozish va navbatni boshqarish</p>
@@ -353,7 +646,9 @@ function focusSearch() {
           <p>{{ s.name }}</p>
           <strong>{{ s.value }}</strong
           ><small>{{
-            s.name === "Tushum" ? "Ma’lumot mavjud emas" : "Lokal namuna holati"
+            ["Tushum", "Jonli navbat"].includes(s.name)
+              ? "Hozircha ulanmagan"
+              : "Qabullar API"
           }}</small>
         </div>
       </article>
@@ -367,46 +662,57 @@ function focusSearch() {
             :class="{ active: tab === t.id }"
             :aria-pressed="tab === t.id"
             data-permission="reception.view"
-            @click="tab = t.id"
+            :disabled="t.id === 'walk_in'"
+            :title="
+              t.id === 'walk_in'
+                ? 'Jonli navbat bu bosqichda ulanmagan'
+                : undefined
+            "
+            @click="
+              tab = t.id;
+              status = '';
+            "
           >
             {{ t.name }} <span>{{ t.count }}</span>
           </button>
         </nav>
-        <div v-if="listDate !== today" class="rp-date-context">
-          <span>{{ uzDate(listDate) }} qabullari</span
-          ><button
-            class="rp-link"
-            @click="
-              listDate = today;
-              tab = 'all';
-              query = '';
-              doctor = '';
-              specialty = '';
-              status = '';
-              page = 1;
-            "
-          >
-            Bugungi ro‘yxatga qaytish
-          </button>
+        <div class="rp-date-context">
+          <label
+            >Sana filtri
+            <DateField v-model="listDate" label="Qabullar sanasi" /></label
+          ><button class="rp-link" @click="listDate = today">Bugun</button
+          ><span>{{ uzDate(listDate) }} qabullari</span>
         </div>
+        <p v-if="catalogError" role="alert" class="rp-error">
+          {{ catalogError }}
+        </p>
+        <p v-if="error" role="alert" class="rp-error">
+          {{ error }}
+          <button type="button" class="rp-link" @click="load">
+            Qayta urinish
+          </button>
+        </p>
+        <p v-if="loading" role="status" class="rp-empty">
+          Qabullar yuklanmoqda…
+        </p>
         <div class="rp-filters">
           <label class="rp-search"
             ><Search :size="18" /><input
               id="reception-query"
               v-model="query"
               aria-label="Ro‘yxatdan bemor qidirish"
-              placeholder="Bemor qidirish..." /></label
-          ><select v-model="specialty" aria-label="Mutaxassislik">
-            <option value="">Mutaxassislik</option>
-            <option v-for="d in departments" :key="d.id" :value="d.id">
-              {{ d.name }}
+              placeholder="Bemor qidirish..."
+          /></label>
+          <select v-model="branch" aria-label="Qabullar filiali">
+            <option v-for="b in branches" :key="b.id" :value="b.id">
+              {{ b.name }}
             </option></select
           ><select v-model="doctor" aria-label="Shifokor">
             <option value="">Shifokor</option>
             <option v-for="d in doctors" :key="d.id" :value="d.id">
               {{ d.name }}
             </option></select
-          ><select v-model="status" aria-label="Holat">
+          ><select v-model="status" aria-label="Holat" @change="tab = 'all'">
             <option value="">Holat</option>
             <option v-for="(label, id) in statusLabels" :key="id" :value="id">
               {{ label }}
@@ -417,7 +723,6 @@ function focusSearch() {
             aria-label="Filtrlarni tozalash"
             @click="
               query = '';
-              specialty = '';
               doctor = '';
               status = '';
               tab = 'all';
@@ -439,7 +744,11 @@ function focusSearch() {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(a, i) in rows" :key="a.id">
+              <tr
+                v-for="(a, i) in rows"
+                :key="a.id"
+                :class="{ 'rp-new-booking': a.id === highlight }"
+              >
                 <td>{{ (page - 1) * 8 + i + 1 }}</td>
                 <td>
                   <div class="rp-person">
@@ -462,11 +771,11 @@ function focusSearch() {
                 <td>
                   <span class="rp-badge" :class="a.status"
                     ><CalendarDays
-                      v-if="a.status === 'booked'"
+                      v-if="a.status === 'scheduled'"
                       :size="16"
                     /><Clock3
                       v-else-if="
-                        a.status === 'waiting' || a.status === 'in_progress'
+                        a.status === 'checked_in' || a.status === 'in_progress'
                       "
                       :size="16"
                     /><CheckCircle2 v-else :size="16" />{{
@@ -480,18 +789,8 @@ function focusSearch() {
                 <td>
                   <div class="rp-row-actions">
                     <button
-                      v-if="
-                        a.status === 'booked' &&
-                        a.date === today &&
-                        canReception('checkIn')
-                      "
-                      class="rp-button rp-outline"
-                      @click="openArrival(a)"
-                    >
-                      <Check :size="16" /> Keldi</button
-                    ><button
-                      v-else
                       class="rp-button rp-soft"
+                      :disabled="!canReception('detail')"
                       data-permission="appointments.view"
                       @click="detail = a"
                     >
@@ -521,7 +820,7 @@ function focusSearch() {
                   </div>
                 </td>
               </tr>
-              <tr v-if="!rows.length">
+              <tr v-if="!loading && !error && !rows.length">
                 <td colspan="6" class="rp-empty">
                   Bemor topilmadi. Qidiruv yoki filtrlarni o‘zgartiring.
                 </td>
@@ -531,10 +830,10 @@ function focusSearch() {
         </div>
         <footer class="rp-pagination">
           <span
-            >{{ visible.length ? (page - 1) * 8 + 1 : 0 }}–{{
-              Math.min(page * 8, visible.length)
+            >{{ total ? (page - 1) * 8 + 1 : 0 }}–{{
+              Math.min(page * 8, total)
             }}
-            / {{ visible.length }} ta bemor</span
+            / {{ total }} ta bemor</span
           >
           <div>
             <button
@@ -565,13 +864,19 @@ function focusSearch() {
       </section>
       <aside class="rp-side">
         <section class="rp-panel rp-schedule">
-          <h2>Bugungi qabullar</h2>
+          <h2>
+            {{
+              listDate === today
+                ? "Bugungi qabullar"
+                : "Belgilangan sana qabullari"
+            }}
+          </h2>
           <p class="rp-schedule-date">
-            <CalendarDays :size="16" />{{ uzDate(today) }}
+            <CalendarDays :size="16" />{{ uzDate(listDate) }}
           </p>
           <label class="rp-doctor"
             ><span class="rp-avatar">{{
-              initials(doctors.find((d) => d.id === scheduleDoctor)!.fullName)
+              initials(sideDoctor?.name || "")
             }}</span>
             <div>
               <select
@@ -581,12 +886,33 @@ function focusSearch() {
                 <option v-for="d in doctors" :key="d.id" :value="d.id">
                   {{ d.name }}
                 </option></select
-              ><small>{{
-                doctors.find((d) => d.id === scheduleDoctor)?.specialty
-              }}</small>
+              ><small>{{ sideDoctor?.specialty_name }}</small>
             </div></label
           >
-          <p v-if="!schedule.length" class="rp-empty">
+          <label class="rp-doctor"
+            >Qabul turi<select
+              v-model="scheduleService"
+              aria-label="Jadval qabul turi"
+            >
+              <option
+                v-for="s in sideDoctor?.services ?? []"
+                :key="s.id"
+                :value="s.id"
+              >
+                {{ s.name }}
+              </option>
+            </select></label
+          >
+          <p v-if="scheduleLoading" role="status" class="rp-empty">
+            Jadval yuklanmoqda…
+          </p>
+          <p v-if="scheduleError" role="alert" class="rp-error">
+            {{ scheduleError }}
+          </p>
+          <p
+            v-if="!scheduleLoading && !scheduleError && !schedule.length"
+            class="rp-empty"
+          >
             Bu kun uchun shifokor jadvali belgilanmagan.
           </p>
           <div
@@ -596,7 +922,7 @@ function focusSearch() {
           >
             <div
               v-for="s in schedule"
-              :key="s.time"
+              :key="s.start + (s.slot?.room_id ?? s.appointment?.id)"
               class="rp-timeline-row"
               :class="s.appointment?.status"
             >
@@ -619,7 +945,7 @@ function focusSearch() {
                 :aria-label="`${s.time} vaqtiga yozish`"
                 data-permission="appointments.create"
                 :disabled="!canReception('book')"
-                @click="bookSlot(s.time)"
+                @click="s.slot && bookSlot(s.slot)"
               >
                 + Yozish
               </button>
@@ -639,9 +965,8 @@ function focusSearch() {
               <CalendarDays :size="23" />Qabulga yozish</button
             ><button
               @click="
-                tab = 'walk_in';
+                toast = 'Jonli navbat bu bosqichda ulanmagan.';
                 doctor = '';
-                specialty = '';
                 status = '';
                 query = '';
               "
@@ -654,11 +979,9 @@ function focusSearch() {
     </div>
     <BookingDialog
       v-if="booking"
-      :patients="state.patients"
-      :appointments="state.appointments"
       :preset="bookingPreset"
       @close="booking = false"
-      @save="saveBooking"
+      @saved="saved"
     /><ArrivalDialog
       v-if="arrival"
       :patients="state.patients"
@@ -670,7 +993,7 @@ function focusSearch() {
     /><ReceptionDialog
       v-if="detail"
       title="Qabul ma’lumotlari"
-      subtitle="Lokal namuna · faqat ko‘rish uchun"
+      subtitle="Qabullar API · faqat ko‘rish uchun"
       @close="detail = undefined"
       ><div class="rp-dialog-body rp-details">
         <h3>{{ person(detail).name }}</h3>
@@ -681,15 +1004,11 @@ function focusSearch() {
         <p><b>Shifokor:</b> {{ physician(detail).fullName }}</p>
         <p>
           <b>Filial:</b>
-          {{ branches.find((b) => b.id === detail!.branchId)?.name }}
+          {{ branches.find((b) => b.id === detail!.branch_id)?.name }}
         </p>
         <p>
           <b>Sana va vaqt:</b> {{ detail.date }} · {{ detail.time }}–{{
-            timeText(
-              minutes(detail.time) +
-                (services.find((s) => s.id === detail!.serviceId)?.duration ??
-                  30),
-            )
+            localTime(detail.ends_at, zone)
           }}
         </p>
         <p><b>Holati:</b> {{ statusLabels[detail.status] }}</p>

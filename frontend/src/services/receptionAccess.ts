@@ -1,9 +1,17 @@
-import { can } from "./session";
+import { can, session } from "./session";
 /** Same existing action codes as booking/attendance APIs; reception has no duplicate grants. */
 export const receptionActions = {
   book: {
     label: "Qabulga yozish",
-    codes: ["appointments.view", "appointments.create", "patients.view"],
+    codes: [
+      "appointments.view",
+      "appointments.create",
+      "patients.view",
+      "doctors.view",
+      "rooms.view",
+      "services.view",
+      "schedules.view",
+    ],
   },
   patient: {
     label: "Yangi bemor qo‘shish",
@@ -37,5 +45,9 @@ export const receptionActions = {
   },
 } as const;
 export function canReception(action: keyof typeof receptionActions) {
-  return can("reception.view") && receptionActions[action].codes.every(can);
+  return (
+    can("reception.view") &&
+    receptionActions[action].codes.every(can) &&
+    (action !== "book" || session.grants?.["services.view"] === "entire_clinic")
+  );
 }

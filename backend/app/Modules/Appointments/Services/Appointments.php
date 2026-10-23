@@ -20,6 +20,24 @@ final class Appointments
         return json_decode(app(Governance::class)->call('booking_command', [$action, $id, json_encode($payload, JSON_THROW_ON_ERROR), $key], $actor, $tenant), true, flags: JSON_THROW_ON_ERROR);
     }
 
+    public function bookingOptions(User $actor, string $tenant, array $filters): array
+    {
+        return app(Scheduling::class)->context($actor, $tenant, function () use ($filters) {
+            foreach (['appointments.view', 'doctors.view', 'rooms.view', 'schedules.view'] as $permission) {
+                abort_if(app(Permissions::class)->scope($permission) === null, 403);
+            }
+            app(Permissions::class)->requireEntireClinic('services.view');
+            foreach (['doctors.view', 'rooms.view', 'schedules.view'] as $permission) {
+                abort_unless(DB::selectOne('SELECT governance.scheduling_branch(?,?) AS allowed', [$permission, $filters['branch_id']])->allowed, 403);
+            }
+
+            $value = DB::selectOne('SELECT governance.reception_booking_options(?,?,?) AS value', [$filters['branch_id'], $filters['page'] ?? 1, $filters['per_page'] ?? 50])->value;
+            abort_if($value === null, 404);
+
+            return json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+        });
+    }
+
     public function listing(User $actor, string $tenant, string $kind, array $filters, ?string $patient = null, bool $export = false): array
     {
         return app(Scheduling::class)->context($actor, $tenant, function () use ($kind, $filters, $patient, $export) {
@@ -39,7 +57,15 @@ final class Appointments
             }
             if (isset($filters['q'])) {
                 $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['q']).'%';
-                $query->whereRaw('id::text ILIKE ?', [$term]);
+                $query->where(function ($q) use ($term, $kind) {
+                    $q->whereRaw('id::text ILIKE ?', [$term]);
+                    if ($kind === 'appointments') {
+                        $q->orWhereExists(function ($p) use ($term) {
+                            $p->selectRaw('1')->from('patients')->whereColumn('patients.id', 'appointments.patient_id')->whereRaw('patients.tenant_id=public.context_tenant()')
+                                ->where(fn ($p) => $p->where('patients.name', 'ilike', $term)->orWhere('patients.phone', 'ilike', $term)->orWhere('patients.patient_number', 'ilike', $term));
+                        });
+                    }
+                });
             }
             foreach (['from' => '>=', 'to' => '<'] as $key => $op) {
                 if (isset($filters[$key])) {
