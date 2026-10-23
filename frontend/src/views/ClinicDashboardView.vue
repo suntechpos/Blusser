@@ -30,6 +30,7 @@ import {
   Map,
   MapPin,
   Menu,
+  Monitor,
   Package,
   Search,
   Settings,
@@ -144,6 +145,7 @@ const allGroups = [
       { label: "Bemorlar", icon: Users },
       { label: "Qabullar", icon: CalendarDays },
       { label: "Navbatlar", icon: ClipboardList },
+      { label: "Tablo boshqaruvi", icon: Monitor },
     ],
   },
   {
