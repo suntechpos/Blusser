@@ -149,6 +149,19 @@ export async function bookingSession(
         },
       });
     }
+    if (path.endsWith("/patients") && method === "POST") {
+      record();
+      const body = request.postDataJSON();
+      const created = {
+        ...patients[0]!,
+        ...body,
+        id: "60000000-0000-4000-8000-000000000099",
+        patient_number: "P-99",
+        branch_ids: [body.branch_id],
+      };
+      patients.push(created);
+      return route.fulfill({ status: 201, json: created });
+    }
     if (path.endsWith("/patients") && method === "GET") {
       record();
       if (state.patientDelay)

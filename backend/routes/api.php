@@ -41,6 +41,8 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                     }
                     Route::put($kind.'/{id}', [SchedulingController::class, 'update'])->whereUuid('id')->defaults('resourceKind', $kind);
                 }
+                Route::get('appointments/configuration-services', [SchedulingController::class, 'index'])->defaults('resourceKind', 'services');
+                Route::post('appointments/configuration-services', [SchedulingController::class, 'store'])->defaults('resourceKind', 'services');
                 Route::get('doctors/{doctor}/availability', [SchedulingController::class, 'availability'])->whereUuid('doctor');
                 Route::get('queue-tickets', [QueueController::class, 'index']);
                 Route::post('queue-tickets', [QueueController::class, 'store']);

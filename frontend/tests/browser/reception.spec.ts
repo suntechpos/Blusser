@@ -10,6 +10,9 @@ async function open(page: Page) {
     .getByRole("button", { name: "Qabulga yozish", exact: true })
     .click();
   await expect(dialog(page)).toBeVisible();
+  await dialog(page)
+    .getByRole("button", { name: "Oldin kelgan bemor", exact: true })
+    .click();
 }
 async function prepare(page: Page, date = "2026-10-28", time = "10:30") {
   await dialog(page)
@@ -43,7 +46,7 @@ test("real API-shaped existing patient booking uses October 28 slot, refreshes t
   await open(page);
   await expect(
     dialog(page).getByRole("button", { name: "Yangi bemor", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await prepare(page);
   await dialog(page)
     .getByLabel("Izoh", { exact: true })
@@ -118,7 +121,12 @@ test("409 clears slot, refreshes availability and keeps patient and note; server
   s.state.fail = true;
   await submit(page);
   await expect(dialog(page)).toBeVisible();
-  await expect(dialog(page).getByRole("alert")).toContainText("Server bilan");
+  await dialog(page)
+    .getByRole("button", { name: "Oldin kelgan bemor", exact: true })
+    .click();
+  await expect(dialog(page).getByRole("alert")).toContainText(
+    "Server xatosi (503)",
+  );
   s.state.delay = 500;
   await submit(page);
   await expect(
@@ -257,7 +265,7 @@ test("empty/error/loading states and mobile dialog keep working", async ({
   await dialog(page)
     .getByLabel("Qabul turi *", { exact: true })
     .selectOption(ids.service);
-  await expect(dialog(page)).toContainText("Bu sanada qabul mavjud emas");
+  await expect(dialog(page)).toContainText("Bu sanada bo‘sh vaqt yo‘q");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await dialog(page).evaluate((el) => el.scrollWidth <= el.clientWidth),
@@ -387,4 +395,181 @@ test("schedule-derived service duration is displayed from authoritative slot tim
   await expect(
     dialog(page).getByLabel("Qabul turi *", { exact: true }),
   ).toHaveValue(ids.service);
+});
+
+test("new patient is default; failed appointment retries the saved patient without duplicate creation", async ({
+  page,
+}) => {
+  const s = await bookingSession(page);
+  await open(page);
+  await dialog(page)
+    .getByRole("button", { name: "Yangi bemor", exact: true })
+    .click();
+  await dialog(page).getByLabel("Familiya *", { exact: true }).fill("Karimov");
+  await dialog(page).getByLabel("Ism *", { exact: true }).fill("Ilhom");
+  await dialog(page)
+    .getByLabel("Otasining ismi", { exact: true })
+    .fill("Ali o‘g‘li");
+  await dialog(page)
+    .getByLabel("Tug‘ilgan sana", { exact: true })
+    .fill("1994-03-12");
+  await dialog(page)
+    .getByLabel("Bo‘lim *", { exact: true })
+    .selectOption(ids.specialty);
+  await dialog(page)
+    .getByLabel("Shifokor *", { exact: true })
+    .selectOption(ids.doctor);
+  await dialog(page)
+    .getByLabel("Qabul turi *", { exact: true })
+    .selectOption(ids.service);
+  await dialog(page)
+    .getByLabel("Qabul sanasi", { exact: true })
+    .fill("2026-10-28");
+  await dialog(page)
+    .getByRole("button", { name: "10:30", exact: true })
+    .click();
+  s.state.conflict = true;
+  await submit(page);
+  await expect(dialog(page)).toContainText("Bemor saqlandi: P-99");
+  await expect(dialog(page)).toContainText("Bu vaqt hozir band qilindi");
+  await expect(
+    dialog(page).getByLabel("Familiya *", { exact: true }),
+  ).toBeDisabled();
+  expect(
+    s.requests.filter(
+      (r) => r.method === "POST" && r.path.endsWith("/patients"),
+    ),
+  ).toHaveLength(1);
+  await dialog(page)
+    .getByRole("button", { name: "11:00", exact: true })
+    .click();
+  await submit(page);
+  await expect(dialog(page)).toHaveCount(0);
+  expect(
+    s.requests.filter(
+      (r) => r.method === "POST" && r.path.endsWith("/patients"),
+    ),
+  ).toHaveLength(1);
+  expect(
+    s.requests.find((r) => r.method === "POST" && r.path.endsWith("/patients"))!
+      .body,
+  ).toMatchObject({
+    name: "Karimov Ilhom Ali o‘g‘li",
+    phone: null,
+    gender: null,
+    date_of_birth: "1994-03-12",
+    branch_id: ids.branch,
+  });
+  await expect(page.locator("tbody")).toContainText("Karimov Ilhom");
+  await page.reload();
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-28");
+  await expect(page.locator("tbody")).toContainText("Karimov Ilhom");
+});
+
+test("patient search distinguishes permission, server and network errors from empty results", async ({
+  page,
+}) => {
+  await bookingSession(page);
+  let status = 403;
+  await page.route("**/api/v1/clinic/patients?**", (route) =>
+    status === 0
+      ? route.abort("failed")
+      : route.fulfill({ status, json: { message: "Rejected" } }),
+  );
+  await open(page);
+  await expect(dialog(page).getByRole("alert")).toContainText(
+    "ruxsat yo‘q. (403)",
+  );
+  status = 500;
+  await dialog(page)
+    .getByRole("button", { name: "Qayta urinish", exact: true })
+    .click();
+  await expect(dialog(page).getByRole("alert")).toContainText(
+    "Server xatosi (500)",
+  );
+  status = 0;
+  await dialog(page)
+    .getByRole("button", { name: "Qayta urinish", exact: true })
+    .click();
+  await expect(dialog(page).getByRole("alert")).toContainText("Tarmoq xatosi");
+  await expect(dialog(page)).not.toContainText("Bemor topilmadi");
+});
+
+test("patient-create permission is independent from booking existing patients", async ({
+  page,
+}) => {
+  const grants = { ...allServerGrants };
+  delete grants["patients.create"];
+  const s = await bookingSession(page, grants);
+  await open(page);
+  await expect(
+    dialog(page).getByRole("button", { name: "Yangi bemor", exact: true }),
+  ).toBeDisabled();
+  await prepare(page);
+  await submit(page);
+  await expect(dialog(page)).toHaveCount(0);
+  expect(
+    s.requests.filter(
+      (r) => r.method === "POST" && r.path.endsWith("/patients"),
+    ),
+  ).toHaveLength(0);
+  expect(
+    s.requests.filter(
+      (r) => r.method === "POST" && r.path.endsWith("/appointments"),
+    ),
+  ).toHaveLength(1);
+});
+
+test("new-patient validation errors remain editable and never report booking success", async ({
+  page,
+}) => {
+  const s = await bookingSession(page);
+  let creations = 0;
+  await page.route("**/api/v1/clinic/patients", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    creations++;
+    if (creations === 1)
+      return route.fulfill({
+        status: 422,
+        json: { errors: { date_of_birth: ["Invalid date"] } },
+      });
+    return route.fallback();
+  });
+  await open(page);
+  await prepare(page);
+  await dialog(page)
+    .getByRole("button", { name: "Yangi bemor", exact: true })
+    .click();
+  await submit(page);
+  expect(creations).toBe(0);
+  await expect(dialog(page)).toContainText("To‘ldiring.");
+  await dialog(page)
+    .getByLabel("Familiya *", { exact: true })
+    .fill("Synthetic");
+  await dialog(page).getByLabel("Ism *", { exact: true }).fill("Validation");
+  await dialog(page)
+    .getByLabel("Tug‘ilgan sana", { exact: true })
+    .fill("2000-01-01");
+  await submit(page);
+  await expect(dialog(page).getByRole("alert")).toContainText("Tug‘ilgan sana");
+  await expect(dialog(page).getByRole("alert")).toContainText("(422)");
+  await expect(
+    dialog(page).getByLabel("Familiya *", { exact: true }),
+  ).toBeEnabled();
+  expect(
+    s.requests.filter(
+      (r) => r.method === "POST" && r.path.endsWith("/appointments"),
+    ),
+  ).toHaveLength(0);
+  await dialog(page)
+    .getByLabel("Tug‘ilgan sana", { exact: true })
+    .fill("1999-01-01");
+  await submit(page);
+  await expect(dialog(page)).toHaveCount(0);
+  expect(creations).toBe(2);
+  expect(
+    s.requests.filter(
+      (r) => r.method === "POST" && r.path.endsWith("/appointments"),
+    ),
+  ).toHaveLength(1);
 });

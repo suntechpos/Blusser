@@ -3,14 +3,17 @@ import { computed, ref, watch, onBeforeUnmount } from "vue";
 import axios from "axios";
 import { CalendarDays, Search } from "lucide-vue-next";
 import DateField from "../employees/DateField.vue";
+import BookingConfigurationDialog from "./BookingConfigurationDialog.vue";
 import ReceptionDialog from "./ReceptionDialog.vue";
 import ReceptionPatientSearch from "./ReceptionPatientSearch.vue";
 import { uzDate, type ReceptionPatient } from "../../mocks/reception";
 import { canReception } from "../../services/receptionAccess";
-import { session } from "../../services/session";
-import { clinicRequest, errorText } from "../../services/api";
+import { can, session } from "../../services/session";
+import { clinicRequest } from "../../services/api";
 import {
   bookingCatalog,
+  patientChoice,
+  bookingError,
   bookingAvailability,
   findBookingPatients,
   localDay,
@@ -27,6 +30,33 @@ const emit = defineEmits<{
   close: [];
   saved: [appointment: BookingAppointment, date: string];
 }>();
+import type { Patient } from "../../services/operations";
+const configuring = ref(false),
+  catalogRevision = ref(0);
+const canConfigure = computed(() =>
+  [
+    "employees.view",
+    "doctors.view",
+    "doctors.create",
+    "rooms.view",
+    "rooms.create",
+    "schedules.view",
+    "schedules.create",
+    "services.view",
+    "services.create",
+  ].every((code) => session.grants?.[code] === "entire_clinic"),
+);
+const mode = ref(can("patients.create") ? "new" : "existing");
+const demographics = ref({
+  lastName: "",
+  firstName: "",
+  middleName: "",
+  phone: "",
+  date_of_birth: "",
+  gender: "",
+});
+const createdPatient = ref<BookingPatient>();
+const patientPayload = ref<Record<string, unknown>>();
 const branches = computed(() => session.branches.filter((b) => b.active));
 const patient = ref<ReceptionPatient | null>(null),
   doctors = ref<BookingDoctor[]>([]),
@@ -48,6 +78,7 @@ const errors = ref<Record<string, string>>({}),
   loading = ref(false),
   loadingSlots = ref(false),
   saving = ref(false);
+const emptySlotReason = ref("");
 const slots = ref<BookingSlot[]>([]),
   selectedSlot = ref<BookingSlot>(),
   future = ref(props.preset?.date ? "other" : "today");
@@ -102,14 +133,16 @@ const today = computed(() =>
   zone.value ? localDay(Date.now(), zone.value) : "",
 );
 const patientWarning = computed(() =>
+  mode.value === "existing" &&
   patient.value &&
   !(patient.value as BookingPatient).branchIds?.includes(draft.value.branchId)
     ? "Bemor tanlangan filialga biriktirilmagan. Filial biriktirishini alohida tekshiring."
     : "",
 );
 watch(
-  () => draft.value.branchId,
-  async (branch) => {
+  () => [draft.value.branchId, catalogRevision.value] as const,
+  async ([branch], previous) => {
+    const retained = previous?.[0] === branch ? { ...draft.value } : undefined;
     const serial = ++catalogSequence;
     doctors.value = [];
     slots.value = [];
@@ -131,6 +164,17 @@ watch(
       zone.value = result.timezone;
       if (!draft.value.date)
         draft.value.date = localDay(Date.now(), zone.value);
+      if (retained) {
+        const retainedDoctor = result.doctors.find(
+          (d) => d.id === retained.doctorId,
+        );
+        if (retainedDoctor) {
+          draft.value.departmentId = retainedDoctor.specialty_id;
+          draft.value.doctorId = retainedDoctor.id;
+          if (retainedDoctor.services.some((s) => s.id === retained.serviceId))
+            draft.value.serviceId = retained.serviceId;
+        }
+      }
       if (initial) {
         const doctor = doctors.value.find(
           (d) => d.id === props.preset?.doctorId,
@@ -151,7 +195,7 @@ watch(
       }
     } catch (e) {
       if (alive && serial === catalogSequence)
-        catalogError.value = errorText(e);
+        catalogError.value = bookingError(e);
     } finally {
       if (alive && serial === catalogSequence) loading.value = false;
     }
@@ -178,6 +222,7 @@ async function loadSlots() {
   selectedSlot.value = undefined;
   draft.value.time = "";
   slotsError.value = "";
+  emptySlotReason.value = "";
   const d = { ...draft.value },
     tz = zone.value;
   if (!d.doctorId || !d.serviceId || !d.date || !tz || d.date < today.value) {
@@ -195,6 +240,18 @@ async function loadSlots() {
     );
     if (!alive || serial !== slotSequence) return;
     slots.value = result;
+    emptySlotReason.value =
+      (
+        {
+          no_schedule: "Bu sana uchun ish jadvali sozlanmagan.",
+          schedule_closed: "Bu sanada ish jadvali yopilgan.",
+          room_unavailable:
+            "Jadvaldagi xona faol yoki foydalanish uchun ochiq emas.",
+          configuration_unavailable:
+            "Shifokor yoki xizmat biriktirishi faol emas.",
+        } as Record<string, string>
+      )[result.unavailableReason ?? ""] ??
+      "Jadval, xona va mavjud bandlikni tekshiring.";
     if (props.preset?.slot && !error.value) {
       const preset = result.find(
         (s) =>
@@ -204,7 +261,7 @@ async function loadSlots() {
       if (preset) chooseSlot(preset);
     }
   } catch (e) {
-    if (alive && serial === slotSequence) slotsError.value = errorText(e);
+    if (alive && serial === slotSequence) slotsError.value = bookingError(e);
   } finally {
     if (alive && serial === slotSequence) loadingSlots.value = false;
   }
@@ -242,7 +299,20 @@ function dateMode(next: string) {
 async function save() {
   if (!canReception("book") || saving.value) return;
   errors.value = {};
-  if (!patient.value) errors.value.patient = "Bemorni tanlang.";
+  if (mode.value === "existing" && !patient.value)
+    errors.value.patient = "Bemorni tanlang.";
+  if (mode.value === "new") {
+    if (!can("patients.create")) return;
+    if (!patientPayload.value) {
+      for (const field of ["lastName", "firstName", "date_of_birth"] as const)
+        if (!demographics.value[field].trim())
+          errors.value[field] = "To‘ldiring.";
+      if (
+        demographics.value.date_of_birth > new Date().toISOString().slice(0, 10)
+      )
+        errors.value.date_of_birth = "Tug‘ilgan sana kelajakda bo‘lmasin.";
+    }
+  }
   for (const field of [
     "branchId",
     "departmentId",
@@ -262,10 +332,29 @@ async function save() {
   saving.value = true;
   error.value = "";
   try {
+    if (mode.value === "new" && !createdPatient.value) {
+      const d = demographics.value;
+      patientPayload.value ??= {
+        name: [d.lastName.trim(), d.firstName.trim(), d.middleName.trim()]
+          .filter(Boolean)
+          .join(" "),
+        date_of_birth: d.date_of_birth,
+        phone: d.phone.trim() || null,
+        gender: d.gender || null,
+        branch_id: draft.value.branchId,
+      };
+      const result = await clinicRequest<Patient>("patients", {
+        method: "POST",
+        body: patientPayload.value,
+      });
+      createdPatient.value = patientChoice(result.data);
+    }
+    const bookedPatient =
+      mode.value === "new" ? createdPatient.value : patient.value;
     const response = await clinicRequest<BookingAppointment>("appointments", {
       method: "POST",
       body: {
-        patient_id: patient.value!.id,
+        patient_id: bookedPatient!.id,
         doctor_id: draft.value.doctorId,
         branch_id: draft.value.branchId,
         service_id: draft.value.serviceId,
@@ -279,10 +368,20 @@ async function save() {
       emit("saved", response.data, submittedDate);
   } catch (e) {
     if (!alive) return;
-    if (axios.isAxiosError(e) && e.response?.status === 409) {
+    if (
+      !createdPatient.value &&
+      axios.isAxiosError(e) &&
+      e.response?.status === 422
+    )
+      patientPayload.value = undefined;
+    if (
+      (mode.value === "existing" || createdPatient.value) &&
+      axios.isAxiosError(e) &&
+      e.response?.status === 409
+    ) {
       error.value = "Bu vaqt hozir band qilindi. Boshqa vaqtni tanlang.";
       await loadSlots();
-    } else error.value = errorText(e);
+    } else error.value = bookingError(e);
   } finally {
     if (alive) saving.value = false;
   }
@@ -301,164 +400,266 @@ const summary = computed(() => chosenDoctor.value?.name);
       novalidate
       @submit.prevent="save"
     >
-      <div class="rp-segment" aria-label="Bemor turi">
+      <fieldset :disabled="saving" class="rp-booking-fields">
+        <div class="rp-segment" aria-label="Bemor turi">
+          <button
+            type="button"
+            :disabled="saving || !can('patients.create')"
+            :class="{ active: mode === 'new' }"
+            :aria-pressed="mode === 'new'"
+            data-permission="patients.view"
+            @click="can('patients.create') && (mode = 'new')"
+          >
+            Yangi bemor
+          </button>
+          <button
+            type="button"
+            :class="{ active: mode === 'existing' }"
+            :aria-pressed="mode === 'existing'"
+            :disabled="saving"
+            @click="mode = 'existing'"
+            data-permission="patients.view"
+          >
+            <Search :size="18" /> Oldin kelgan bemor
+          </button>
+        </div>
+
+        <p v-if="error" class="rp-error" role="alert">{{ error }}</p>
         <button
+          v-if="canConfigure"
+          class="rp-button"
           type="button"
-          disabled
-          title="Yangi bemorni ro‘yxatga olish keyingi bosqichda"
+          :disabled="saving || !draft.branchId"
+          data-permission="schedules.create"
+          @click="configuring = true"
         >
-          Yangi bemor
+          Qabulni sozlash
         </button>
-        <button
-          type="button"
-          class="active"
-          aria-pressed="true"
-          data-permission="patients.view"
+        <p v-if="catalogError" class="rp-error" role="alert">
+          {{ catalogError }}
+        </p>
+        <fieldset
+          v-if="mode === 'new'"
+          :disabled="saving || !!patientPayload"
+          class="rp-section rp-new-patient"
         >
-          <Search :size="18" /> Oldin kelgan bemor
-        </button>
-      </div>
-      <p class="rp-hint">Yangi bemorni ro‘yxatga olish keyingi bosqichda.</p>
-      <p v-if="error" class="rp-error" role="alert">{{ error }}</p>
-      <p v-if="catalogError" class="rp-error" role="alert">
-        {{ catalogError }}
-      </p>
-      <ReceptionPatientSearch v-model="patient" :lookup="findBookingPatients" />
-      <p v-if="patientWarning" class="rp-error" role="alert">
-        {{ patientWarning }}
-      </p>
-      <p v-if="loading" role="status">Qabul ma’lumotlari yuklanmoqda…</p>
-      <p v-if="errors.patient" class="rp-error" role="alert">
-        {{ errors.patient }}
-      </p>
-      <section class="rp-section">
-        <h3>Qabul ma’lumotlari</h3>
-        <div class="rp-form-grid">
-          <label
-            >Filial <span>*</span
-            ><select v-model="draft.branchId" aria-label="Filial *">
-              <option v-for="b in branches" :key="b.id" :value="b.id">
-                {{ b.name }}
-              </option></select
-            ><small v-if="errors.branchId" class="rp-error">{{
-              errors.branchId
-            }}</small></label
-          ><label
-            >Bo‘lim <span>*</span
-            ><select v-model="draft.departmentId" aria-label="Bo‘lim *">
-              <option value="">Bo‘limni tanlang</option>
-              <option v-for="d in departments" :key="d.id" :value="d.id">
-                {{ d.name }}
-              </option></select
-            ><small v-if="errors.departmentId" class="rp-error">{{
-              errors.departmentId
-            }}</small></label
-          ><label
-            >Shifokor <span>*</span
-            ><select v-model="draft.doctorId" aria-label="Shifokor *">
-              <option value="">Shifokorni tanlang</option>
-              <option v-for="d in eligibleDoctors" :key="d.id" :value="d.id">
-                {{ d.name }}
-              </option></select
-            ><small v-if="errors.doctorId" class="rp-error">{{
-              errors.doctorId
-            }}</small></label
-          ><label
-            >Qabul turi <span>*</span
-            ><select v-model="draft.serviceId" aria-label="Qabul turi *">
-              <option value="">Qabul turini tanlang</option>
-              <option v-for="s in services" :key="s.id" :value="s.id">
-                {{ s.name }} ·
-                {{ s.duration ? s.duration + " daqiqa" : "Jadval bo‘yicha" }}
-              </option></select
-            ><small v-if="errors.serviceId" class="rp-error">{{
-              errors.serviceId
-            }}</small></label
+          <div class="rp-form-grid">
+            <label
+              >Familiya <span>*</span
+              ><input
+                v-model="demographics.lastName"
+                aria-label="Familiya *"
+                maxlength="80"
+              /><small v-if="errors.lastName" class="rp-error">{{
+                errors.lastName
+              }}</small></label
+            >
+            <label
+              >Ism <span>*</span
+              ><input
+                v-model="demographics.firstName"
+                aria-label="Ism *"
+                maxlength="80"
+              /><small v-if="errors.firstName" class="rp-error">{{
+                errors.firstName
+              }}</small></label
+            >
+            <label
+              >Telefon<input
+                v-model="demographics.phone"
+                aria-label="Telefon"
+                type="tel"
+                maxlength="32"
+            /></label>
+            <label
+              >Tug‘ilgan sana <span>*</span
+              ><DateField
+                v-model="demographics.date_of_birth"
+                label="Tug‘ilgan sana"
+                :max="new Date().toISOString().slice(0, 10)"
+              /><small v-if="errors.date_of_birth" class="rp-error">{{
+                errors.date_of_birth
+              }}</small></label
+            >
+            <label
+              >Otasining ismi<input
+                v-model="demographics.middleName"
+                aria-label="Otasining ismi"
+                maxlength="80"
+            /></label>
+            <label
+              >Jinsi<select v-model="demographics.gender" aria-label="Jinsi">
+                <option value="">Tanlang</option>
+                <option value="female">Ayol</option>
+                <option value="male">Erkak</option>
+                <option value="unspecified">Ko‘rsatilmagan</option>
+              </select></label
+            >
+          </div>
+        </fieldset>
+        <p
+          v-if="mode === 'new' && createdPatient"
+          class="rp-hint"
+          role="status"
+        >
+          Bemor saqlandi: {{ createdPatient.patientNumber }}. Qabulni qayta
+          saqlashda bemor takror yaratilmaydi.
+        </p>
+        <ReceptionPatientSearch
+          v-if="mode === 'existing'"
+          v-model="patient"
+          :lookup="findBookingPatients"
+        />
+        <p v-if="patientWarning" class="rp-error" role="alert">
+          {{ patientWarning }}
+        </p>
+        <p
+          v-if="!loading && !catalogError && !doctors.length"
+          class="rp-hint"
+          role="status"
+        >
+          Tanlangan filialda faol shifokor, mutaxassislik va xizmat biriktirishi
+          topilmadi. Administrator qabulni sozlashi kerak.
+        </p>
+        <p v-if="loading" role="status">Qabul ma’lumotlari yuklanmoqda…</p>
+        <p v-if="errors.patient" class="rp-error" role="alert">
+          {{ errors.patient }}
+        </p>
+        <section class="rp-section">
+          <h3>Qabul ma’lumotlari</h3>
+          <div class="rp-form-grid">
+            <label
+              >Filial <span>*</span
+              ><select
+                v-model="draft.branchId"
+                aria-label="Filial *"
+                :disabled="saving || (mode === 'new' && !!patientPayload)"
+              >
+                <option v-for="b in branches" :key="b.id" :value="b.id">
+                  {{ b.name }}
+                </option></select
+              ><small v-if="errors.branchId" class="rp-error">{{
+                errors.branchId
+              }}</small></label
+            ><label
+              >Bo‘lim <span>*</span
+              ><select v-model="draft.departmentId" aria-label="Bo‘lim *">
+                <option value="">Bo‘limni tanlang</option>
+                <option v-for="d in departments" :key="d.id" :value="d.id">
+                  {{ d.name }}
+                </option></select
+              ><small v-if="errors.departmentId" class="rp-error">{{
+                errors.departmentId
+              }}</small></label
+            ><label
+              >Shifokor <span>*</span
+              ><select v-model="draft.doctorId" aria-label="Shifokor *">
+                <option value="">Shifokorni tanlang</option>
+                <option v-for="d in eligibleDoctors" :key="d.id" :value="d.id">
+                  {{ d.name }}
+                </option></select
+              ><small v-if="errors.doctorId" class="rp-error">{{
+                errors.doctorId
+              }}</small></label
+            ><label
+              >Qabul turi <span>*</span
+              ><select v-model="draft.serviceId" aria-label="Qabul turi *">
+                <option value="">Qabul turini tanlang</option>
+                <option v-for="s in services" :key="s.id" :value="s.id">
+                  {{ s.name }} ·
+                  {{ s.duration ? s.duration + " daqiqa" : "Jadval bo‘yicha" }}
+                </option></select
+              ><small v-if="errors.serviceId" class="rp-error">{{
+                errors.serviceId
+              }}</small></label
+            >
+          </div>
+        </section>
+        <section class="rp-section rp-date-slots">
+          <div>
+            <h3>Qabul sanasi <span>*</span></h3>
+            <div class="rp-date-modes">
+              <button
+                v-for="d in [
+                  ['today', 'Bugun'],
+                  ['tomorrow', 'Ertaga'],
+                  ['other', 'Boshqa sana'],
+                ]"
+                :key="d[0]"
+                type="button"
+                :class="{ active: future === d[0] }"
+                @click="dateMode(d[0]!)"
+              >
+                {{ d[1] }}
+              </button>
+            </div>
+            <DateField
+              label="Qabul sanasi"
+              v-model="draft.date"
+              :min="today"
+              @update:model-value="future = 'other'"
+            />
+            <p class="rp-hint">
+              Kalendardan istalgan kelajakdagi sanani tanlang
+            </p>
+            <small v-if="errors.date" class="rp-error">{{ errors.date }}</small>
+          </div>
+          <div>
+            <h3>Bo‘sh vaqtlar <span>*</span></h3>
+            <p class="rp-hint">
+              {{ uzDate(draft.date) }} ·
+              {{ durationLabel }}
+            </p>
+            <p v-if="loadingSlots" class="rp-empty" role="status">
+              Bo‘sh vaqtlar yuklanmoqda…
+            </p>
+            <p v-else-if="slotsError" class="rp-error" role="alert">
+              {{ slotsError }}
+              <button type="button" class="rp-link" @click="loadSlots">
+                Qayta urinish
+              </button>
+            </p>
+            <p v-else-if="!draft.doctorId || !draft.serviceId" class="rp-empty">
+              Shifokor va qabul turini tanlang.
+            </p>
+            <p v-else-if="!slots.length" class="rp-empty">
+              Bu sanada bo‘sh vaqt yo‘q. {{ emptySlotReason }}
+            </p>
+            <div v-else class="rp-slots">
+              <button
+                v-for="s in slots"
+                :key="s.starts_at + s.room_id"
+                type="button"
+                :aria-label="localTime(s.starts_at, zone)"
+                :aria-pressed="selectedSlot === s"
+                :class="{ active: selectedSlot === s }"
+                :disabled="saving"
+                @click="chooseSlot(s)"
+              >
+                {{ localTime(s.starts_at, zone) }}
+                <span v-if="selectedSlot === s">✓</span>
+              </button>
+            </div>
+            <small v-if="errors.time" class="rp-error">{{ errors.time }}</small>
+          </div>
+        </section>
+        <label class="rp-note"
+          >Izoh<textarea
+            v-model="draft.note"
+            placeholder="Qo‘shimcha ma’lumot"
+            maxlength="2000"
+          />
+        </label>
+        <div v-if="draft.time" class="rp-summary">
+          <CalendarDays :size="21" /><span
+            >{{ uzDate(draft.date) }} · {{ draft.time }} · {{ summary }}</span
           >
         </div>
-      </section>
-      <section class="rp-section rp-date-slots">
-        <div>
-          <h3>Qabul sanasi <span>*</span></h3>
-          <div class="rp-date-modes">
-            <button
-              v-for="d in [
-                ['today', 'Bugun'],
-                ['tomorrow', 'Ertaga'],
-                ['other', 'Boshqa sana'],
-              ]"
-              :key="d[0]"
-              type="button"
-              :class="{ active: future === d[0] }"
-              @click="dateMode(d[0]!)"
-            >
-              {{ d[1] }}
-            </button>
-          </div>
-          <DateField
-            label="Qabul sanasi"
-            v-model="draft.date"
-            :min="today"
-            @update:model-value="future = 'other'"
-          />
-          <p class="rp-hint">Kalendardan istalgan kelajakdagi sanani tanlang</p>
-          <small v-if="errors.date" class="rp-error">{{ errors.date }}</small>
-        </div>
-        <div>
-          <h3>Bo‘sh vaqtlar <span>*</span></h3>
-          <p class="rp-hint">
-            {{ uzDate(draft.date) }} ·
-            {{ durationLabel }}
-          </p>
-          <p v-if="loadingSlots" class="rp-empty" role="status">
-            Bo‘sh vaqtlar yuklanmoqda…
-          </p>
-          <p v-else-if="slotsError" class="rp-error" role="alert">
-            {{ slotsError }}
-            <button type="button" class="rp-link" @click="loadSlots">
-              Qayta urinish
-            </button>
-          </p>
-          <p v-else-if="!draft.doctorId || !draft.serviceId" class="rp-empty">
-            Shifokor va qabul turini tanlang.
-          </p>
-          <p v-else-if="!slots.length" class="rp-empty">
-            Bu sanada qabul mavjud emas.
-          </p>
-          <div v-else class="rp-slots">
-            <button
-              v-for="s in slots"
-              :key="s.starts_at + s.room_id"
-              type="button"
-              :aria-label="localTime(s.starts_at, zone)"
-              :aria-pressed="selectedSlot === s"
-              :class="{ active: selectedSlot === s }"
-              :disabled="saving"
-              @click="chooseSlot(s)"
-            >
-              {{ localTime(s.starts_at, zone) }}
-              <span v-if="selectedSlot === s">✓</span>
-            </button>
-          </div>
-          <small v-if="errors.time" class="rp-error">{{ errors.time }}</small>
-        </div>
-      </section>
-      <label class="rp-note"
-        >Izoh<textarea
-          v-model="draft.note"
-          placeholder="Qo‘shimcha ma’lumot"
-          maxlength="2000"
-        />
-      </label>
-      <div v-if="draft.time" class="rp-summary">
-        <CalendarDays :size="21" /><span
-          >{{ uzDate(draft.date) }} · {{ draft.time }} · {{ summary }}</span
-        >
-      </div>
-      <p class="rp-hint">
-        Bo‘sh vaqtlar joriy bandlikka bog‘liq. Saqlash vaqtida qayta
-        tekshiriladi.
-      </p>
+        <p class="rp-hint">
+          Bo‘sh vaqtlar joriy bandlikka bog‘liq. Saqlash vaqtida qayta
+          tekshiriladi.
+        </p>
+      </fieldset>
     </form>
     <template #footer
       ><button
@@ -486,4 +687,11 @@ const summary = computed(() => chosenDoctor.value?.name);
       </button></template
     ></ReceptionDialog
   >
+  <BookingConfigurationDialog
+    v-if="configuring"
+    :branch-id="draft.branchId"
+    :date="draft.date || today"
+    @close="configuring = false"
+    @saved="catalogRevision++"
+  />
 </template>

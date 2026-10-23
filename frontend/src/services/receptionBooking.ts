@@ -1,3 +1,5 @@
+import axios from "axios";
+import { errorText } from "./api";
 import { clinicRequest } from "./api";
 import type { Patient } from "./operations";
 import type { ReceptionPatient } from "../mocks/reception";
@@ -99,10 +101,11 @@ export async function bookingAvailability(
   zone: string,
 ) {
   const slots: BookingSlot[] = [];
+  let unavailableReason: string | null | undefined;
   for (let page = 1; ; page++) {
     const r = await clinicRequest<{
       data: BookingSlot[];
-      meta: { total: number };
+      meta: { total: number; unavailable_reason?: string | null };
     }>(`doctors/${doctorId}/availability`, {
       params: {
         branch_id: branchId,
@@ -112,8 +115,23 @@ export async function bookingAvailability(
         per_page: 100,
       },
     });
+    unavailableReason = r.data.meta.unavailable_reason;
     slots.push(...r.data.data);
     if (slots.length >= r.data.meta.total || !r.data.data.length) break;
   }
-  return slots.filter((s) => Date.parse(s.starts_at) > Date.now());
+  return Object.assign(
+    slots.filter((s) => Date.parse(s.starts_at) > Date.now()),
+    { unavailableReason },
+  );
+}
+
+/** Preserve actionable HTTP failures; empty results are exclusively successful lists. */
+export function bookingError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    if (error.response && error.response.status >= 500)
+      return `Server xatosi (${error.response.status}). Qayta urinib ko‘ring.`;
+    if (!error.response) return "Tarmoq xatosi. Serverga ulanishni tekshiring.";
+    return `${errorText(error)} (${error.response.status})`;
+  }
+  return errorText(error);
 }

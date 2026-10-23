@@ -63,6 +63,11 @@ final class BrowserFixtureTest extends FoundationTestCase
         $db->table('users')->insert(['id' => $doctorUser, 'login' => 'booking.doctor', 'name' => 'Booking test doctor', 'password_hash' => Hash::make('Synthetic-password-42!'), 'must_change_password' => false]);
         $db->table('tenant_memberships')->insert(['id' => $membership, 'tenant_id' => $tenant, 'user_id' => $doctorUser, 'role_id' => $role]);
         $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $tenant, 'membership_id' => $membership, 'branch_id' => $branch]);
+        $setupUser = (string) Str::uuid();
+        $setupMember = (string) Str::uuid();
+        $db->table('users')->insert(['id' => $setupUser, 'login' => 'booking.config-clinician', 'name' => 'Booking configurable clinician', 'password_hash' => Hash::make('Synthetic-password-42!'), 'must_change_password' => false]);
+        $db->table('tenant_memberships')->insert(['id' => $setupMember, 'tenant_id' => $tenant, 'user_id' => $setupUser, 'role_id' => $role]);
+        $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $tenant, 'membership_id' => $setupMember, 'branch_id' => $branch]);
         $db->table('services')->insert(['id' => $service, 'tenant_id' => $tenant, 'code' => 'booking_consultation', 'name' => 'Booking consultation']);
         $scheduling = app(Scheduling::class);
         $actor = $this->actor($doctorUser);
@@ -79,7 +84,7 @@ final class BrowserFixtureTest extends FoundationTestCase
         $registrator = (string) Str::uuid();
         $registratorMembership = (string) Str::uuid();
         $db->table('tenant_roles')->insert(['id' => $registratorRole, 'tenant_id' => $tenant, 'code' => 'booking_registrator', 'name' => 'Registrator']);
-        foreach (['reception.view', 'patients.view', 'appointments.view', 'appointments.create', 'doctors.view', 'rooms.view', 'services.view', 'schedules.view'] as $permission) {
+        foreach (['reception.view', 'patients.view', 'patients.create', 'appointments.view', 'appointments.create', 'doctors.view', 'rooms.view', 'services.view', 'schedules.view'] as $permission) {
             $db->table('role_permissions')->insert(['tenant_id' => $tenant, 'role_id' => $registratorRole, 'permission_id' => $db->table('permissions')->where('code', $permission)->value('id'), 'scope' => $permission === 'services.view' ? 'entire_clinic' : 'assigned_branches']);
         }
         $db->table('users')->insert(['id' => $registrator, 'login' => 'booking.registrator', 'name' => 'Booking test registrator', 'password_hash' => Hash::make('Synthetic-password-42!'), 'must_change_password' => false]);

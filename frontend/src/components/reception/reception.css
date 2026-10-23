@@ -1210,3 +1210,39 @@
 .rp-date-context .e-date-field {
   min-width: 145px;
 }
+
+.rp-new-patient {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.rp-booking-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.rp-configuration fieldset {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+.rp-configuration legend {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.rp-configuration label {
+  display: block;
+  min-width: 0;
+}
+.rp-configuration label > :is(input, select) {
+  display: block;
+  width: 100%;
+  margin: 4px 0 10px;
+}
+.rp-configuration form {
+  margin-top: 14px;
+}
