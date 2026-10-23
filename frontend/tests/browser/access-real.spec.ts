@@ -139,7 +139,7 @@ test("real role CRUD, employee account, password change, live grants and access 
   await staff
     .getByRole("button", { name: "Kassaga kirish", exact: true })
     .click();
-  await modal(staff).getByLabel("4 xonali demo PIN").fill("1122");
+  await modal(staff).getByLabel("4 xonali PIN").fill("1122");
   await modal(staff)
     .getByRole("button", { name: "Kirish", exact: true })
     .click();
@@ -169,7 +169,7 @@ test("real role CRUD, employee account, password change, live grants and access 
   await staff
     .getByRole("button", { name: "Kassaga kirish", exact: true })
     .click();
-  await modal(staff).getByLabel("4 xonali demo PIN").fill("1122");
+  await modal(staff).getByLabel("4 xonali PIN").fill("1122");
   await modal(staff)
     .getByRole("button", { name: "Kirish", exact: true })
     .click();
@@ -342,7 +342,9 @@ test("real employee view grants restrict menus, URL and API independently of the
 }) => {
   await login(page, "accessdemo.admin");
   const roles = (await (await get(page, "roles")).json()).data;
-  const role = roles.find((r: { code: string }) => r.code === "registrator");
+  const role = roles.find(
+    (r: { code: string }) => r.code === "access_registrator",
+  );
   const suffix = Date.now().toString(36);
   const temporary = "Synthetic-page-browser-42!";
   await page.getByRole("button", { name: "Xodimlar", exact: true }).click();
@@ -391,7 +393,11 @@ test("real employee view grants restrict menus, URL and API independently of the
   await expect(
     sidebar.getByRole("button", { name: "Bemorlar", exact: true }),
   ).toHaveCount(0);
-  const me = await (await staff.request.get("/api/v1/auth/me")).json();
+  const self = await staff.request.get("/api/v1/auth/me", {
+    headers: { Origin: "http://localhost:5173", Accept: "application/json" },
+  });
+  expect(self.status()).toBe(200);
+  const me = await self.json();
   expect(Object.keys(me.grants).sort()).toEqual([
     "cashier.view",
     "reception.view",
@@ -401,5 +407,95 @@ test("real employee view grants restrict menus, URL and API independently of the
   await expect(
     staff.getByRole("heading", { name: "403 — Ruxsat yo‘q" }),
   ).toBeVisible();
+  await ctx.close();
+});
+
+test("real doctor with cashier page unlocks using their private PIN, without gaining shift permissions", async ({
+  page,
+  browser,
+}) => {
+  await login(page, "accessdemo.admin");
+  const roles = (await (await get(page, "roles")).json()).data;
+  const doctor = roles.find(
+    (r: { code: string }) => r.code === "access_doctor",
+  );
+  const suffix = Date.now().toString(36),
+    user = "privatepin." + suffix,
+    temporary = "Synthetic-private-pin-42!";
+  await page.getByRole("button", { name: "Xodimlar", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Xodim qo‘shish", exact: true })
+    .click();
+  await page.getByLabel("Familiya *", { exact: true }).fill("Private" + suffix);
+  await page.getByLabel("Ism *", { exact: true }).fill("Doctor");
+  await page.getByLabel("Telefon *", { exact: true }).fill("+998 90 000 11 22");
+  await page.getByLabel("Login *", { exact: true }).fill(user);
+  await page
+    .getByLabel("Ruxsat roli *", { exact: true })
+    .selectOption(doctor.id);
+  await page.getByLabel("Yangi hisob paroli", { exact: true }).fill(temporary);
+  for (const label of ["Kassa", "Shifokor kabineti"])
+    await page
+      .getByRole("checkbox", { name: "Bo‘lim: " + label, exact: true })
+      .check();
+  await page.getByLabel("Kassa PIN-kodi", { exact: true }).fill("4826");
+  await page.getByLabel("PIN-kodni tasdiqlash", { exact: true }).fill("4826");
+  const saved = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/clinic/employees") && r.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Saqlash", exact: true }).click();
+  expect((await saved).status()).toBe(201);
+  const ctx = await browser.newContext(),
+    staff = await ctx.newPage();
+  await staff.goto("/");
+  await staff.getByLabel("Login", { exact: true }).fill(user);
+  await staff.getByLabel("Parol", { exact: true }).fill(temporary);
+  await staff.getByRole("button", { name: "Kirish", exact: true }).click();
+  await staff.getByLabel("Joriy parol", { exact: true }).fill(temporary);
+  await staff.getByLabel("Yangi parol", { exact: true }).fill(PASSWORD);
+  await staff
+    .getByLabel("Yangi parolni tasdiqlang", { exact: true })
+    .fill(PASSWORD);
+  await staff
+    .getByRole("button", { name: "Parolni almashtirish", exact: true })
+    .click();
+  await staff
+    .locator(".clinic-sidebar")
+    .getByRole("button", { name: "Kassa", exact: true })
+    .click();
+  await staff
+    .getByRole("button", { name: "Kassaga kirish", exact: true })
+    .click();
+  await modal(staff).getByLabel("4 xonali PIN").fill("1122");
+  await modal(staff)
+    .getByRole("button", { name: "Kirish", exact: true })
+    .click();
+  await expect(modal(staff).getByRole("alert")).toContainText("PIN noto‘g‘ri");
+  await modal(staff).getByLabel("4 xonali PIN").fill("4826");
+  const verified = staff.waitForResponse((r) =>
+    r.url().endsWith("/clinic/cashier/unlock"),
+  );
+  await modal(staff)
+    .getByRole("button", { name: "Kirish", exact: true })
+    .click();
+  expect((await verified).status()).toBe(204);
+  await expect(
+    modal(staff).getByRole("heading", { name: "Kassani ochish", exact: true }),
+  ).toBeVisible();
+  const self = await staff.request.get("/api/v1/auth/me", {
+    headers: { Origin: "http://localhost:5173", Accept: "application/json" },
+  });
+  expect(self.status()).toBe(200);
+  const me = await self.json();
+  expect(me.role.code).toBe("access_doctor");
+  expect(me.grants["cashier.view"]).toBeTruthy();
+  expect(me.grants["cashier.shift"]).toBeUndefined();
+  const stored = await staff.evaluate(() =>
+    JSON.stringify([localStorage, sessionStorage]),
+  );
+  expect(stored).not.toContain("cashier_pin");
+  expect(stored).not.toContain("$argon2id$");
+  expect(stored).not.toContain('"4826"');
   await ctx.close();
 });

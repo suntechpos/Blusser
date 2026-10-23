@@ -9327,6 +9327,93 @@
         },
         "description": "Read-only active membership self projection. No role-name inference or role catalog. Current tenant comes from session. Grants are current public.permission_scope results only; branches include only active self-assigned branches. Platform/full-identity guards and FORCE RLS apply. No input fields or query filters. Snapshot-consistent; revoked grants/memberships apply on the next request."
       }
+    },
+    "/api/v1/clinic/cashier/unlock": {
+      "post": {
+        "operationId": "Verify_private_cashier_PIN",
+        "tags": [
+          "Cashier"
+        ],
+        "summary": "Verify the authenticated employee private cashier PIN",
+        "description": "Uses only active session clinic/user and effective cashier.view, regardless of primary role. Five failures per user/clinic and thirty attempts per IP in fifteen minutes. Verifies entry into the demo UI, without creating payment/shift authority or reusable tokens.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact trusted first-party origin configured in SANCTUM_STATEFUL_DOMAINS. Referer is also supported by Sanctum; untrusted origins and originless API requests are denied."
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Value of XSRF-TOKEN cookie from CSRF handshake or latest rotated response."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "cashier_pin"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "cashier_pin": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}$",
+                    "writeOnly": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "PIN verified. No PIN, hash or token returned.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "419": {
+            "$ref": "#/components/responses/CsrfMismatch"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
     }
   },
   "components": {

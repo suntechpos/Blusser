@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  watch,
+} from "vue";
 import {
   LockKeyhole,
   Wallet,
@@ -21,6 +28,9 @@ import {
   CreditCard,
 } from "lucide-vue-next";
 import { session } from "../services/session";
+import { isAxiosError } from "axios";
+import { errorText } from "../services/api";
+import { unlockCashier } from "../services/cashierUnlock";
 import {
   cashierConfig,
   catalog,
@@ -215,23 +225,60 @@ function attempt(fn: () => void) {
     error.value = (e as Error).message;
   }
 }
-function unlock() {
-  if (pin.value !== cashierConfig.pin) {
-    pin.value = "";
-    error.value = "PIN noto‘g‘ri. Qayta kiriting.";
-    pinInput.value?.focus();
-    return;
-  }
+const pinBusy = ref(false);
+let unlockAttempt = 0;
+function resetUnlock() {
+  unlockAttempt++;
+  pinBusy.value = false;
+  verified.value = false;
   pin.value = "";
-  verified.value = true;
-  error.value = "";
-  if (shift.value) {
+}
+onBeforeUnmount(resetUnlock);
+watch(
+  [
+    () => session.user?.id,
+    () => session.user?.active_tenant_id,
+    () => session.epoch,
+    () => session.grants?.["cashier.view"],
+  ],
+  () => {
+    resetUnlock();
     modal.value = "";
-    if (!invoice.value) select(pending.value[0]?.id ?? "");
-  } else {
-    opening.value = "200000";
-    openingNote.value = "";
-    modal.value = "open";
+  },
+);
+async function unlock() {
+  if (pinBusy.value || !/^[0-9]{4}$/.test(pin.value)) return;
+  const attempt = ++unlockAttempt;
+  const entered = pin.value;
+  pin.value = "";
+  pinBusy.value = true;
+  error.value = "";
+  try {
+    await unlockCashier(entered);
+    if (attempt !== unlockAttempt || modal.value !== "pin") return;
+    verified.value = true;
+    if (shift.value) {
+      modal.value = "";
+      if (!invoice.value) select(pending.value[0]?.id ?? "");
+    } else {
+      opening.value = "200000";
+      openingNote.value = "";
+      modal.value = "open";
+    }
+  } catch (e) {
+    if (attempt !== unlockAttempt || modal.value !== "pin") return;
+    verified.value = false;
+    error.value =
+      isAxiosError(e) && e.response?.status === 422
+        ? "PIN noto‘g‘ri yoki hali sozlanmagan. Qayta kiriting."
+        : errorText(e);
+  } finally {
+    if (attempt === unlockAttempt) {
+      pinBusy.value = false;
+      await nextTick();
+      if (attempt === unlockAttempt && modal.value === "pin")
+        pinInput.value?.focus();
+    }
   }
 }
 function pinKey(e: KeyboardEvent) {
@@ -241,14 +288,14 @@ function pinKey(e: KeyboardEvent) {
   }
 }
 function digit(value: string) {
+  if (pinBusy.value) return;
   if (value === "delete") pin.value = pin.value.slice(0, -1);
   else if (pin.value.length < 4) pin.value += value;
   pinInput.value?.focus();
 }
 function closeModal() {
   if (modal.value === "pin" || modal.value === "open") {
-    verified.value = false;
-    pin.value = "";
+    resetUnlock();
   }
   modal.value = "";
   error.value = "";
@@ -1098,7 +1145,7 @@ const currentPaymentAccount = computed(() =>
       v-if="modal === 'pin'"
       class="dx-dialog cs-dialog cs-pin-dialog"
       title="Kassaga kirish"
-      subtitle="Shaxsiy demo PIN-kodingizni kiriting"
+      subtitle="Shaxsiy PIN-kodingizni kiriting"
       :icon="LockKeyhole"
       @close="closeModal"
       ><div class="dx-modal-body cs-pin-body">
@@ -1109,10 +1156,11 @@ const currentPaymentAccount = computed(() =>
         <input
           ref="pinInput"
           v-model="pin"
+          :disabled="pinBusy"
           type="password"
           inputmode="numeric"
           maxlength="4"
-          aria-label="4 xonali demo PIN"
+          aria-label="4 xonali PIN"
           autocomplete="off"
           autofocus
           @input="pin = pin.replace(/\D/g, '').slice(0, 4)"
@@ -1138,7 +1186,7 @@ const currentPaymentAccount = computed(() =>
               'delete',
             ]"
             :key="n"
-            :disabled="!n"
+            :disabled="!n || pinBusy"
             :aria-label="
               n === 'delete' ? 'PIN raqamini o‘chirish' : n || 'Bo‘sh'
             "
@@ -1151,7 +1199,7 @@ const currentPaymentAccount = computed(() =>
         </div>
         <p v-if="error" class="dx-error" role="alert">{{ error }}</p>
         <p class="cs-muted">
-          PIN faqat lokal namuna uchun. Backend himoyasi emas.
+          PIN serverda tekshiriladi. To‘lov va smena jarayonlari demo rejimida.
         </p>
       </div>
       <template #footer
@@ -1159,7 +1207,7 @@ const currentPaymentAccount = computed(() =>
           <button class="dx-button" @click="closeModal">Bekor qilish</button
           ><button
             class="dx-button dx-primary"
-            :disabled="pin.length !== 4"
+            :disabled="pin.length !== 4 || pinBusy"
             @click="unlock"
           >
             Kirish

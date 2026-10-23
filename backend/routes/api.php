@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Appointments\Http\AppointmentController;
+use App\Modules\Cashier\Http\UnlockController;
 use App\Modules\Identity\Http\AuthController;
 use App\Modules\Patients\Http\PatientController;
 use App\Modules\Platform\Http\ClinicController as PlatformController;
@@ -31,6 +32,7 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
             Route::post('platform/clinics/{tenant}/ceo-recovery', [PlatformController::class, 'recovery']);
             Route::post('platform/ceo-recoveries/{recovery}/approve', [PlatformController::class, 'approve']);
             Route::prefix('clinic')->group(function () {
+                Route::post('cashier/unlock', UnlockController::class);
                 foreach (['doctors', 'rooms', 'schedules', 'schedule-exceptions', 'specialties'] as $kind) {
                     Route::get($kind, [SchedulingController::class, 'index'])->defaults('resourceKind', $kind);
                     Route::post($kind, [SchedulingController::class, 'store'])->defaults('resourceKind', $kind);
