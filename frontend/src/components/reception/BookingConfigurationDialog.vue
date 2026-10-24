@@ -5,7 +5,11 @@ import DateField from "../employees/DateField.vue";
 import { clinicRequest } from "../../services/api";
 import { bookingError } from "../../services/receptionBooking";
 import { can, session } from "../../services/session";
-const props = defineProps<{ branchId: string; date: string }>();
+const props = defineProps<{
+  branchId: string;
+  date: string;
+  membershipId?: string;
+}>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 type Choice = {
   id: string;
@@ -44,9 +48,19 @@ const weekday = ref(
 const branch = computed(() =>
   session.branches.find((b) => b.id === props.branchId),
 );
+const doctorChoices = computed(() =>
+  (data.value.doctors ?? []).filter(
+    (d) => !props.membershipId || d.membership_id === props.membershipId,
+  ),
+);
+const existingProfile = computed(() =>
+  data.value.doctors?.find((d) => d.membership_id === member.value),
+);
+let initialized = false;
 const members = computed(() =>
   (data.value.employees ?? []).filter(
     (m) =>
+      (!props.membershipId || m.membership_id === props.membershipId) &&
       m.access &&
       m.active &&
       m.membership_id &&
@@ -86,6 +100,16 @@ async function load() {
       rooms: "rooms",
     }))
       data.value[key] = await listing(path);
+    if (!initialized) {
+      member.value = props.membershipId ?? "";
+      const d = existingProfile.value;
+      if (d) {
+        doctor.value = d.id;
+        specialty.value = d.specialty_id ?? "";
+        service.value = d.service_ids?.[0] ?? "";
+      }
+      initialized = true;
+    }
   } catch (e) {
     error.value = bookingError(e);
   } finally {
@@ -144,7 +168,7 @@ onMounted(load);
 </script>
 <template>
   <ReceptionDialog
-    title="Qabulni sozlash"
+    title="Shifokor profili va ish jadvali"
     subtitle="Faqat vakolatli administrator uchun"
     @close="!busy && emit('close')"
   >
@@ -235,7 +259,7 @@ onMounted(load);
         <label
           >Mavjud shifokor<select aria-label="Mavjud shifokor" v-model="doctor">
             <option value="">Tanlang</option>
-            <option v-for="d in data.doctors" :key="d.id" :value="d.id">
+            <option v-for="d in doctorChoices" :key="d.id" :value="d.id">
               {{
                 data.employees?.find((e) => e.membership_id === d.membership_id)
                   ?.name || d.id
@@ -253,6 +277,10 @@ onMounted(load);
         >
           Tanlangan xizmatni shifokorga qo‘shish
         </button>
+        <p v-if="existingProfile" role="status" class="rp-hint">
+          Bu xodimning shifokor profili mavjud. Qayta yaratilmaydi; xizmat va
+          ish jadvalini boshqaring.
+        </p>
         <form
           data-permission="doctors.create"
           @submit.prevent="
@@ -289,7 +317,7 @@ onMounted(load);
           <button
             class="rp-button"
             type="submit"
-            :disabled="!member || !specialty || !service"
+            :disabled="!!existingProfile || !member || !specialty || !service"
           >
             Shifokor profilini yaratish
           </button>
