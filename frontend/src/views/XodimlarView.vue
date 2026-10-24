@@ -24,8 +24,7 @@ import {
 import BookingConfigurationDialog from "../components/reception/BookingConfigurationDialog.vue";
 import "../components/reception/reception.css";
 import EmployeeForm from "../components/employees/EmployeeForm.vue";
-import ScheduleDialog from "../components/employees/ScheduleDialog.vue";
-import ExceptionDialog from "../components/employees/ExceptionDialog.vue";
+import EmployeeScheduleReadOnly from "../components/employees/EmployeeScheduleReadOnly.vue";
 import {
   positions,
   fullName,
@@ -35,8 +34,6 @@ import {
   today,
   clone,
   type Employee,
-  type Schedule,
-  type Exception,
 } from "../mocks/employees";
 import { useRolesStore } from "../components/settings/store";
 import { session, can } from "../services/session";
@@ -160,9 +157,6 @@ const search = ref(""),
   status = ref("");
 const page = ref(1);
 const tab = ref("general");
-const scheduleOpen = ref(false),
-  exceptionOpen = ref(false);
-const exception = ref<Exception | null>(null);
 const current = computed(() =>
   employees.value.find((e) => e.id === selected.value),
 );
@@ -246,16 +240,6 @@ async function save(
   } finally {
     saving.value = false;
   }
-}
-function saveSchedule(_value: Schedule) {
-  saveError.value = "Xodim jadvali bu API oqimiga hali ulanmagan.";
-}
-function openException(e: Exception | null = null) {
-  exception.value = e ? clone(e) : null;
-  exceptionOpen.value = true;
-}
-function saveException(_value: Exception) {
-  saveError.value = "Istisnolar bu API oqimiga hali ulanmagan.";
 }
 const colors = [
   "blue",
@@ -761,177 +745,12 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
           </section>
         </div>
       </div>
-      <template v-else
-        ><section class="e-card">
-          <div class="e-section-head">
-            <div>
-              <h2>Haftalik ish jadvali</h2>
-              <p v-if="current.schedule" class="e-hint">
-                Amal qilish sanasi:
-                {{ dateLabel(current.schedule.effective) }} dan
-              </p>
-            </div>
-            <div class="e-actions">
-              <span
-                v-if="current.position === 'Shifokor'"
-                class="e-badge blue duration"
-                ><Clock3 :size="18" />Qabul: {{ current.duration }} daqiqa</span
-              ><button
-                class="e-button primary"
-                disabled
-                title="Jadval bu API oqimiga hali ulanmagan"
-                @click="scheduleOpen = true"
-              >
-                <Pencil :size="18" />{{
-                  current.schedule ? "Jadvalni tahrirlash" : "Jadval yaratish"
-                }}
-              </button>
-            </div>
-          </div>
-          <div v-if="current.schedule" class="e-table-scroll">
-            <table class="schedule-display">
-              <thead>
-                <tr>
-                  <th>Kun</th>
-                  <th>Filial</th>
-                  <th v-if="current.position === 'Shifokor'">Kabinet</th>
-                  <th>Ish vaqti</th>
-                  <th>Tanaffus</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template
-                  v-for="(day, index) in current.schedule.days"
-                  :key="index"
-                  ><tr
-                    v-for="(shift, i) in day.enabled ? day.shifts : [null]"
-                    :key="i"
-                  >
-                    <td>
-                      {{
-                        [
-                          "Dushanba",
-                          "Seshanba",
-                          "Chorshanba",
-                          "Payshanba",
-                          "Juma",
-                          "Shanba",
-                          "Yakshanba",
-                        ][index]
-                      }}
-                    </td>
-                    <td>{{ shift?.branch || "—" }}</td>
-                    <td v-if="current.position === 'Shifokor'">
-                      {{ shift?.room || "—" }}
-                    </td>
-                    <td>
-                      <template v-if="shift"
-                        >{{ shift.start }} – {{ shift.end
-                        }}<small v-if="shift.nextDay">
-                          (keyingi kun)</small
-                        ></template
-                      ><span v-else class="e-badge gray">Dam olish</span>
-                    </td>
-                    <td>
-                      {{
-                        shift?.breakStart
-                          ? shift.breakStart + " – " + shift.breakEnd
-                          : "—"
-                      }}
-                    </td>
-                  </tr></template
-                >
-              </tbody>
-            </table>
-          </div>
-          <p v-else class="e-empty">
-            Ish jadvali hali yaratilmagan. Jadval yaratish tugmasini bosing.
-          </p>
-        </section>
-        <section class="e-card">
-          <div class="e-section-head">
-            <h2>Istisno sanalar</h2>
-            <button
-              class="e-button"
-              disabled
-              title="Istisnolar bu API oqimiga hali ulanmagan"
-              @click="openException()"
-            >
-              <Plus :size="20" />Istisno qo‘shish
-            </button>
-          </div>
-          <div class="e-table-scroll">
-            <table class="schedule-display">
-              <thead>
-                <tr>
-                  <th>Sana</th>
-                  <th>Sabab</th>
-                  <th>Ish vaqti</th>
-                  <th>Izoh</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="e in current.exceptions" :key="e.id">
-                  <td>
-                    {{ dateLabel(e.from)
-                    }}<template v-if="e.to !== e.from">
-                      – {{ dateLabel(e.to) }}</template
-                    >
-                  </td>
-                  <td>{{ e.reason }}</td>
-                  <td>
-                    <span v-if="e.kind === 'off'" class="e-badge gray"
-                      >Qabul yo‘q</span
-                    ><template v-else
-                      >{{ e.shift.start }} – {{ e.shift.end }}
-                      {{ e.shift.nextDay ? "(keyingi kun)" : "" }}</template
-                    >
-                  </td>
-                  <td>
-                    {{
-                      e.note ||
-                      (e.kind === "changed"
-                        ? e.shift.branch +
-                          (current.position === "Shifokor"
-                            ? " · " + e.shift.room
-                            : "")
-                        : "—")
-                    }}
-                  </td>
-                  <td>
-                    <button
-                      class="e-icon"
-                      :aria-label="
-                        dateLabel(e.from) + ' istisnosini tahrirlash'
-                      "
-                      @click="openException(e)"
-                    >
-                      <Pencil :size="17" />
-                    </button>
-                  </td>
-                </tr>
-                <tr v-if="!current.exceptions.length">
-                  <td colspan="5" class="e-empty">Istisno sanalar yo‘q.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p class="e-hint e-info-line">
-            <Info :size="17" />Istisno sanalar haftalik jadvaldan ustun turadi.
-          </p>
-        </section></template
-      ><ScheduleDialog
-        v-if="scheduleOpen"
-        :employee="current"
-        @close="scheduleOpen = false"
-        @save="saveSchedule" /><ExceptionDialog
-        v-if="exceptionOpen"
-        :employee="current"
-        :exception="exception"
-        @close="exceptionOpen = false"
-        @save="saveException"
-    /></template>
+      <EmployeeScheduleReadOnly
+        v-else
+        :membership-id="current.membershipId"
+        :branch-id="managementBranch"
+      />
+    </template>
     <BookingConfigurationDialog
       v-if="managementOpen && current?.membershipId"
       :branch-id="managementBranch"
@@ -939,7 +758,10 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
       :date="today()"
       @close="managementOpen = false"
     />
-    <p class="e-hint employee-demo-disclosure">
+    <p
+      v-if="screen !== 'profile' || tab !== 'schedule'"
+      class="e-hint employee-demo-disclosure"
+    >
       Xodim profili, hisob va ruxsatlar server orqali saqlanadi. Shifokorning
       haqiqiy qabul jadvali “Shifokor profili / ish jadvali” orqali
       boshqariladi. Umumiy xodim jadvali va istisnolar hali ulanmagan.
