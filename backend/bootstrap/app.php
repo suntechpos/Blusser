@@ -6,6 +6,7 @@ use App\Http\Middleware\NoStore;
 use App\Modules\Access\Console\AccessDemo;
 use App\Modules\Access\Console\ClinicRoles;
 use App\Modules\Access\Services\GovernanceDenied;
+use App\Modules\Appointments\Console\BookingCheck;
 use App\Modules\Patients\Console\BackfillCeoPermissions;
 use App\Modules\Platform\Console\CreatePlatformOperator;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -20,7 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         api: __DIR__.'/../routes/api.php',
     )
-    ->withCommands([ClinicRoles::class, AccessDemo::class, CreatePlatformOperator::class, BackfillCeoPermissions::class])
+    ->withCommands([BookingCheck::class, ClinicRoles::class, AccessDemo::class, CreatePlatformOperator::class, BackfillCeoPermissions::class])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
         $middleware->trimStrings(except: ['password', 'password_confirmation', 'current_password', 'temporary_password', 'cashier_pin', 'cashier_pin_confirmation', 'token']);

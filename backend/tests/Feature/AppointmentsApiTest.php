@@ -180,6 +180,20 @@ final class AppointmentsApiTest extends FoundationTestCase
         $this->assertSame('Second service', $this->scheduleCommand($a, 'services', ['code' => 'second-service', 'name' => 'Second service', 'active' => true])['name']);
     }
 
+    public function test_booking_check_authenticates_and_inspects_without_seeding_or_grant_changes(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $db = DB::connection('migration');
+        $tables = ['patients', 'doctor_profiles', 'specialties', 'services', 'doctor_services', 'doctor_branches', 'rooms', 'schedule_rules', 'role_permissions'];
+        $before = array_map(fn ($table) => $db->table($table)->count(), $tables);
+        $this->artisan('blusser:booking-check', ['--actor' => 'synthetic.a', '--tenant' => $a['tenant']])
+            ->expectsQuestion('Joriy parol', 'Synthetic-password-42!')
+            ->expectsOutputToContain('Eligible booking doctors: 1')->assertSuccessful();
+        $this->assertSame($before, array_map(fn ($table) => $db->table($table)->count(), $tables));
+        $this->artisan('blusser:booking-check', ['--actor' => 'synthetic.a', '--tenant' => (string) Str::uuid()])
+            ->expectsQuestion('Joriy parol', 'Synthetic-password-42!')->assertFailed();
+    }
+
     private function data(array $a, string $time = '09:00'): array
     {
         $end = (new \DateTimeImmutable('2030-01-07T'.$time.':00+05:00'))->modify('+30 minutes')->format('c');

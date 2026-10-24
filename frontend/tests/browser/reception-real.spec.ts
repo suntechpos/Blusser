@@ -141,7 +141,7 @@ test("registrator creates a real new patient then books it and reopens persisted
   await expect(page.locator("tbody")).toContainText("Synthetic Newborn");
 });
 
-test("authorized setup creates real service, specialty, doctor, room and schedule; availability reloads", async ({
+test("administrator has real linked catalog and availability without a setup entry", async ({
   page,
 }) => {
   await page.goto("/");
@@ -156,86 +156,25 @@ test("authorized setup creates real service, specialty, doctor, room and schedul
     .getByRole("button", { name: "Qabulga yozish", exact: true })
     .click();
   const d = page.getByRole("dialog", { name: "Qabulga yozish", exact: true });
-  await d.getByRole("button", { name: "Qabulni sozlash", exact: true }).click();
-  const c = page.getByRole("dialog", { name: "Qabulni sozlash", exact: true });
-  await c
-    .getByLabel("Yangi mutaxassislik kodi", { exact: true })
-    .fill("configured-specialty");
-  await c.getByLabel("Nomi", { exact: true }).fill("Configured specialty");
-  await c
-    .getByRole("button", { name: "Mutaxassislik yaratish", exact: true })
-    .click();
-  await expect(c.getByLabel("Mutaxassislik", { exact: true })).not.toHaveValue(
-    "",
-  );
-  await c
-    .getByLabel("Yangi xizmat kodi", { exact: true })
-    .fill("configured-consultation");
-  await c
-    .getByLabel("Xizmat nomi", { exact: true })
-    .fill("Configured consultation");
-  await c.getByRole("button", { name: "Xizmat yaratish", exact: true }).click();
-  await expect(c.getByLabel("Xizmat", { exact: true })).not.toHaveValue("");
-  await c
-    .getByLabel("Mavjud shifokor", { exact: true })
-    .selectOption({ label: "Booking test doctor" });
-  const assignment = page.waitForResponse(
-    (r) =>
-      r.request().method() === "PUT" && r.url().includes("/clinic/doctors/"),
-  );
-  await c
-    .getByRole("button", {
-      name: "Tanlangan xizmatni shifokorga qo‘shish",
-      exact: true,
-    })
-    .click();
-  const assigned = await assignment;
-  expect(assigned.status()).toBe(200);
-  const doctor = await assigned.json();
-  expect(doctor.service_ids).toHaveLength(2);
-  expect(doctor.branch_ids).toHaveLength(1);
-  await c
-    .getByLabel("Faol xodim hisobi", { exact: true })
-    .selectOption({ label: "Booking configurable clinician" });
-  await c
-    .getByRole("button", { name: "Shifokor profilini yaratish", exact: true })
-    .click();
   await expect(
-    c.getByLabel("Mavjud shifokor", { exact: true }),
-  ).not.toHaveValue("");
-  await c
-    .getByLabel("Yangi xona raqami", { exact: true })
-    .fill("Configured R2");
-  await c.getByRole("button", { name: "Xona yaratish", exact: true }).click();
-  await expect(c.getByLabel("Mavjud xona", { exact: true })).not.toHaveValue(
-    "",
-  );
-  await c.getByLabel("Jadval boshlanishi", { exact: true }).fill("2030-01-09");
-  await c.getByLabel("Jadval tugashi", { exact: true }).fill("2030-01-09");
-  await c.getByLabel("Hafta kuni", { exact: true }).selectOption("3");
-  const schedule = page.waitForResponse(
-    (r) =>
-      r.request().method() === "POST" && r.url().endsWith("/clinic/schedules"),
-  );
-  await c.getByRole("button", { name: "Jadval yaratish", exact: true }).click();
-  expect((await schedule).status()).toBe(201);
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(await c.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await c.screenshot({ path: "/tmp/reception-configuration.png" });
-  await c.getByRole("button", { name: "Yopish", exact: true }).last().click();
-  await page.setViewportSize({ width: 1536, height: 1024 });
+    d.getByRole("button", { name: "Qabulni sozlash", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog", { name: "Qabulni sozlash", exact: true }),
+  ).toHaveCount(0);
+  await d
+    .getByLabel("Filial *", { exact: true })
+    .selectOption({ label: "Booking test branch" });
   await d
     .getByLabel("Bo‘lim *", { exact: true })
-    .selectOption({ label: "Configured specialty" });
+    .selectOption({ label: "Booking specialty" });
   await d
     .getByLabel("Shifokor *", { exact: true })
-    .selectOption({ label: "Booking configurable clinician" });
+    .selectOption({ label: "Booking test doctor" });
   await d
     .getByLabel("Qabul turi *", { exact: true })
-    .selectOption({ label: "Configured consultation · Jadval bo‘yicha" });
-  await d.getByLabel("Qabul sanasi", { exact: true }).fill("2030-01-08");
-  await expect(d).toContainText("Bu sana uchun ish jadvali sozlanmagan.");
-  await d.getByLabel("Qabul sanasi", { exact: true }).fill("2030-01-09");
+    .selectOption({ label: "Booking consultation · 30 daqiqa" });
+  await d.getByLabel("Qabul sanasi", { exact: true }).fill("2026-10-28");
   await expect(
     d.getByRole("button", { name: "09:00", exact: true }),
   ).toBeVisible();
