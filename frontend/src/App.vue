@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, onUnmounted } from "vue";
 import LoginView from "./views/LoginView.vue";
+import LandingView from "./views/LandingView.vue";
 import ClinicDashboardView from "./views/ClinicDashboardView.vue";
 import SessionGate from "./components/operations/SessionGate.vue";
 import {
@@ -27,6 +28,11 @@ async function handleAuthenticated() {
 import IdentityLinks from "./components/operations/IdentityLinks.vue";
 const linksOpen = ref(false);
 const loggingOut = ref(false);
+const showLogin = ref(window.location.pathname === "/login");
+function openLogin() {
+  showLogin.value = true;
+  window.history.pushState({}, "", "/login");
+}
 let rechecking = false;
 let accessTimer: ReturnType<typeof setInterval>;
 async function regainFocus() {
@@ -60,6 +66,7 @@ async function handleLogout() {
     linksOpen.value = false;
     expire();
     notifyLogout();
+    showLogin.value = false;
     window.history.replaceState({}, "", "/");
   } catch (e) {
     session.error = errorText(e);
@@ -70,6 +77,7 @@ async function handleLogout() {
 </script>
 <template>
   <div v-if="session.checking">Sessiya tekshirilmoqda…</div>
+  <LandingView v-else-if="!session.user && !showLogin" @login="openLogin" />
   <LoginView v-else-if="!session.user" @authenticated="handleAuthenticated" />
   <div v-else-if="session.switching">Klinika yuklanmoqda…</div>
   <SessionGate
