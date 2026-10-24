@@ -21,6 +21,8 @@ import {
   Info,
   FileText,
 } from "lucide-vue-next";
+import BookingConfigurationDialog from "../components/reception/BookingConfigurationDialog.vue";
+import "../components/reception/reception.css";
 import EmployeeForm from "../components/employees/EmployeeForm.vue";
 import ScheduleDialog from "../components/employees/ScheduleDialog.vue";
 import ExceptionDialog from "../components/employees/ExceptionDialog.vue";
@@ -40,6 +42,21 @@ import { useRolesStore } from "../components/settings/store";
 import { session, can } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import axios from "axios";
+const managementOpen = ref(false),
+  managementBranch = ref("");
+const canManageBooking = computed(() =>
+  [
+    "employees.view",
+    "doctors.view",
+    "doctors.create",
+    "rooms.view",
+    "rooms.create",
+    "schedules.view",
+    "schedules.create",
+    "services.view",
+    "services.create",
+  ].every((code) => session.grants?.[code] === "entire_clinic"),
+);
 const branches = computed(() => session.branches);
 const branchLabel = (id: string) =>
   session.branches.find((b) => b.id === id)?.name ?? id;
@@ -160,6 +177,9 @@ function open(e: Employee) {
   selected.value = e.id;
   screen.value = "profile";
   tab.value = "general";
+  managementBranch.value = e.branchIds?.includes(e.branch)
+    ? e.branch
+    : (e.branchIds?.[0] ?? "");
 }
 function form(e: Employee | null = null) {
   editing.value = e ? clone(e) : null;
@@ -454,6 +474,31 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
           <p>Xodim ma’lumotlari va profil ko‘rinishi.</p>
         </div>
         <div class="e-actions">
+          <template v-if="canManageBooking && current.membershipId">
+            <select
+              v-model="managementBranch"
+              aria-label="Shifokor jadvali filiali"
+              class="e-select"
+            >
+              <option value="">Filialni tanlang</option>
+              <option
+                v-for="b in branches.filter(
+                  (b) => b.active && current?.branchIds?.includes(b.id),
+                )"
+                :key="b.id"
+                :value="b.id"
+              >
+                {{ b.name }}
+              </option>
+            </select>
+            <button
+              class="e-button"
+              :disabled="!managementBranch"
+              @click="managementOpen = true"
+            >
+              Shifokor profili / ish jadvali
+            </button>
+          </template>
           <button class="e-button" @click="screen = 'list'">
             <ArrowLeft :size="19" />Orqaga</button
           ><button
@@ -847,9 +892,17 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
         @close="exceptionOpen = false"
         @save="saveException"
     /></template>
+    <BookingConfigurationDialog
+      v-if="managementOpen && current?.membershipId"
+      :branch-id="managementBranch"
+      :membership-id="current.membershipId"
+      :date="today()"
+      @close="managementOpen = false"
+    />
     <p class="e-hint employee-demo-disclosure">
-      Frontend namoyishi: barcha xodimlar namunaviy. O‘zgarishlar faqat joriy
-      sahifa xotirasida; API va haqiqiy bazaga yozilmaydi.
+      Xodim profili, hisob va ruxsatlar server orqali saqlanadi. Shifokorning
+      haqiqiy qabul jadvali “Shifokor profili / ish jadvali” orqali
+      boshqariladi. Umumiy xodim jadvali va istisnolar hali ulanmagan.
     </p>
   </div>
 </template>
