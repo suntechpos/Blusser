@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { allServerGrants, serverPermissions } from "./access.fixture";
 import { createEmployees } from "../../src/mocks/employees";
 export async function editorSession(page: Page, grants = allServerGrants) {
+  const calendars = new Map<string, any>();
   const roles = [
     ["administrator", "Administrator"],
     ["registrator", "Registrator"],
@@ -87,6 +88,30 @@ export async function editorSession(page: Page, grants = allServerGrants) {
           data: [{ id: "clinic-a", name: "API fixture clinic", role: "CEO" }],
         },
       });
+    if (path.includes("/clinic/employee-work-schedules/")) {
+      const id = path.split("/employee-work-schedules/")[1];
+      const branch =
+        new URL(route.request().url()).searchParams.get("branch_id") ||
+        route.request().postDataJSON()?.branch_id;
+      const key = id + ":" + branch;
+      if (route.request().method() === "GET")
+        return route.fulfill({
+          json: calendars.get(key) || { version: 0, data: [] },
+        });
+      const body = route.request().postDataJSON();
+      const old = calendars.get(key) || { version: 0, data: [] };
+      const saved = {
+        version: old.version + 1,
+        data: body.days.map((r: any) => ({
+          ...r,
+          id: `work-${id}-${r.weekday}`,
+          employee_id: id,
+          branch_id: branch,
+        })),
+      };
+      calendars.set(key, saved);
+      return route.fulfill({ json: saved });
+    }
     if (path.endsWith("/clinic/context"))
       return route.fulfill({
         json: {

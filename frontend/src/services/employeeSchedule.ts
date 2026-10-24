@@ -2,7 +2,7 @@ import { clinicRequest } from "./api";
 export interface DoctorRecord {
   id: string;
   membership_id: string;
-  specialty_id: string;
+  specialty_id: string | null;
   branch_ids: string[];
   service_ids: string[];
   active: boolean;
@@ -13,6 +13,7 @@ export interface Rule {
   branch_id: string;
   room_id: string;
   room_usage?: "shared" | "private";
+  active?: boolean;
   weekday: number;
   local_start: string;
   local_end: string;
@@ -71,4 +72,51 @@ export async function saveRules(
     completed.set(signature, r.data);
     onSaved(r.data);
   }
+}
+
+export interface WorkDay {
+  id?: string;
+  employee_id?: string;
+  branch_id?: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  receives_patients: boolean;
+}
+export interface WorkCalendar {
+  version: number;
+  data: WorkDay[];
+}
+export async function readWork(employeeId: string, branchId: string) {
+  return (
+    await clinicRequest<WorkCalendar>(`employee-work-schedules/${employeeId}`, {
+      params: { branch_id: branchId },
+    })
+  ).data;
+}
+export async function writeWork(
+  employeeId: string,
+  branchId: string,
+  days: WorkDay[],
+  removals: number[],
+  version: number,
+) {
+  return (
+    await clinicRequest<WorkCalendar>(`employee-work-schedules/${employeeId}`, {
+      method: "PUT",
+      etag: `"${version}"`,
+      body: {
+        branch_id: branchId,
+        days: days.map(
+          ({ weekday, start_time, end_time, receives_patients }) => ({
+            weekday,
+            start_time,
+            end_time,
+            receives_patients,
+          }),
+        ),
+        confirmed_removals: removals,
+      },
+    })
+  ).data;
 }

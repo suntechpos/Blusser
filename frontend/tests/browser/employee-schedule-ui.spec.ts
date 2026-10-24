@@ -35,9 +35,6 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
     exact: true,
   });
   await expect(
-    section.getByText("Umumiy xodim ish jadvali", { exact: false }),
-  ).toBeVisible();
-  await expect(
     section.getByRole("button", { name: "Jadvalni saqlash", exact: true }),
   ).toBeDisabled();
   await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
@@ -58,6 +55,11 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
     path: "/tmp/employee-schedule-default-readonly.png",
   });
   await page.getByLabel("Lavozim *", { exact: true }).selectOption("Shifokor");
+  await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  await expect(
+    section.getByLabel("Bemor qabul qiladi", { exact: true }),
+  ).not.toBeChecked();
+  await section.getByLabel("Bemor qabul qiladi", { exact: true }).check();
   await expect(
     section.getByLabel("Qabul xonasi", { exact: true }).locator("option"),
   ).toHaveCount(2);
@@ -184,6 +186,7 @@ test("empty room API shows honest empty state without demo IDs", async ({
     exact: true,
   });
   await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  await section.getByLabel("Bemor qabul qiladi", { exact: true }).check();
   const rooms = section.getByLabel("Qabul xonasi", { exact: true });
   await expect(rooms).toHaveValue("");
   await expect(

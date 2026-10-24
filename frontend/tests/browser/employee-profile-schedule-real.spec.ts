@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-test("employee profile reads persisted doctor schedule and room without mutations", async ({
+test("employee profile does not fabricate employee working hours from legacy appointment rules", async ({
   page,
 }) => {
   await page.goto("/");
@@ -28,15 +28,13 @@ test("employee profile reads persisted doctor schedule and room without mutation
     exact: true,
   });
   await expect(table.locator("tbody tr")).toHaveCount(7);
+  await expect(
+    section.getByText("Ish jadvali hali yaratilmagan", { exact: true }),
+  ).toBeVisible();
   await expect(table.getByRole("row", { name: /Dushanba/ })).toContainText(
-    "09:00–18:00",
+    "Dam olish",
   );
-  await expect(table.getByRole("row", { name: /Dushanba/ })).toContainText(
-    "30 daqiqa",
-  );
-  await expect(table.getByRole("row", { name: /Dushanba/ })).toContainText(
-    "B101",
-  );
+  await expect(table).not.toContainText("B101");
   await expect(
     section.getByText("Istisno sanalar yo‘q", { exact: true }),
   ).toBeVisible();

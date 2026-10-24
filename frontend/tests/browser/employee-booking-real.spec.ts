@@ -57,6 +57,8 @@ test("employee management creates real doctor links and schedule then books a pe
   await page.getByLabel("Kassa PIN-kodi", { exact: true }).fill("7462");
   await page.getByLabel("PIN-kodni tasdiqlash", { exact: true }).fill("7462");
   const c = page.getByRole("region", { name: "Ish jadvali", exact: true });
+  await c.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  await c.getByLabel("Bemor qabul qiladi", { exact: true }).check();
   await expect(
     c
       .getByLabel("Qabul xonasi", { exact: true })

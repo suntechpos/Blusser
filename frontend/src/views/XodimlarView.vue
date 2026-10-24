@@ -170,9 +170,9 @@ function open(e: Employee) {
   selected.value = e.id;
   screen.value = "profile";
   tab.value = "general";
-  managementBranch.value = e.branchIds?.includes(e.branch)
+  managementBranch.value = branches.value.some((b) => b.id === e.branch)
     ? e.branch
-    : (e.branchIds?.[0] ?? "");
+    : e.branchIds?.[0] || branches.value[0]?.id || "";
 }
 function form(e: Employee | null = null) {
   committedEmployeeId.value = "";
@@ -482,16 +482,19 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
           <p>Xodim ma’lumotlari va profil ko‘rinishi.</p>
         </div>
         <div class="e-actions">
-          <template v-if="current.membershipId && current.branchIds?.length">
+          <template v-if="current.branch || current.branchIds?.length">
             <select
               v-model="managementBranch"
-              aria-label="Shifokor jadvali filiali"
+              aria-label="Ish jadvali filiali"
               class="e-select"
             >
               <option value="">Filialni tanlang</option>
               <option
                 v-for="b in branches.filter(
-                  (b) => b.active && current?.branchIds?.includes(b.id),
+                  (b) =>
+                    b.active &&
+                    (current?.branch === b.id ||
+                      current?.branchIds?.includes(b.id)),
                 )"
                 :key="b.id"
                 :value="b.id"
@@ -724,6 +727,8 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
       </div>
       <EmployeeScheduleReadOnly
         v-else
+        :employee-id="current.id"
+        :position="current.position"
         :membership-id="current.membershipId"
         :branch-id="managementBranch"
       />

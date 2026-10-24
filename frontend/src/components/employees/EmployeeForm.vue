@@ -195,8 +195,10 @@ function save(link = false) {
     e.phone = "Telefonni +998 va 9 ta raqam bilan kiriting.";
   if (d.dob && d.dob > today()) e.dob = "Tug‘ilgan sana kelajakda bo‘lmasin.";
   if (d.position === "Shifokor") {
-    if (!d.specialty.trim()) e.specialty = "Mutaxassislikni kiriting.";
-    if (!Number.isInteger(d.duration) || d.duration < 5 || d.duration > 480)
+    if (
+      workSchedule.value?.needsReception() &&
+      (!Number.isInteger(d.duration) || d.duration < 5 || d.duration > 480)
+    )
       e.duration = "5–480 daqiqa kiriting.";
   }
   if (d.access) {
@@ -454,14 +456,13 @@ function save(link = false) {
                 </select></label
               ><template v-if="draft.position === 'Shifokor'"
                 ><label
-                  >Mutaxassislik <em>*</em
-                  ><input
+                  >Mutaxassislik ><input
                     v-model="draft.specialty"
                     placeholder="Mutaxassislikni kiriting"
                   /><small v-if="errors.specialty" class="e-error">{{
                     errors.specialty
                   }}</small></label
-                ><label
+                ><label v-if="workSchedule?.needsReception()"
                   >Qabul davomiyligi <em>*</em
                   ><input
                     v-model.number="draft.duration"
@@ -644,6 +645,7 @@ function save(link = false) {
         ref="workSchedule"
         @save="save(false)"
         :position="draft.position"
+        :employee-id="draft.id"
         :profile-specialty="draft.specialty"
         :membership-id="draft.membershipId"
         :branch-id="draft.branch"

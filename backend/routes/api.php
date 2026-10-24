@@ -7,6 +7,7 @@ use App\Modules\Patients\Http\PatientController;
 use App\Modules\Platform\Http\ClinicController as PlatformController;
 use App\Modules\Platform\Http\HealthController;
 use App\Modules\Queues\Http\QueueController;
+use App\Modules\Scheduling\Http\EmployeeWorkController;
 use App\Modules\Scheduling\Http\SchedulingController;
 use App\Modules\Tenancy\Http\ClinicController;
 use App\Modules\Tenancy\Http\ContextController;
@@ -32,6 +33,8 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
             Route::post('platform/clinics/{tenant}/ceo-recovery', [PlatformController::class, 'recovery']);
             Route::post('platform/ceo-recoveries/{recovery}/approve', [PlatformController::class, 'approve']);
             Route::prefix('clinic')->group(function () {
+                Route::get('employee-work-schedules/{employee}', [EmployeeWorkController::class, 'show'])->whereUuid('employee');
+                Route::put('employee-work-schedules/{employee}', [EmployeeWorkController::class, 'save'])->whereUuid('employee');
                 Route::post('cashier/unlock', UnlockController::class);
                 foreach (['doctors', 'rooms', 'schedules', 'schedule-exceptions', 'specialties'] as $kind) {
                     Route::get($kind, [SchedulingController::class, 'index'])->defaults('resourceKind', $kind);

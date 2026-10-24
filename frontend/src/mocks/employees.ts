@@ -2,6 +2,8 @@
 export const positions = [
   "Shifokor",
   "Hamshira",
+  "Laborant",
+  "Boshqa",
   "Registrator",
   "Kassir",
   "Qorovul",

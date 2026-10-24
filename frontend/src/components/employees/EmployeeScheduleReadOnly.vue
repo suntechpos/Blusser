@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount } from "vue";
 import {
+  readWork,
+  type WorkDay,
   employeeDoctor,
   scheduleList,
   type Rule,
 } from "../../services/employeeSchedule";
 import { errorText } from "../../services/api";
 import { dateLabel } from "../../mocks/employees";
-const props = defineProps<{ membershipId?: string | null; branchId: string }>();
+const props = defineProps<{
+  employeeId: string;
+  position: string;
+  membershipId?: string | null;
+  branchId: string;
+}>();
+const work = ref<WorkDay[]>([]);
 interface Room {
   id: string;
   number: string;
@@ -34,21 +42,35 @@ const rules = ref<Rule[]>([]),
   rooms = ref<Room[]>([]),
   exceptions = ref<Exception[]>([]);
 const loading = ref(false),
-  error = ref("");
+  error = ref(""),
+  clinicalError = ref("");
 let revision = 0;
 onBeforeUnmount(() => revision++);
 watch(
-  () => [props.membershipId, props.branchId],
+  () => [props.employeeId, props.position, props.membershipId, props.branchId],
   async () => {
     const n = ++revision;
+    let loadedWork = false;
+    work.value = [];
     rules.value = [];
     rooms.value = [];
     exceptions.value = [];
     error.value = "";
+    clinicalError.value = "";
     loading.value = false;
-    if (!props.membershipId || !props.branchId) return;
+    if (!props.employeeId || !props.branchId) return;
     loading.value = true;
     try {
+      const calendar = await readWork(props.employeeId, props.branchId);
+      if (n !== revision) return;
+      work.value = calendar.data;
+      loadedWork = true;
+      if (
+        !props.membershipId ||
+        props.position !== "Shifokor" ||
+        !work.value.some((r) => r.receives_patients)
+      )
+        return;
       const doctor = await employeeDoctor(props.membershipId);
       if (n !== revision || !doctor) return;
       const filter = { doctor_id: doctor.id, branch_id: props.branchId };
@@ -67,7 +89,10 @@ watch(
         a.local_date.localeCompare(b.local_date),
       );
     } catch (e) {
-      if (n === revision) error.value = errorText(e);
+      if (n === revision) {
+        if (loadedWork) clinicalError.value = errorText(e);
+        else error.value = errorText(e);
+      }
     } finally {
       if (n === revision) loading.value = false;
     }
@@ -76,8 +101,21 @@ watch(
 );
 function dayRules(day: number) {
   return rules.value
-    .filter((r) => r.weekday === day)
+    .filter((r) => r.weekday === day && r.active !== false)
     .sort((a, b) => a.local_start.localeCompare(b.local_start));
+}
+function displayRows(day: number) {
+  const w = work.value.find((r) => r.weekday === day);
+  if (!w) return [];
+  const clinical = w.receives_patients ? dayRules(day) : [];
+  return clinical.length
+    ? clinical.map((r) => ({
+        id: r.id,
+        start: w.start_time,
+        end: w.end_time,
+        clinical: r,
+      }))
+    : [{ id: w.id, start: w.start_time, end: w.end_time, clinical: null }];
 }
 function roomName(id: string) {
   return rooms.value.find((r) => r.id === id)?.number ?? "—";
@@ -94,10 +132,12 @@ function roomName(id: string) {
       <section class="e-card">
         <h2>Haftalik ish jadvali</h2>
         <p class="e-hint">
-          Shifokorning saqlangan haftalik qabul jadvali va ish vaqtlari.
+          Xodimning saqlangan haftalik ish vaqtlari. Bemor qabuli alohida
+          ko‘rsatiladi.
         </p>
-        <p v-if="!rules.length" class="e-empty">
-          Ish jadvali hali yaratilmagan
+        <p v-if="!work.length" class="e-empty">Ish jadvali hali yaratilmagan</p>
+        <p v-if="clinicalError" class="e-error" role="alert">
+          Bemor qabuli ma’lumotlarini yuklab bo‘lmadi: {{ clinicalError }}
         </p>
         <div class="e-table-scroll">
           <table aria-label="Haftalik ish jadvali">
@@ -112,36 +152,34 @@ function roomName(id: string) {
             </thead>
             <tbody>
               <template v-for="(name, i) in names" :key="name">
-                <tr v-for="r in dayRules(i + 1)" :key="r.id">
+                <tr v-for="row in displayRows(i + 1)" :key="row.id">
                   <th scope="row">{{ name }}</th>
-                  <td>
-                    {{ r.local_start }}–{{ r.local_end
-                    }}<small
-                      >{{ dateLabel(r.effective_from) }} —
-                      {{
-                        r.effective_to
-                          ? dateLabel(r.effective_to)
-                          : "cheklanmagan"
-                      }}</small
-                    >
-                  </td>
-                  <td>{{ r.slot_minutes }} daqiqa</td>
-                  <td>{{ roomName(r.room_id) }}</td>
+                  <td>{{ row.start }}–{{ row.end }}</td>
                   <td>
                     {{
-                      rooms.find((room) => room.id === r.room_id)
-                        ?.usage_mode === "shared"
-                        ? "Umumiy xona"
-                        : rooms.find((room) => room.id === r.room_id)
-                              ?.usage_mode === "private"
-                          ? "Shaxsiy xona"
-                          : "—"
+                      row.clinical ? row.clinical.slot_minutes + " daqiqa" : "—"
+                    }}
+                  </td>
+                  <td>
+                    {{ row.clinical ? roomName(row.clinical.room_id) : "—" }}
+                  </td>
+                  <td>
+                    {{
+                      row.clinical
+                        ? rooms.find((r) => r.id === row.clinical?.room_id)
+                            ?.usage_mode === "shared"
+                          ? "Umumiy xona"
+                          : rooms.find((r) => r.id === row.clinical?.room_id)
+                                ?.usage_mode === "private"
+                            ? "Shaxsiy xona"
+                            : "—"
+                        : "—"
                     }}
                   </td>
                 </tr>
-                <tr v-if="!dayRules(i + 1).length" class="no-reception">
+                <tr v-if="!displayRows(i + 1).length" class="no-reception">
                   <th scope="row">{{ name }}</th>
-                  <td>Qabul yo‘q</td>
+                  <td>Dam olish</td>
                   <td>—</td>
                   <td>—</td>
                   <td>—</td>
