@@ -1,4 +1,4 @@
-import {allServerGrants} from "./access.fixture";
+import { allServerGrants } from "./access.fixture";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 const output =
@@ -17,6 +17,28 @@ async function setup(
     if (r.url().includes("/api/") || r.url().includes("/sanctum/"))
       requests.push(`${r.method()} ${new URL(r.url()).pathname}`);
   });
+  const branches = [
+    {
+      id: "branch-main",
+      name: "Asosiy filial",
+      active: true,
+      timezone: "Asia/Tashkent",
+    },
+    {
+      id: "branch-north",
+      name: "Yunusobod",
+      active: true,
+      timezone: "Asia/Tashkent",
+    },
+  ];
+  const records: any[] = Array.from({ length: 12 }, (_, i) => ({
+    id: `room-${i}`,
+    branch_id: "branch-main",
+    number: i === 0 ? "201-kabinet" : `Synthetic ${i}`,
+    service_type: "Qabul kabineti",
+    active: i !== 11,
+    availability: "available",
+  }));
   const user = {
     id: "ui-synthetic-user",
     login: "demo.ceo",
@@ -47,11 +69,44 @@ async function setup(
         },
       });
     // Access-control fixture: the shell now reads authorized branches.
-    if(path === '/api/v1/clinic/branches')return route.fulfill({json:{data:[]}});
+    if (path === "/api/v1/clinic/branches")
+      return route.fulfill({ json: { data: branches } });
     if (path === "/api/v1/clinic/context")
       return route.fulfill({
-        json: { grants: allServerGrants, branches: [], timezone: "Asia/Tashkent" },
+        json: { grants: allServerGrants, branches, timezone: "Asia/Tashkent" },
       });
+    if (path.includes("/clinic/rooms")) {
+      const req = route.request();
+      const id = path.split("/rooms/")[1];
+      if (req.method() === "GET") {
+        const branch = new URL(req.url()).searchParams.get("branch_id");
+        const data = records.filter((r) => !branch || r.branch_id === branch);
+        return route.fulfill({ json: { data, meta: { total: data.length } } });
+      }
+      const body = req.postDataJSON();
+      if (
+        records.some(
+          (r) =>
+            r.id !== id &&
+            r.branch_id === body.branch_id &&
+            r.number.trim().toLocaleLowerCase() ===
+              body.number.trim().toLocaleLowerCase(),
+        )
+      )
+        return route.fulfill({
+          status: 409,
+          json: { message: "Xona raqami allaqachon mavjud." },
+        });
+      const record = { ...body, id: id || `created-${records.length}` };
+      if (id)
+        records.splice(
+          records.findIndex((r) => r.id === id),
+          1,
+          record,
+        );
+      else records.push(record);
+      return route.fulfill({ status: id ? 200 : 201, json: record });
+    }
     return route.fulfill({
       status: 500,
       json: { message: "Unexpected UI test request" },
@@ -74,14 +129,13 @@ const dialog = (page: Page) => page.getByRole("dialog");
 const roomsTab = (page: Page) =>
   page.getByRole("tab", { name: "Xonalar", exact: true });
 test.use({ viewport: { width: 1672, height: 941 }, locale: "uz-UZ" });
-test("four reference views and no operations API requests", async ({
+test("reference views use real room API contract while departments remain preview-only", async ({
   page,
 }) => {
   const { requests, errors } = await setup(page);
   await expect(
     page.getByRole("heading", { name: "Bo‘limlar va Xonalar" }),
   ).toBeVisible();
-  const initial = [...requests];
   await expect(page.locator(".dr-departments tbody tr")).toHaveCount(8);
   await shot(page, "01-departments");
   const add = page.getByRole("button", {
@@ -100,7 +154,7 @@ test("four reference views and no operations API requests", async ({
   await expect(add).toBeFocused();
   await roomsTab(page).click();
   await expect(page.locator(".dr-pagination")).toContainText(
-    "1 – 8 / 23 ta xona",
+    "1 – 8 / 12 ta xona",
   );
   await shot(page, "03-rooms");
   await page
@@ -113,15 +167,17 @@ test("four reference views and no operations API requests", async ({
     .getByLabel("Filial", { exact: true })
     .selectOption("Asosiy filial");
   await dialog(page)
-    .getByLabel("Bo‘lim", { exact: true })
-    .selectOption("B-001");
-  await dialog(page)
     .getByLabel("Xona turi", { exact: true })
     .selectOption("Qabul kabineti");
-  await dialog(page).getByLabel("Qavat", { exact: true }).fill("2");
+  await expect(dialog(page).getByLabel("Bo‘lim", { exact: true })).toHaveCount(
+    0,
+  );
   await shot(page, "04-room-modal");
   await dialog(page).getByRole("button", { name: "Yopish" }).click();
-  expect(requests).toEqual(initial);
+  expect(requests.filter((r) => r.includes("/rooms"))).toContain(
+    "GET /api/v1/clinic/rooms",
+  );
+  expect(requests.some((r) => r.startsWith("POST "))).toBe(false);
   expect(errors).toEqual([]);
 });
 test("department filters, empty state and room-count drilldown", async ({
@@ -137,17 +193,13 @@ test("department filters, empty state and room-count drilldown", async ({
   await expect(page.locator("tbody tr")).toHaveCount(3);
   await page.getByLabel("Bo‘limlar holat filtri").selectOption("false");
   await expect(page.locator("tbody tr")).toHaveCount(1);
-  await page
-    .getByRole("button", { name: "Fizioterapiya xonalarini ko‘rish" })
-    .click();
-  await expect(roomsTab(page)).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByLabel("Xonalar filial filtri")).toHaveValue(
-    "Yunusobod",
+  await roomsTab(page).click();
+  await page.getByLabel("Xonalar filial filtri").selectOption("branch-north");
+  await expect(page.locator("tbody")).toContainText(
+    "Bu filialda qabul xonasi mavjud emas",
   );
-  await expect(page.getByLabel("Xonalar bo‘lim filtri")).toHaveValue("B-008");
-  await expect(page.locator("tbody")).toContainText("Xona topilmadi");
-  await page.getByLabel("Xonalar filial filtri").selectOption("Asosiy filial");
-  await expect(page.getByLabel("Xonalar bo‘lim filtri")).toHaveValue("");
+  await page.getByLabel("Xonalar filial filtri").selectOption("branch-main");
+  await expect(page.locator("tbody")).toContainText("201-kabinet");
 });
 test("department required/duplicate validation, create/edit, cancel and focus trap", async ({
   page,
@@ -196,13 +248,13 @@ test("department required/duplicate validation, create/edit, cancel and focus tr
   await page.getByLabel("Bo‘limlarni qidirish").fill("Demo yangilangan");
   await expect(page.locator("tbody")).toContainText("Faol emas");
 });
-test("room filters, pagination, scoped departments, required fields and duplicate names", async ({
+test("room API filters, pagination, validation, server conflicts and persisted edits", async ({
   page,
 }) => {
   await setup(page);
   await roomsTab(page).click();
   await page.getByRole("button", { name: "Keyingi xonalar sahifasi" }).click();
-  await expect(page.locator(".dr-pagination")).toContainText("9 – 16");
+  await expect(page.locator(".dr-pagination")).toContainText("9 – 12");
   await page.getByLabel("Xonalarni qidirish").fill("201");
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await page.getByLabel("Xonalarni qidirish").fill("");
@@ -213,59 +265,37 @@ test("room filters, pagination, scoped departments, required fields and duplicat
     .getByRole("button", { name: "Xona qo‘shish", exact: true })
     .click();
   const d = dialog(page);
-  await expect(d.getByLabel("Holati", { exact: true })).toHaveValue("true");
-  await expect(d.getByLabel("Bo‘lim", { exact: true })).toBeDisabled();
   await d.getByRole("button", { name: "Saqlash", exact: true }).click();
-  await expect(d.locator(".dr-error")).toHaveCount(4);
-  await d.getByLabel("Filial", { exact: true }).selectOption("Asosiy filial");
-  await d.getByLabel("Bo‘lim", { exact: true }).selectOption("B-001");
-  await d.getByLabel("Filial", { exact: true }).selectOption("Yunusobod");
-  await expect(d.getByLabel("Bo‘lim", { exact: true })).toHaveValue("");
-  await expect(
-    d.getByLabel("Bo‘lim", { exact: true }).locator("option"),
-  ).not.toContainText(["Kardiologiya"]);
-  await d.getByLabel("Filial", { exact: true }).selectOption("Asosiy filial");
-  await d.getByLabel("Bo‘lim", { exact: true }).selectOption("B-001");
+  await expect(d.locator(".dr-error")).toHaveCount(2);
   await d
     .getByLabel("Xona turi", { exact: true })
     .selectOption("Qabul kabineti");
   await d
     .getByLabel("Xona nomi yoki raqami", { exact: true })
-    .fill("  201-KABINET ");
+    .fill("201-kabinet");
   await d.getByRole("button", { name: "Saqlash", exact: true }).click();
-  await expect(d.locator(".dr-error")).toContainText("shu nomli");
-  await d
-    .getByLabel("Xona nomi yoki raqami", { exact: true })
-    .fill("Demo xona");
+  await expect(d.getByRole("alert")).toBeVisible();
+  await d.getByLabel("Xona nomi yoki raqami", { exact: true }).fill("API xona");
   await d.getByRole("button", { name: "Saqlash", exact: true }).click();
   await expect(d).toBeHidden();
-  await page.getByLabel("Xonalarni qidirish").fill("Demo xona");
-  await expect(page.locator("tbody tr")).toHaveCount(1);
-  await expect(page.locator("tbody")).toContainText("—");
+  await page.getByLabel("Xonalarni qidirish").fill("API xona");
   await page
-    .getByRole("button", { name: "Demo xona xonasini tahrirlash" })
+    .getByRole("button", { name: "API xona xonasini tahrirlash", exact: true })
     .click();
   await expect(
-    dialog(page).getByRole("heading", { name: "Xonani tahrirlash" }),
-  ).toBeVisible();
-  await dialog(page).getByLabel("Qavat", { exact: true }).fill("4");
+    dialog(page).getByLabel("Filial", { exact: true }),
+  ).toBeDisabled();
+  await dialog(page)
+    .getByLabel("Xona nomi yoki raqami", { exact: true })
+    .fill("API updated");
   await dialog(page)
     .getByRole("button", { name: "Saqlash", exact: true })
     .click();
-  await expect(page.locator("tbody")).toContainText("4-qavat");
-  await page
-    .getByRole("button", { name: "Demo xona xonasini tahrirlash" })
-    .click();
-  await dialog(page)
-    .getByLabel("Xona nomi yoki raqami", { exact: true })
-    .fill("O‘chadigan");
-  await page.keyboard.press("Escape");
-  await expect(page.locator("tbody")).toContainText("Demo xona");
-  await page.getByRole("tab", { name: "Bo‘limlar", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Kardiologiya xonalarini ko‘rish" })
-    .click();
-  await expect(page.locator(".dr-pagination")).toContainText("/ 5 ta xona");
+  await expect(dialog(page)).toBeHidden();
+  await page.reload();
+  await roomsTab(page).click();
+  await page.getByLabel("Xonalarni qidirish").fill("API updated");
+  await expect(page.locator("tbody")).toContainText("API updated");
 });
 test("mobile modal stays in viewport, tables scroll locally, demo resets on reload", async ({
   page,

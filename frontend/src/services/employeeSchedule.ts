@@ -12,6 +12,7 @@ export interface Rule {
   doctor_id: string;
   branch_id: string;
   room_id: string;
+  room_usage?: "shared" | "private";
   weekday: number;
   local_start: string;
   local_end: string;
@@ -27,6 +28,8 @@ export interface Option {
   branch_id?: string;
   active?: boolean;
   availability?: string;
+  usage_mode?: "shared" | "private";
+  exclusive_doctor_id?: string | null;
 }
 export async function scheduleList<T>(
   path: string,

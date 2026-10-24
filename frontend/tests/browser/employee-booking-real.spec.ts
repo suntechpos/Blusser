@@ -3,6 +3,7 @@ test.use({ viewport: { width: 1536, height: 1024 } });
 test("employee management creates real doctor links and schedule then books a persisted appointment", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2030-01-08T21:30:00Z"));
   await page.goto("/");
   await page.getByLabel("Login", { exact: true }).fill("booking.doctor");
   await page
@@ -14,75 +15,77 @@ test("employee management creates real doctor links and schedule then books a pe
     .getByRole("row")
     .filter({ hasText: "configurable clinician" })
     .click();
-  await page
-    .getByRole("button", {
-      name: "Shifokor profili / ish jadvali",
-      exact: true,
-    })
-    .click();
-  const c = page.getByRole("dialog", {
-    name: "Shifokor profili va ish jadvali",
-    exact: true,
+  // Catalog creation is test setup through existing real endpoints; the removed modal is not restored.
+  await page.evaluate(async () => {
+    const path = "/src/services/api.ts";
+    const { clinicRequest } = await import(path);
+    await clinicRequest("specialties", {
+      method: "POST",
+      body: {
+        code: "configured-specialty",
+        name: "Configured specialty",
+        active: true,
+      },
+    });
+    await clinicRequest("appointments/configuration-services", {
+      method: "POST",
+      body: {
+        code: "configured-consultation",
+        name: "Configured consultation",
+        active: true,
+      },
+    });
+    const sessionPath = "/src/services/session.ts";
+    const { session } = await import(sessionPath);
+    await clinicRequest("rooms", {
+      method: "POST",
+      body: {
+        branch_id: session.branch || session.branches[0]?.id,
+        number: "Configured R2",
+        service_type: "consultation",
+        active: true,
+        availability: "available",
+      },
+    });
   });
-  await c
-    .getByLabel("Yangi mutaxassislik kodi", { exact: true })
-    .fill("configured-specialty");
-  await c.getByLabel("Nomi", { exact: true }).fill("Configured specialty");
-  await c
-    .getByRole("button", { name: "Mutaxassislik yaratish", exact: true })
-    .click();
-  await expect(c.getByLabel("Mutaxassislik", { exact: true })).not.toHaveValue(
-    "",
-  );
-  await c
-    .getByLabel("Yangi xizmat kodi", { exact: true })
-    .fill("configured-consultation");
-  await c
-    .getByLabel("Xizmat nomi", { exact: true })
-    .fill("Configured consultation");
-  await c.getByRole("button", { name: "Xizmat yaratish", exact: true }).click();
-  await expect(c.getByLabel("Xizmat", { exact: true })).not.toHaveValue("");
-  await c
-    .getByLabel("Faol xodim hisobi", { exact: true })
-    .selectOption({ label: "Booking configurable clinician" });
-  await c
-    .getByRole("button", { name: "Shifokor profilini yaratish", exact: true })
-    .click();
-  await expect(
-    c.getByLabel("Mavjud shifokor", { exact: true }),
-  ).not.toHaveValue("");
-  await c
-    .getByLabel("Yangi xona raqami", { exact: true })
-    .fill("Configured R2");
-  await c.getByRole("button", { name: "Xona yaratish", exact: true }).click();
-  await expect(c.getByLabel("Mavjud xona", { exact: true })).not.toHaveValue(
-    "",
-  );
-  await c.getByLabel("Jadval boshlanishi", { exact: true }).fill("2030-01-09");
-  await c.getByLabel("Jadval tugashi", { exact: true }).fill("2030-01-09");
-  await c.getByLabel("Hafta kuni", { exact: true }).selectOption("3");
-  const schedule = page.waitForResponse(
-    (r) =>
-      r.request().method() === "POST" && r.url().endsWith("/clinic/schedules"),
-  );
-  await c.getByRole("button", { name: "Jadval yaratish", exact: true }).click();
-  expect((await schedule).status()).toBe(201);
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(await c.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await c.screenshot({ path: "/tmp/reception-configuration.png" });
-  await c.getByRole("button", { name: "Yopish", exact: true }).last().click();
-  await page.setViewportSize({ width: 1536, height: 1024 });
+  await page.getByRole("button", { name: "Tahrirlash", exact: true }).click();
+  await page.getByLabel("Telefon *", { exact: true }).fill("+998 90 765 43 30");
+  await page.getByLabel("Lavozim *", { exact: true }).selectOption("Shifokor");
   await page
-    .getByRole("button", {
-      name: "Shifokor profili / ish jadvali",
-      exact: true,
-    })
-    .click();
-  await expect(c).toContainText("Bu xodimning shifokor profili mavjud");
+    .getByPlaceholder("Mutaxassislikni kiriting", { exact: true })
+    .fill("Configured specialty");
+  await page.getByLabel("Kassa PIN-kodi", { exact: true }).fill("7462");
+  await page.getByLabel("PIN-kodni tasdiqlash", { exact: true }).fill("7462");
+  const c = page.getByRole("region", { name: "Ish jadvali", exact: true });
   await expect(
-    c.getByRole("button", { name: "Shifokor profilini yaratish", exact: true }),
-  ).toBeDisabled();
-  await c.getByRole("button", { name: "Yopish", exact: true }).last().click();
+    c
+      .getByLabel("Qabul xonasi", { exact: true })
+      .locator("option")
+      .filter({ hasText: "Configured R2" }),
+  ).toHaveCount(1);
+  await c.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  await c
+    .getByLabel("Qabul xonasi", { exact: true })
+    .selectOption({ label: "Configured R2" });
+  await c
+    .getByLabel("Shifokor xizmati: Configured consultation", { exact: true })
+    .check();
+  await c
+    .getByRole("button", { name: "Yana bir kun qo‘shish", exact: true })
+    .click();
+  await c.getByLabel("Dushanba hafta kuni").selectOption("3");
+  await c
+    .getByRole("button", { name: "Jadvalni saqlash", exact: true })
+    .click();
+  await expect(page.getByLabel("Xodimlarni qidirish")).toBeVisible();
+  await page
+    .getByRole("row")
+    .filter({ hasText: "configurable clinician" })
+    .click();
+  await page.getByRole("tab", { name: "Ish jadvali", exact: true }).click();
+  await expect(
+    page.getByRole("table", { name: "Haftalik ish jadvali", exact: true }),
+  ).toContainText("Configured R2");
   await page.getByRole("button", { name: "Registratura", exact: true }).click();
   await page
     .locator(".rp-heading-actions")
@@ -108,7 +111,7 @@ test("employee management creates real doctor links and schedule then books a pe
   await d
     .getByLabel("Qabul turi *", { exact: true })
     .selectOption({ label: "Configured consultation · Jadval bo‘yicha" });
-  await d.getByLabel("Qabul sanasi", { exact: true }).fill("2030-01-08");
+  await d.getByLabel("Qabul sanasi", { exact: true }).fill("2030-01-10");
   await expect(d).toContainText("Bu sana uchun ish jadvali sozlanmagan.");
   await d.getByLabel("Qabul sanasi", { exact: true }).fill("2030-01-09");
   await expect(

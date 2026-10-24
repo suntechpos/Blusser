@@ -18,6 +18,7 @@ export interface Department {
   icon: string;
 }
 export interface Room {
+  availability?: "available" | "unavailable";
   id: string;
   name: string;
   branch: string;
