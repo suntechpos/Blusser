@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, onBeforeUnmount, watch } from "vue";
+import PagePermissions from "./PagePermissions.vue";
+import EmployeeScheduleSection from "./EmployeeScheduleSection.vue";
+import "./page-permissions.css";
 import DateField from "./DateField.vue";
 import { UserRound, Upload, Save, Eye, EyeOff, Info } from "lucide-vue-next";
 import {
@@ -10,6 +13,10 @@ import {
   type Employee,
 } from "../../mocks/employees";
 import { useRolesStore } from "../settings/store";
+const workSchedule = ref<InstanceType<typeof EmployeeScheduleSection>>();
+defineExpose({
+  commitSchedule: (employee: Employee) => workSchedule.value?.commit(employee),
+});
 const rolesStore = useRolesStore();
 const branches = computed(() => session.branches);
 import { session, can } from "../../services/session";
@@ -30,6 +37,17 @@ if (!props.employee) {
   draft.value.pageGrants = [];
   draft.value.branchIds = draft.value.branch ? [draft.value.branch] : [];
 }
+watch(
+  () => props.employee,
+  (e) => {
+    if (e) {
+      draft.value.id = e.id;
+      draft.value.version = e.version;
+      draft.value.membershipId = e.membershipId;
+      draft.value.cashierPinSet = e.cashierPinSet;
+    }
+  },
+);
 const errors = ref<Record<string, string>>({});
 watch(
   () => props.serverErrors,
@@ -58,11 +76,6 @@ const pageGrants = computed(
       ?.grants.filter((g) => g.code.endsWith(".view")) ??
     [],
 );
-const scopeLabels: Record<string, string> = {
-  own: "O‘ziga tegishli",
-  assigned_branches: "Biriktirilgan filiallar",
-  entire_clinic: "Butun klinika",
-};
 function setPageScope(code: string, scope: string) {
   if (
     !can("employees.assign_role") ||
@@ -157,6 +170,8 @@ function generate() {
   );
 }
 function save(link = false) {
+  if (link && workSchedule.value && !workSchedule.value.validateLink()) return;
+  if (workSchedule.value && !workSchedule.value.validate()) return;
   const d = draft.value;
   const e: Record<string, string> = {};
   for (const key of ["last", "first", "phone", "position", "branch"] as const)
@@ -346,57 +361,6 @@ function save(link = false) {
                   errors.branch
                 }}</small></label
               >
-              <div class="e-label employee-pages">
-                <span>Ishlashga ruxsat berilgan bo‘limlar</span>
-                <label
-                  v-for="page in pageOptions"
-                  :key="page.code"
-                  class="employee-access-row"
-                >
-                  <input
-                    type="checkbox"
-                    :aria-label="'Bo‘lim: ' + page.label"
-                    :checked="pageGrants.some((g) => g.code === page.code)"
-                    :disabled="
-                      !can('employees.assign_role') ||
-                      (!rolesStore.allowedScopes(page.code).length &&
-                        !pageGrants.some((g) => g.code === page.code))
-                    "
-                    @change="
-                      togglePage(
-                        page.code,
-                        ($event.target as HTMLInputElement).checked,
-                      )
-                    "
-                  />
-                  {{ page.label }}
-                  <select
-                    v-if="pageGrants.some((g) => g.code === page.code)"
-                    :aria-label="page.label + ' kirish doirasi'"
-                    :disabled="!can('employees.assign_role')"
-                    :value="pageGrants.find((g) => g.code === page.code)?.scope"
-                    @change="
-                      setPageScope(
-                        page.code,
-                        ($event.target as HTMLSelectElement).value,
-                      )
-                    "
-                  >
-                    <option
-                      v-for="scope in rolesStore.allowedScopes(page.code)"
-                      :key="scope"
-                      :value="scope"
-                    >
-                      {{ scopeLabels[scope] }}
-                    </option>
-                  </select>
-                </label>
-                <small class="e-hint"
-                  >Tanlov sahifani ko‘rishga ruxsat beradi. Amallar ruxsat roli
-                  orqali boshqariladi. Klinik bo‘lim va lavozim bundan
-                  alohida.</small
-                >
-              </div>
               <div v-if="cashierSelected" class="e-label employee-pages">
                 <label
                   >Kassa PIN-kodi<input
@@ -629,6 +593,22 @@ function save(link = false) {
           <p class="e-required">* Majburiy maydonlar</p>
         </div>
       </div>
+      <section class="e-card employee-form-permissions-card">
+        <PagePermissions
+          :options="pageOptions"
+          :grants="pageGrants"
+          :editable="can('employees.assign_role')"
+          :allowed-scopes="rolesStore.allowedScopes"
+          @toggle="togglePage"
+          @scope="setPageScope"
+        />
+      </section>
+      <EmployeeScheduleSection
+        ref="workSchedule"
+        :position="draft.position"
+        :membership-id="draft.membershipId"
+        :branch-id="draft.branch"
+      />
     </fieldset>
   </form>
 </template>

@@ -203,6 +203,7 @@ function makeStore() {
     e: EditorEmployee,
     password?: string,
     pin?: { value: string; confirmation: string },
+    onCommitted?: (id: string) => void,
   ) {
     if (!can(e.id ? "employees.update" : "employees.create"))
       throw Error("Bu amal uchun ruxsat yo‘q.");
@@ -257,6 +258,7 @@ function makeStore() {
         etag: e.id ? `"${e.version}"` : undefined,
       },
     );
+    onCommitted?.(saved.data.id);
     await loadEmployees();
     await loadRoles();
     await revalidateSession();

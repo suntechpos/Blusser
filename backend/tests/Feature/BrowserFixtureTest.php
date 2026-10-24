@@ -62,13 +62,21 @@ final class BrowserFixtureTest extends FoundationTestCase
         $membership = (string) Str::uuid();
         $db->table('users')->insert(['id' => $doctorUser, 'login' => 'booking.doctor', 'name' => 'Booking test doctor', 'password_hash' => Hash::make('Synthetic-password-42!'), 'must_change_password' => false]);
         $db->table('tenant_memberships')->insert(['id' => $membership, 'tenant_id' => $tenant, 'user_id' => $doctorUser, 'role_id' => $role]);
+        // Employee governance requires a real clinic CEO, as in provisioned clinics.
+        $db->table('tenant_ceos')->insert(['tenant_id' => $tenant, 'user_id' => $doctorUser, 'membership_id' => $membership]);
         $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $tenant, 'membership_id' => $membership, 'branch_id' => $branch]);
         $setupUser = (string) Str::uuid();
         $setupMember = (string) Str::uuid();
         $db->table('users')->insert(['id' => $setupUser, 'login' => 'booking.config-clinician', 'name' => 'Booking configurable clinician', 'password_hash' => Hash::make('Synthetic-password-42!'), 'must_change_password' => false]);
         $db->table('tenant_memberships')->insert(['id' => $setupMember, 'tenant_id' => $tenant, 'user_id' => $setupUser, 'role_id' => $role]);
         $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $tenant, 'membership_id' => $setupMember, 'branch_id' => $branch]);
+        $inlineUser = (string) Str::uuid();
+        $inlineMember = (string) Str::uuid();
+        $db->table('users')->insert(['id' => $inlineUser, 'login' => 'booking.inline-clinician', 'name' => 'Booking inline clinician', 'password_hash' => Hash::make('Synthetic-password-42!'), 'must_change_password' => false]);
+        $db->table('tenant_memberships')->insert(['id' => $inlineMember, 'tenant_id' => $tenant, 'user_id' => $inlineUser, 'role_id' => $role]);
+        $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $tenant, 'membership_id' => $inlineMember, 'branch_id' => $branch]);
         $db->table('services')->insert(['id' => $service, 'tenant_id' => $tenant, 'code' => 'booking_consultation', 'name' => 'Booking consultation']);
+        $db->table('services')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $tenant, 'code' => 'booking_inline_extra', 'name' => 'Booking inline additional service']);
         $scheduling = app(Scheduling::class);
         $actor = $this->actor($doctorUser);
         $command = fn ($kind, $body) => $scheduling->command($actor, $tenant, $kind, 'create', null, $body, (string) Str::uuid());

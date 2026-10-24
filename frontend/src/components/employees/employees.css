@@ -1123,3 +1123,58 @@
   max-width: 230px;
   margin-left: auto;
 }
+
+.employee-form-permissions-card {
+  margin-top: 16px;
+}
+.employee-inline-schedule {
+  margin-top: 16px;
+}
+.employee-schedule-fields {
+  margin: 12px 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.employee-weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 10px 0 16px;
+}
+.employee-weekdays label,
+.employee-schedule-enable {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.employee-inline-schedule input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.employee-inline-schedule
+  :is(input[type="time"], input[type="number"], select) {
+  width: 100%;
+  min-width: 0;
+}
+.employee-existing-rules {
+  margin-top: 16px;
+  max-height: 260px;
+  overflow: auto;
+}
+.employee-day-times > div {
+  margin: 10px 0;
+  align-items: center;
+}
+.employee-inline-schedule .e-form-grid {
+  margin-top: 12px;
+}
+.employee-day-times > .e-form-grid {
+  grid-template-columns: minmax(110px, 0.6fr) repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 700px) {
+  .employee-day-times > .e-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
