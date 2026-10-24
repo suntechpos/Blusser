@@ -1,6 +1,7 @@
 # Keep the existing "Backend Foundation / foundation" check name stable for branch rules.
-# Fast UI-only PRs validate frontend + mocked browser flows; backend, API,
-# infrastructure, dependency and workflow changes receive the full integration suite.
+# Fast UI-only PRs validate frontend without downloading browsers or starting Docker.
+# Backend, API client, infrastructure, dependency and workflow changes receive
+# the full integration suite. A changed real-browser spec alone stays on fast CI.
 # Every push to main runs the complete suite irrespective of changed paths.
 name: Backend Foundation
 
@@ -47,12 +48,12 @@ jobs:
           cat /tmp/blusser-changed-files.txt
           # Backend and API-sensitive changes must never skip real PostgreSQL tests.
           # Workflow changes intentionally run full CI to validate this gate.
-          if grep -Eq '^(.github/|backend/|scripts/|compose\.ya?ml$|docker-compose[^/]*\.ya?ml$|frontend/src/services/|frontend/src/router/|frontend/playwright\.config\.ts$|frontend/package(-lock)?\.json$|frontend/tests/browser/.*-real\.spec\.ts$)' /tmp/blusser-changed-files.txt; then
+          if grep -Eq '^(.github/|backend/|scripts/|compose\.ya?ml$|docker-compose[^/]*\.ya?ml$|frontend/src/services/|frontend/src/router/|frontend/playwright\.config\.ts$|frontend/package(-lock)?\.json$)' /tmp/blusser-changed-files.txt; then
             echo "full=true" >> "$GITHUB_OUTPUT"
             echo "Critical or integration-sensitive changes: full regression suite"
           else
             echo "full=false" >> "$GITHUB_OUTPUT"
-            echo "UI/docs-only PR: frontend checks and mocked browser smoke tests"
+            echo "UI/docs-only PR: frontend gates and test discovery; real browser tests on main"
           fi
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -64,25 +65,14 @@ jobs:
       - name: Frontend typecheck, unit tests and production build
         working-directory: frontend
         run: |
-          npm ci
+          npm ci --prefer-offline --no-audit --no-fund
           npm test
           npm run build
 
-      - name: Install Chromium for lightweight UI regressions
+      - name: Validate Playwright spec discovery (fast PR)
         if: steps.scope.outputs.full == 'false'
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
-
-      - name: Mocked browser regressions (UI-only PRs)
-        if: steps.scope.outputs.full == 'false'
-        working-directory: frontend
-        run: |
-          npx playwright test \
-            tests/browser/employee-permissions-ui.spec.ts \
-            tests/browser/employee-schedule-ui.spec.ts \
-            tests/browser/employee-pin-ui.spec.ts \
-            tests/browser/employee-form-schedule.spec.ts \
-            tests/browser/reception.spec.ts
+        run: npx playwright test --list
 
       - name: Generate ephemeral local credentials
         if: steps.scope.outputs.full == 'true'
