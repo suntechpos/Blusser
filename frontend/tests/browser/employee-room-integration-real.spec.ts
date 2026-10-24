@@ -69,6 +69,8 @@ test("real room and temporary-password doctor save three days and private usage 
     name: "Ish jadvali",
     exact: true,
   });
+  await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  await section.getByLabel("Bemor qabul qiladi", { exact: true }).check();
   await expect(
     section
       .getByLabel("Qabul xonasi", { exact: true })

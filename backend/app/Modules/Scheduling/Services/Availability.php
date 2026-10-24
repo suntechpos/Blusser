@@ -46,7 +46,7 @@ final class Availability
         if ($day->diff($last)->days >= 31) {
             throw ValidationException::withMessages(['to' => 'Availability is limited to 31 local days.']);
         }
-        $rules = DB::table('schedule_rules')->where('doctor_id', $doctor)->where('branch_id', $filters['branch_id'])->get();
+        $rules = DB::table('schedule_rules')->where('active', true)->where('doctor_id', $doctor)->where('branch_id', $filters['branch_id'])->get();
         $exceptions = DB::table('schedule_exceptions')->where('doctor_id', $doctor)->where('branch_id', $filters['branch_id'])->get()->keyBy('local_date');
         // service_type is a room category, NOT a service identity. Eligibility comes
         // from doctor_services; Stage 1 has no room-to-service relation to invent.

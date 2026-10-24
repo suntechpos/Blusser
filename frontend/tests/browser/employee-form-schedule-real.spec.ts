@@ -22,6 +22,8 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
     name: "Ish jadvali",
     exact: true,
   });
+  await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  await section.getByLabel("Bemor qabul qiladi", { exact: true }).check();
   await expect(
     section
       .getByLabel("Qabul xonasi", { exact: true })
@@ -196,6 +198,9 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
       exact: true,
     })
     .click();
+  await section
+    .getByRole("button", { name: "Tasdiqlash", exact: true })
+    .click();
   await section.getByLabel("Juma tugash", { exact: true }).fill("19:30");
   let updates = 0;
   page.on("request", (r) => {
@@ -204,7 +209,7 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   });
   await page.getByRole("button", { name: "Saqlash", exact: true }).click();
   await expect(page.getByLabel("Xodimlarni qidirish")).toBeVisible();
-  expect(updates).toBe(1);
+  expect(updates).toBe(2);
   expect(bodies[bodies.length - 1].effective_from).toBe("2030-01-09");
   expect(bodies[bodies.length - 1].effective_to).toBe("2030-01-31");
   const changedDoctor = await doctorUpdate;
@@ -217,14 +222,7 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   await section.screenshot({
     path: "/tmp/employee-inline-doctor-schedule.png",
   });
-  await section
-    .getByRole("button", { name: "Yangi jadval", exact: true })
-    .click();
-  await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
-  await expect(section.locator(".employee-schedule-day")).toHaveCount(0);
-  await expect(section.getByLabel("Qabul xonasi", { exact: true })).toHaveValue(
-    "",
-  );
+  await expect(section.locator(".employee-schedule-day")).toHaveCount(1);
   await expect(section.locator(".employee-existing-rules p")).toHaveCount(2);
 });
 
@@ -256,6 +254,8 @@ test("a new loginless doctor profile is retained when scheduling needs an accoun
     name: "Ish jadvali",
     exact: true,
   });
+  await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  await section.getByLabel("Bemor qabul qiladi", { exact: true }).check();
   await expect(
     section
       .getByLabel("Qabul xonasi", { exact: true })
@@ -292,7 +292,7 @@ test("a new loginless doctor profile is retained when scheduling needs an accoun
   );
   expect(posts).toBe(1);
   expect(doctorWrites).toBe(0);
-  await section.getByLabel("Ish jadvalini saqlash").uncheck();
+  await section.getByLabel("Bemor qabul qiladi", { exact: true }).uncheck();
   await page.getByRole("button", { name: "Saqlash", exact: true }).click();
   await expect(page.getByLabel("Xodimlarni qidirish")).toBeVisible();
   expect(posts).toBe(1);

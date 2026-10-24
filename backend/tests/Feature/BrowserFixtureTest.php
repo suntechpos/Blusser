@@ -43,6 +43,27 @@ final class BrowserFixtureTest extends FoundationTestCase
         $this->assertSame('blusser_test', $db->selectOne('SELECT current_database() AS name')->name);
         $this->assertSame(3, $db->table('branches')->count());
         $this->prepareReceptionBookingFixture();
+        $this->prepareWorkFixture();
+    }
+
+    private function prepareWorkFixture(): void
+    {
+        $db = DB::connection('migration');
+        $tenant = (string) Str::uuid();
+        $user = (string) Str::uuid();
+        $member = (string) Str::uuid();
+        $role = (string) Str::uuid();
+        $branch = (string) Str::uuid();
+        $db->table('tenants')->insert(['id' => $tenant, 'name' => 'Synthetic work clinic', 'slug' => 'work-schedule-test']);
+        $db->table('users')->insert(['id' => $user, 'login' => 'work.operator', 'name' => 'Synthetic work operator', 'password_hash' => Hash::make('Synthetic-password-42!'), 'must_change_password' => false]);
+        $db->table('tenant_roles')->insert(['id' => $role, 'tenant_id' => $tenant, 'code' => 'work_setup', 'name' => 'Synthetic work setup']);
+        foreach ($db->table('permissions')->get() as $permission) {
+            $db->table('role_permissions')->insert(['tenant_id' => $tenant, 'role_id' => $role, 'permission_id' => $permission->id, 'scope' => 'entire_clinic']);
+        }
+        $db->table('tenant_memberships')->insert(['id' => $member, 'tenant_id' => $tenant, 'user_id' => $user, 'role_id' => $role]);
+        $db->table('tenant_ceos')->insert(['tenant_id' => $tenant, 'user_id' => $user, 'membership_id' => $member]);
+        $db->table('branches')->insert(['id' => $branch, 'tenant_id' => $tenant, 'name' => 'Work test branch', 'code' => 'work']);
+        $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $tenant, 'membership_id' => $member, 'branch_id' => $branch]);
     }
 
     private function prepareReceptionBookingFixture(): void

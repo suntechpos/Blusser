@@ -5,6 +5,9 @@ import { CalendarClock, PlusCircle, Trash2, Save, Info } from "lucide-vue-next";
 import { session, can } from "../../services/session";
 import { clinicRequest, errorText } from "../../services/api";
 import {
+  readWork,
+  writeWork,
+  type WorkDay,
   scheduleList,
   employeeDoctor,
   saveRules,
@@ -15,10 +18,22 @@ import {
 import type { Employee } from "../../mocks/employees";
 const props = defineProps<{
   position: string;
+  employeeId?: string;
   membershipId?: string | null;
   branchId: string;
   profileSpecialty: string;
 }>();
+const receivesPatients = ref(false),
+  patientDays = ref<Record<number, boolean>>({});
+const workRows = ref<WorkDay[]>([]),
+  workVersion = ref(0),
+  workLoading = ref(false),
+  committing = ref(false);
+const removals = new Set<number>();
+const pendingRemoval = ref<number>();
+const pendingMove = ref<number>();
+const pendingDisable = ref<number | "all">();
+let workSequence = 0;
 const emit = defineEmits<{ save: [] }>();
 const roomUsage = ref<"shared" | "private">("shared");
 const enabled = ref(false),
@@ -62,11 +77,98 @@ const specialty = computed(() => {
   const matches = specialties.value.filter(
     (s) => s.name?.trim().normalize("NFKC").toLocaleLowerCase() === name,
   );
-  return matches.length === 1 ? matches[0]!.id : "";
+  return matches.length === 1
+    ? matches[0]!.id
+    : (doctor.value?.specialty_id ?? "");
 });
 const isDoctor = computed(() => props.position === "Shifokor");
 let serial = 0;
-onBeforeUnmount(() => serial++);
+onBeforeUnmount(() => {
+  serial++;
+  workSequence++;
+});
+function removeDay(day: number) {
+  if (workRows.value.some((r) => r.weekday === day)) pendingRemoval.value = day;
+  else days.value = days.value.filter((d) => d !== day);
+}
+function confirmRemoval() {
+  const day = pendingRemoval.value;
+  if (!day) return;
+  removals.add(day);
+  if (pendingMove.value) {
+    const next = pendingMove.value;
+    perDay.value[next] = { ...perDay.value[day]! };
+    patientDays.value[next] = patientDays.value[day] ?? false;
+    days.value = days.value.map((d) => (d === day ? next : d));
+  } else {
+    days.value = days.value.filter((d) => d !== day);
+  }
+  patientDays.value[day] = false;
+  pendingMove.value = undefined;
+  pendingRemoval.value = undefined;
+}
+function setPatientDay(day: number, event: Event) {
+  const on = (event.target as HTMLInputElement).checked;
+  if (
+    !on &&
+    existing.value.some((r) => r.weekday === day && r.active !== false)
+  ) {
+    pendingDisable.value = day;
+    (event.target as HTMLInputElement).checked = true;
+    return;
+  }
+  patientDays.value[day] = on;
+}
+function setReception(event: Event) {
+  const on = (event.target as HTMLInputElement).checked;
+  if (!on && existing.value.some((r) => r.active !== false)) {
+    pendingDisable.value = "all";
+    (event.target as HTMLInputElement).checked = true;
+    return;
+  }
+  if (on && !days.value.some((d) => patientDays.value[d]))
+    for (const day of days.value) patientDays.value[day] = true;
+  receivesPatients.value = on;
+}
+function confirmDisable() {
+  if (pendingDisable.value === "all") receivesPatients.value = false;
+  else if (pendingDisable.value)
+    patientDays.value[pendingDisable.value] = false;
+  pendingDisable.value = undefined;
+}
+async function loadWork() {
+  if (committing.value) return;
+  const n = ++workSequence;
+  workLoading.value = true;
+  try {
+    const saved = props.employeeId
+      ? await readWork(props.employeeId, branch.value)
+      : { version: 0, data: [] };
+    if (n !== workSequence || committing.value) return;
+    workVersion.value = saved.version;
+    if (!enabled.value) {
+      workRows.value = saved.data;
+      days.value = saved.data.map((r) => r.weekday);
+      perDay.value = Object.fromEntries(
+        saved.data.map((r) => [
+          r.weekday,
+          { start: r.start_time, end: r.end_time },
+        ]),
+      );
+      patientDays.value = Object.fromEntries(
+        saved.data.map((r) => [r.weekday, r.receives_patients]),
+      );
+      receivesPatients.value =
+        isDoctor.value && saved.data.some((r) => r.receives_patients);
+      removals.clear();
+    }
+  } catch (e) {
+    if (n === workSequence) error.value = errorText(e);
+  } finally {
+    if (n === workSequence) workLoading.value = false;
+  }
+}
+watch(() => [props.employeeId, branch.value], loadWork, { immediate: true });
 function addDay() {
   const day = names.map((_, i) => i + 1).find((d) => !days.value.includes(d));
   if (day) {
@@ -77,6 +179,13 @@ function addDay() {
 function changeDay(old: number, event: Event) {
   const next = Number((event.target as HTMLSelectElement).value);
   if (!next || (next !== old && days.value.includes(next))) return;
+  if (workRows.value.some((r) => r.weekday === old)) {
+    pendingRemoval.value = old;
+    pendingMove.value = next;
+    (event.target as HTMLSelectElement).value = String(old);
+    return;
+  }
+  patientDays.value[next] = patientDays.value[old] ?? false;
   perDay.value[next] = { ...perDay.value[old]! };
   days.value = days.value.map((d) => (d === old ? next : d));
 }
@@ -138,15 +247,20 @@ function edit(rule: Rule) {
 }
 async function load() {
   const n = ++serial;
-  if (!isDoctor.value) return;
+  if (!isDoctor.value || !receivesPatients.value || committing.value) {
+    loading.value = false;
+    return;
+  }
   loading.value = true;
   error.value = "";
   try {
     const [sp, sv, rm, d, context] = await Promise.all([
       scheduleList<Option>("specialties", { status: "active" }),
-      scheduleList<Option>("appointments/configuration-services", {
-        status: "active",
-      }),
+      session.grants?.["services.view"] === "entire_clinic"
+        ? scheduleList<Option>("appointments/configuration-services", {
+            status: "active",
+          })
+        : Promise.resolve([] as Option[]),
       scheduleList<Option>("rooms", {
         branch_id: branch.value,
         status: "active",
@@ -176,9 +290,26 @@ async function load() {
       : [];
     if (n !== serial) return;
     existing.value = rules;
-    if (!enabled.value) {
+    editing.value = Object.fromEntries(
+      [
+        ...rules.filter((r) => r.active === false),
+        ...rules.filter((r) => r.active !== false),
+      ].map((r) => [r.weekday, r]),
+    );
+    if (!room.value)
+      room.value =
+        (rules.find((r) => r.active !== false) ?? rules[0])?.room_id ?? "";
+    if (!serviceIds.value.length)
       serviceIds.value = [...(d?.service_ids ?? [])];
-      if (existing.value[0]) edit(existing.value[0]);
+    if (!enabled.value || !days.value.length) {
+      serviceIds.value = [...(d?.service_ids ?? [])];
+      if (!workRows.value.length && existing.value[0]) edit(existing.value[0]);
+      else {
+        room.value =
+          (existing.value.find((r) => r.active !== false) ?? existing.value[0])
+            ?.room_id ?? "";
+        serviceIds.value = [...(d?.service_ids ?? [])];
+      }
     }
   } catch (e) {
     if (n === serial) error.value = errorText(e);
@@ -199,7 +330,7 @@ watch(branch, () => {
 watch(
   () => props.position,
   () => {
-    if (!isDoctor.value) enabled.value = false;
+    if (!isDoctor.value) receivesPatients.value = false;
   },
 );
 watch(
@@ -208,43 +339,48 @@ watch(
     if (!enabled.value) branch.value = b;
   },
 );
-watch(() => [props.position, props.membershipId, branch.value], load, {
-  immediate: true,
-});
+watch(
+  () => [
+    props.position,
+    props.membershipId,
+    branch.value,
+    receivesPatients.value,
+  ],
+  load,
+  {
+    immediate: true,
+  },
+);
 watch(
   days,
   (ds) => {
-    for (const day of ds)
+    for (const day of ds) {
       perDay.value[day] ??= { start: start.value, end: end.value };
+      patientDays.value[day] ??= receivesPatients.value;
+    }
   },
   { deep: true },
 );
 function validate() {
   if (!enabled.value) return true;
   error.value = "";
-  if (!isDoctor.value)
-    error.value = "Bu lavozim uchun umumiy ish jadvali API mavjud emas.";
-  else if (loading.value)
+  if (loading.value || workLoading.value)
     error.value = "Jadval ma’lumotlari yuklanishini kuting.";
-  else if (!specialty.value)
-    error.value =
-      "Yuqoridagi profil mutaxassisligi server katalogidagi yagona faol mutaxassislikka mos kelishi kerak.";
+  else if (!branch.value) error.value = "Filialni tanlang.";
   else if (
-    !branch.value ||
-    !specialty.value ||
-    !serviceIds.value.length ||
-    !room.value ||
-    !days.value.length ||
-    !from.value
+    isDoctor.value &&
+    receivesPatients.value &&
+    days.value.some((d) => patientDays.value[d]) &&
+    !room.value
   )
-    error.value =
-      "Filial, mutaxassislik, xizmat, xona, kunlar va boshlanish sanasini tanlang.";
-  else if (to.value && to.value < from.value)
-    error.value = "Tugash sanasi boshlanishdan oldin bo‘lmasin.";
+    error.value = "Qabul xonasini tanlang.";
   else if (
-    !Number.isInteger(minutes.value) ||
-    minutes.value < 1 ||
-    minutes.value > 480
+    isDoctor.value &&
+    receivesPatients.value &&
+    days.value.some((d) => patientDays.value[d]) &&
+    (!Number.isInteger(minutes.value) ||
+      minutes.value < 1 ||
+      minutes.value > 480)
   )
     error.value = "Qabul davomiyligi 1–480 daqiqa bo‘lsin.";
   else if (
@@ -258,39 +394,40 @@ function validate() {
     error.value = "Har bir kunda tugash vaqti boshlanishdan keyin bo‘lsin.";
   return !error.value;
 }
-async function commit(employee: Employee) {
-  if (!enabled.value) return;
-  if (!validate()) throw Error(error.value);
+async function commitAppointments(employee: Employee) {
   if (!employee.membershipId || !employee.access)
     throw Error(
       "Xodim saqlandi. Shifokor jadvali uchun faol login hisobi kerak; avval hisobni bog‘lang.",
     );
   const desired = {
     branch: branch.value,
-    specialty: specialty.value,
+    specialty: specialty.value || null,
     services: [...serviceIds.value],
   };
-  const rows: Rule[] = days.value.map((day) => {
-    const time = separate.value
-      ? perDay.value[day]!
-      : { start: start.value, end: end.value };
-    const previous = editing.value[day];
-    return {
-      id: previous?.id,
-      doctor_id: "",
-      branch_id: desired.branch,
-      room_id: room.value,
-      room_usage: roomUsage.value,
-      weekday: day,
-      local_start: time.start,
-      local_end: time.end,
-      slot_minutes: minutes.value,
-      effective_from:
-        previous?.effective_from ?? localDay(new Date(), clinicZone.value),
-      effective_to: previous ? previous.effective_to : null,
-      breaks: previous?.breaks ?? [],
-    };
-  });
+  const rows: Rule[] = days.value
+    .filter((day) => receivesPatients.value && patientDays.value[day])
+    .map((day) => {
+      const time = separate.value
+        ? perDay.value[day]!
+        : { start: start.value, end: end.value };
+      const previous = editing.value[day];
+      return {
+        id: previous?.id,
+        doctor_id: "",
+        branch_id: desired.branch,
+        room_id: room.value,
+        room_usage: roomUsage.value,
+        active: true,
+        weekday: day,
+        local_start: time.start,
+        local_end: time.end,
+        slot_minutes: minutes.value,
+        effective_from:
+          previous?.effective_from ?? localDay(new Date(), clinicZone.value),
+        effective_to: previous ? previous.effective_to : null,
+        breaks: previous?.breaks ?? [],
+      };
+    });
   try {
     let d = await employeeDoctor(employee.membershipId);
     if (!d) {
@@ -346,7 +483,7 @@ async function commit(employee: Employee) {
       doctor_id: d.id,
       branch_id: desired.branch,
     });
-    for (const day of days.value) {
+    for (const day of rows.map((r) => r.weekday)) {
       const saved = editing.value[day];
       const actual = stored.find((r) => r.id === saved?.id);
       if (
@@ -377,13 +514,91 @@ async function commit(employee: Employee) {
     throw Error(error.value);
   }
 }
+async function commit(employee: Employee) {
+  if (!enabled.value) return;
+  if (!validate()) throw Error(error.value);
+  committing.value = true;
+  workSequence++;
+  try {
+    const desired = days.value.map((day) => ({
+      weekday: day,
+      start_time: separate.value ? perDay.value[day]!.start : start.value,
+      end_time: separate.value ? perDay.value[day]!.end : end.value,
+      receives_patients:
+        isDoctor.value && receivesPatients.value && !!patientDays.value[day],
+    }));
+    const shape = (rows: WorkDay[]) =>
+      JSON.stringify(
+        rows
+          .map(({ weekday, start_time, end_time, receives_patients }) => ({
+            weekday,
+            start_time,
+            end_time,
+            receives_patients,
+          }))
+          .sort((a, b) => a.weekday - b.weekday),
+      );
+    if (shape(desired) !== shape(workRows.value) || removals.size) {
+      const saved = await writeWork(
+        employee.id,
+        branch.value,
+        desired,
+        [...removals],
+        workVersion.value,
+      );
+      workVersion.value = saved.version;
+      workRows.value = saved.data;
+      removals.clear();
+    }
+    const verified = await readWork(employee.id, branch.value);
+    if (shape(verified.data) !== shape(desired))
+      throw Error("Ish jadvali serverdan tasdiqlanmadi. Qayta yuklang.");
+    workVersion.value = verified.version;
+    workRows.value = verified.data;
+    // Explicitly disabling known appointment days preserves rows/history and existing bookings.
+    for (const r of existing.value.filter(
+      (r) =>
+        r.active !== false &&
+        (!days.value.includes(r.weekday) ||
+          !receivesPatients.value ||
+          !patientDays.value[r.weekday]),
+    )) {
+      const { id, ...body } = r;
+      await clinicRequest(`schedules/${id}`, {
+        method: "PUT",
+        body: { ...body, active: false },
+      });
+      r.active = false;
+    }
+    if (
+      isDoctor.value &&
+      receivesPatients.value &&
+      desired.some((r) => r.receives_patients)
+    )
+      await commitAppointments(employee);
+    error.value = "";
+  } catch (e) {
+    error.value = `Xodim saqlandi. Jadval to‘liq saqlanmadi: ${errorText(e)} Qayta urinish xodimni qayta yaratmaydi.`;
+    throw Error(error.value);
+  } finally {
+    committing.value = false;
+  }
+}
 function validateLink() {
   if (!enabled.value) return true;
   error.value =
     "Mavjud hisobni bog‘lash roziligini avval yakunlang. Hozir jadval tanlovini o‘chiring; rozilikdan keyin xodimni tahrirlab jadvalni saqlang.";
   return false;
 }
-defineExpose({ validate, validateLink, commit });
+defineExpose({
+  validate,
+  validateLink,
+  commit,
+  needsReception: () =>
+    isDoctor.value &&
+    receivesPatients.value &&
+    days.value.some((d) => patientDays.value[d]),
+});
 </script>
 <template>
   <section class="e-card employee-inline-schedule" aria-label="Ish jadvali">
@@ -396,35 +611,65 @@ defineExpose({ validate, validateLink, commit });
     </header>
     <div class="employee-schedule-body">
       <button
-        v-if="isDoctor && existing.length"
+        v-if="
+          isDoctor && receivesPatients && existing.length && !workRows.length
+        "
         type="button"
         class="e-button"
         @click="newRule"
       >
         Yangi jadval
       </button>
-      <p v-if="!isDoctor" class="e-hint">
-        Umumiy xodim ish jadvali uchun backend API mavjud emas. Bu lavozim
-        jadvali serverga saqlanmaydi; xodim profilini odatdagidek saqlash
-        mumkin.
-      </p>
-      <label v-else class="employee-schedule-enable"
+      <label class="employee-schedule-enable"
         ><input
           v-model="enabled"
           type="checkbox"
           aria-label="Ish jadvalini saqlash"
+          :disabled="workLoading"
         />Ish jadvalini saqlash / yangilash</label
       >
-      <p v-if="isDoctor" class="e-hint">
-        Login hisobi faol bo‘lsin. Vakolatli administrator jadvalni xodim
-        birinchi kirishidan oldin ham sozlashi mumkin. Profil va jadval alohida
-        API amallarida saqlanadi.
-      </p>
       <p class="e-hint">
-        Jadval filiali xodimning kirish filiallariga biriktirilgan bo‘lsin.
-        Faqat tanlangan kunlar yaratiladi yoki yangilanadi. Boshqa mavjud
-        jadvallar o‘chirilmaydi.
+        Ish jadvali xodimga biriktiriladi. Bemor qabuli alohida, ixtiyoriy
+        sozlanadi.
       </p>
+      <label v-if="isDoctor" class="employee-schedule-enable"
+        ><input
+          :checked="receivesPatients"
+          type="checkbox"
+          aria-label="Bemor qabul qiladi"
+          :disabled="!enabled || workLoading || loading"
+          @change="setReception"
+        />Bemor qabul qiladi</label
+      >
+      <div v-if="pendingRemoval || pendingDisable" class="e-info" role="alert">
+        <span
+          >{{
+            pendingRemoval
+              ? names[pendingRemoval - 1] +
+                " ish kunini olib tashlashni tasdiqlaysizmi?"
+              : "Ushbu kunlarning haftalik bemor qabuli to‘xtatilishini tasdiqlaysizmi?"
+          }}
+          Mavjud qabul yozuvlari o‘chirilmaydi.</span
+        >
+        <button
+          type="button"
+          class="e-button"
+          @click="pendingRemoval ? confirmRemoval() : confirmDisable()"
+        >
+          Tasdiqlash
+        </button>
+        <button
+          type="button"
+          class="e-button"
+          @click="
+            pendingRemoval = undefined;
+            pendingMove = undefined;
+            pendingDisable = undefined;
+          "
+        >
+          Bekor qilish
+        </button>
+      </div>
       <p v-if="loading" role="status">Jadval ma’lumotlari yuklanmoqda…</p>
       <p v-if="error" class="e-error" role="alert">
         {{ error }}
@@ -434,7 +679,7 @@ defineExpose({ validate, validateLink, commit });
       </p>
       <p v-if="notice" role="status">{{ notice }}</p>
       <fieldset
-        :disabled="!isDoctor || !enabled || loading"
+        :disabled="!enabled || loading || workLoading"
         class="employee-schedule-fields"
       >
         <label class="employee-schedule-mode"
@@ -461,6 +706,19 @@ defineExpose({ validate, validateLink, commit });
             >
           </div>
         </template>
+        <div
+          v-if="!separate && isDoctor && receivesPatients"
+          class="employee-weekdays"
+        >
+          <label v-for="day in days" :key="day"
+            ><input
+              type="checkbox"
+              :checked="patientDays[day]"
+              :aria-label="names[day - 1] + ' bemor qabuli'"
+              @change="setPatientDay(day, $event)"
+            />{{ names[day - 1] }} — bemor qabuli</label
+          >
+        </div>
         <div v-if="!separate" class="e-form-grid">
           <label
             >Ish boshlanishi<input
@@ -476,6 +734,16 @@ defineExpose({ validate, validateLink, commit });
         </div>
         <div v-else class="employee-day-times">
           <div v-for="day in days" :key="day" class="employee-schedule-day">
+            <label
+              v-if="isDoctor && receivesPatients"
+              class="employee-schedule-patient-day"
+              ><input
+                type="checkbox"
+                :checked="patientDays[day]"
+                :aria-label="names[day - 1] + ' bemor qabuli'"
+                @change="setPatientDay(day, $event)"
+              />Bemor qabul qiladi</label
+            >
             <label
               >Hafta kuni<select
                 :value="day"
@@ -508,7 +776,7 @@ defineExpose({ validate, validateLink, commit });
               type="button"
               class="employee-schedule-remove"
               :aria-label="names[day - 1] + ' kunini olib tashlash'"
-              @click="days = days.filter((d) => d !== day)"
+              @click="removeDay(day)"
             >
               <Trash2 :size="20" />
             </button>
@@ -523,7 +791,10 @@ defineExpose({ validate, validateLink, commit });
           </button>
         </div>
         <div class="e-form-grid employee-schedule-details">
-          <label :class="{ 'employee-schedule-branch-only': !isDoctor }"
+          <label
+            :class="{
+              'employee-schedule-branch-only': !isDoctor || !receivesPatients,
+            }"
             >Filial<select v-model="branch" aria-label="Jadval filiali">
               <option value="">Tanlang</option>
               <option
@@ -535,7 +806,7 @@ defineExpose({ validate, validateLink, commit });
               </option>
             </select></label
           >
-          <label v-if="isDoctor"
+          <label v-if="isDoctor && receivesPatients"
             >Qabul davomiyligi (daqiqada)<input
               v-model.number="minutes"
               type="number"
@@ -543,7 +814,7 @@ defineExpose({ validate, validateLink, commit });
               max="480"
               aria-label="Jadval qabul davomiyligi"
           /></label>
-          <template v-if="isDoctor">
+          <template v-if="isDoctor && receivesPatients">
             <div class="employee-schedule-room">
               <label
                 >Qabul xonasi<select
@@ -617,12 +888,17 @@ defineExpose({ validate, validateLink, commit });
           >
         </div>
       </fieldset>
-      <div v-if="isDoctor && existing.length" class="employee-existing-rules">
-        <h3>Serverdagi jadvallar</h3>
+      <div
+        v-if="isDoctor && receivesPatients && existing.length"
+        class="employee-existing-rules"
+      >
+        <h3>Bemor qabuli jadvallari (serverda)</h3>
         <p v-for="r in existing" :key="r.id">
           {{ names[r.weekday - 1] }} · {{ r.local_start }}–{{ r.local_end }} ·
           {{ r.effective_from }} — {{ r.effective_to || "cheklanmagan" }}
+          <span v-if="r.active === false"> · Qabul o‘chirilgan</span>
           <button
+            v-if="!workRows.length"
             type="button"
             class="e-button"
             @click="
@@ -635,7 +911,10 @@ defineExpose({ validate, validateLink, commit });
           </button>
         </p>
       </div>
-      <p v-else-if="isDoctor && !loading && !error" class="e-hint">
+      <p
+        v-else-if="isDoctor && receivesPatients && !loading && !error"
+        class="e-hint"
+      >
         Bu filialda shifokor jadvali topilmadi. Yangi jadvalni aniq tanlab
         saqlang.
       </p>
@@ -643,7 +922,7 @@ defineExpose({ validate, validateLink, commit });
         <button
           type="button"
           class="e-button"
-          :disabled="loading || !isDoctor"
+          :disabled="loading || workLoading"
           @click="cancelDraft"
         >
           Bekor qilish
@@ -651,7 +930,7 @@ defineExpose({ validate, validateLink, commit });
         <button
           type="button"
           class="e-button primary"
-          :disabled="loading || !isDoctor || !enabled"
+          :disabled="loading || workLoading || !enabled"
           @click="emit('save')"
         >
           <Save :size="18" />Jadvalni saqlash

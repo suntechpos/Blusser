@@ -3,6 +3,32 @@ import { editorSession } from "./access-editor.fixture";
 async function profile(page: Page, mode = "filled") {
   const s = await editorSession(page);
   const e = s.employees.find((e) => e.profile.first === "Aziz")!;
+  await page.route("**/api/v1/clinic/employee-work-schedules/**", (route) =>
+    route.fulfill({
+      json: {
+        version: mode === "empty" ? 0 : 1,
+        data:
+          mode === "empty"
+            ? []
+            : [
+                {
+                  id: "w1",
+                  weekday: 1,
+                  start_time: "09:15",
+                  end_time: "14:45",
+                  receives_patients: true,
+                },
+                {
+                  id: "w2",
+                  weekday: 2,
+                  start_time: "10:00",
+                  end_time: "16:00",
+                  receives_patients: true,
+                },
+              ],
+      },
+    }),
+  );
   for (const path of ["doctors", "rooms", "schedules", "schedule-exceptions"]) {
     await page.route(`**/api/v1/clinic/${path}**`, async (route) => {
       if (mode === "error" && path === "schedules")
@@ -100,7 +126,7 @@ test("profile schedule is read-only, resolves real rooms, shows all days and ser
       .last(),
   ).toHaveText("—");
   await expect(table.getByRole("row", { name: /Yakshanba/ })).toContainText(
-    "Qabul yo‘q",
+    "Dam olish",
   );
   await expect(
     section.getByRole("table", { name: "Istisno sanalar", exact: true }),

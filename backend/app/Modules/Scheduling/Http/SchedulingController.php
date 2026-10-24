@@ -51,7 +51,7 @@ final class SchedulingController
         $kind = $request->route('resourceKind');
         $rules = match ($kind) {
             'services', 'specialties' => ['code' => 'required|string|max:64', 'name' => 'required|string|max:255', 'active' => 'required|boolean'],
-            'doctors' => ['membership_id' => 'required|uuid', 'specialty_id' => 'required|uuid', 'branch_ids' => 'required|array|min:1|max:100', 'branch_ids.*' => 'required|uuid|distinct', 'service_ids' => 'required|array|min:1|max:100', 'service_ids.*' => 'required|uuid|distinct', 'active' => 'required|boolean'],
+            'doctors' => ['membership_id' => 'required|uuid', 'specialty_id' => 'present|nullable|uuid', 'branch_ids' => 'required|array|min:1|max:100', 'branch_ids.*' => 'required|uuid|distinct', 'service_ids' => 'present|array|max:100', 'service_ids.*' => 'required|uuid|distinct', 'active' => 'required|boolean'],
             'rooms' => ['branch_id' => 'required|uuid', 'number' => 'required|string|max:255', 'service_type' => 'required|string|max:255', 'active' => 'required|boolean', 'availability' => 'required|in:available,unavailable', 'usage_mode' => 'sometimes|in:shared,private', 'exclusive_doctor_id' => 'sometimes|nullable|uuid'],
             'schedules' => $this->scheduleRules(),
             'schedule-exceptions' => ['doctor_id' => 'required|uuid', 'branch_id' => 'required|uuid', 'local_date' => 'required|date_format:Y-m-d', 'kind' => 'required|in:closed,replace', 'replacement' => 'present|nullable|array'],
@@ -68,7 +68,7 @@ final class SchedulingController
     {
         return ['doctor_id' => 'required|uuid', 'branch_id' => 'required|uuid', 'room_id' => 'required|uuid', 'weekday' => 'required|integer|between:1,7',
             'local_start' => 'required|date_format:H:i', 'local_end' => 'required|date_format:H:i', 'slot_minutes' => 'required|integer|between:1,480',
-            'room_usage' => 'sometimes|in:shared,private', 'effective_from' => 'required|date_format:Y-m-d', 'effective_to' => 'sometimes|nullable|date_format:Y-m-d|after_or_equal:effective_from',
+            'room_usage' => 'sometimes|in:shared,private', 'active' => 'sometimes|boolean', 'effective_from' => 'required|date_format:Y-m-d', 'effective_to' => 'sometimes|nullable|date_format:Y-m-d|after_or_equal:effective_from',
             'breaks' => 'present|array|max:100', 'breaks.*' => 'array:local_start,local_end', 'breaks.*.local_start' => 'required|date_format:H:i', 'breaks.*.local_end' => 'required|date_format:H:i'];
     }
 
