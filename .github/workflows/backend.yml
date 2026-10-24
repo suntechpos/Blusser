@@ -1,14 +1,12 @@
-# Keep the existing "Backend Foundation / foundation" check name stable for branch rules.
-# Fast UI-only PRs validate frontend without downloading browsers or starting Docker.
-# Backend, API client, infrastructure, dependency and workflow changes receive
-# the full integration suite. A changed real-browser spec alone stays on fast CI.
-# Every push to main runs the complete suite irrespective of changed paths.
+# Manual-only full integration checks for Blusser.
+# Run from GitHub Actions > Backend Foundation > Run workflow.
+# Pull requests and pushes to main do NOT trigger this workflow automatically.
+# If a GitHub branch-protection rule requires "Backend Foundation / foundation",
+# remove that required check from branch settings to allow unchecked merges.
 name: Backend Foundation
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -34,7 +32,7 @@ jobs:
           set -euo pipefail
           if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
             echo "full=true" >> "$GITHUB_OUTPUT"
-            echo "main push: full regression suite"
+            echo "Manual dispatch: full regression suite"
             exit 0
           fi
           # The pull_request checkout is GitHub's synthetic merge commit.
