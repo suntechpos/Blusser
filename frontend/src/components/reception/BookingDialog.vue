@@ -3,7 +3,6 @@ import { computed, ref, watch, onBeforeUnmount } from "vue";
 import axios from "axios";
 import { CalendarDays, Search } from "lucide-vue-next";
 import DateField from "../employees/DateField.vue";
-import BookingConfigurationDialog from "./BookingConfigurationDialog.vue";
 import ReceptionDialog from "./ReceptionDialog.vue";
 import ReceptionPatientSearch from "./ReceptionPatientSearch.vue";
 import { uzDate, type ReceptionPatient } from "../../mocks/reception";
@@ -31,21 +30,6 @@ const emit = defineEmits<{
   saved: [appointment: BookingAppointment, date: string];
 }>();
 import type { Patient } from "../../services/operations";
-const configuring = ref(false),
-  catalogRevision = ref(0);
-const canConfigure = computed(() =>
-  [
-    "employees.view",
-    "doctors.view",
-    "doctors.create",
-    "rooms.view",
-    "rooms.create",
-    "schedules.view",
-    "schedules.create",
-    "services.view",
-    "services.create",
-  ].every((code) => session.grants?.[code] === "entire_clinic"),
-);
 const mode = ref(can("patients.create") ? "new" : "existing");
 const demographics = ref({
   lastName: "",
@@ -140,9 +124,8 @@ const patientWarning = computed(() =>
     : "",
 );
 watch(
-  () => [draft.value.branchId, catalogRevision.value] as const,
-  async ([branch], previous) => {
-    const retained = previous?.[0] === branch ? { ...draft.value } : undefined;
+  () => draft.value.branchId,
+  async (branch) => {
     const serial = ++catalogSequence;
     doctors.value = [];
     slots.value = [];
@@ -164,17 +147,6 @@ watch(
       zone.value = result.timezone;
       if (!draft.value.date)
         draft.value.date = localDay(Date.now(), zone.value);
-      if (retained) {
-        const retainedDoctor = result.doctors.find(
-          (d) => d.id === retained.doctorId,
-        );
-        if (retainedDoctor) {
-          draft.value.departmentId = retainedDoctor.specialty_id;
-          draft.value.doctorId = retainedDoctor.id;
-          if (retainedDoctor.services.some((s) => s.id === retained.serviceId))
-            draft.value.serviceId = retained.serviceId;
-        }
-      }
       if (initial) {
         const doctor = doctors.value.find(
           (d) => d.id === props.preset?.doctorId,
@@ -425,16 +397,6 @@ const summary = computed(() => chosenDoctor.value?.name);
         </div>
 
         <p v-if="error" class="rp-error" role="alert">{{ error }}</p>
-        <button
-          v-if="canConfigure"
-          class="rp-button"
-          type="button"
-          :disabled="saving || !draft.branchId"
-          data-permission="schedules.create"
-          @click="configuring = true"
-        >
-          Qabulni sozlash
-        </button>
         <p v-if="catalogError" class="rp-error" role="alert">
           {{ catalogError }}
         </p>
@@ -519,7 +481,8 @@ const summary = computed(() => chosenDoctor.value?.name);
           role="status"
         >
           Tanlangan filialda faol shifokor, mutaxassislik va xizmat biriktirishi
-          topilmadi. Administrator qabulni sozlashi kerak.
+          topilmadi. Administrator mavjud backend API orqali qabul
+          konfiguratsiyasini tekshirishi kerak.
         </p>
         <p v-if="loading" role="status">Qabul ma’lumotlari yuklanmoqda…</p>
         <p v-if="errors.patient" class="rp-error" role="alert">
@@ -687,11 +650,4 @@ const summary = computed(() => chosenDoctor.value?.name);
       </button></template
     ></ReceptionDialog
   >
-  <BookingConfigurationDialog
-    v-if="configuring"
-    :branch-id="draft.branchId"
-    :date="draft.date || today"
-    @close="configuring = false"
-    @saved="catalogRevision++"
-  />
 </template>

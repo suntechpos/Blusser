@@ -86,14 +86,47 @@ can leave them empty. They are not sourced from the demo management pages.
 Availability additionally requires a valid schedule, active available room, and
 an unoccupied slot. None of those records is fabricated on an empty database.
 
-`Qabulni sozlash` is available only with entire-clinic employee, doctor, room,
-schedule and service reads plus doctor/room/schedule/service creation authority.
-It uses existing specialty, doctor, room and schedule APIs. A doctor is attached
-to an explicitly selected active account already assigned to the branch. Accounts
-and branches must first exist; the dialog does not silently create either.
-Each configuration step commits separately and errors remain in the dialog.
-A successful change reloads booking options and availability. A schedule specifies
-one weekday and an explicit effective date range; add another rule for another day.
+Registratura no longer exposes `Qabulni sozlash` or opens
+`BookingConfigurationDialog.vue`. No configuration rows or backend endpoints
+were removed. Selects continue to depend only on real backend records, not on
+other management pages being implemented.
+
+Read the local clinic configuration with one authenticated, read-only command
+(after updating this branch):
+
+```sh
+cd ~/projects/Blusser/backend
+php artisan blusser:booking-check --actor=kamron.ceo --tenant=bb799c8d-0058-4eba-a474-83142e47438d
+```
+
+It prompts for the current password without echoing it, verifies clinic
+membership, prints effective booking scopes, visible branches, active doctor/room
+counts, schedule counts and eligible booking doctors/service counts. It neither
+seeds records nor changes grants. Counts honor the actor's RLS, so a denied read
+is reported separately rather than treated as an empty table. The user's
+localhost/database was not accessible from the execution environment.
+
+If configuration is missing, an authorized administrator can explicitly create it
+using the existing authenticated Sanctum/CSRF clinic APIs below. Obtain actual
+membership IDs from `GET employees?format=profile` and actual branch IDs from
+`GET context`; never use a demo UUID. Inspect the corresponding GET list before
+each POST and reuse an existing matching record (specialty/service code, doctor
+membership, room branch+number, exact schedule). Use a stable Idempotency-Key for
+retries; never recreate an existing doctor profile or replace its assignments.
+No automatic development seed is run because the user's actual configuration
+has not been established.
+
+| Existing clinic API | Required payload / authority |
+| --- | --- |
+| `POST specialties` | `code`, `name`, `active`; entire-clinic doctors.view/create |
+| `POST appointments/configuration-services` | `code`, `name`, `active`; entire-clinic services.view/create |
+| `POST doctors` | actual `membership_id`, `specialty_id`, `branch_ids`, `service_ids`, `active`; entire-clinic doctors.view/create |
+| `POST rooms` | actual `branch_id`, user-selected `number`, `service_type`, `active`, `availability=available`; entire-clinic rooms.view/create |
+| `POST schedules` | actual `doctor_id`, `branch_id`, `room_id`, ISO weekday 1–7, `local_start`, `local_end`, `slot_minutes`, explicit `effective_from`/`effective_to`, `breaks`; entire-clinic schedules.view/create |
+
+All writes use the existing audited governance commands and validations. Branches
+and doctor accounts must be active and assigned beforehand. A schedule/room
+conflict is rejected; slot validation and RLS are unchanged.
 
 The only new API is GET/POST `clinic/appointments/configuration-services`: a
 booking-only service list/create surface. It requires `services.view` at
@@ -108,7 +141,7 @@ Update on this extension branch with:
 
 ```sh
 git fetch origin
-git switch feat/reception-registration-complete
+git switch fix/reception-booking-without-setup
 git pull --ff-only
 docker compose build backend
 docker compose run --rm migrate
@@ -147,3 +180,20 @@ controller/service/availability, new `BookingService.php`, routes and migration
 000018; OpenAPI/this document; appointment/fixture and reception browser tests.
 No frontend dependency, role provisioning or unrelated module change is included.
 These are local test results, not a remote GitHub Actions result.
+
+
+## Urgent booking UI fix verification
+
+The setup entry and its component import/mount were removed from BookingDialog;
+its dependent branch/specialty/doctor/service selection and patient retry logic
+were retained. In the isolated PostgreSQL fixture all four selects resolve real
+IDs and both new/existing patient bookings persist after refresh. The user's
+local database was not inspected; no claim is made that it contains the same
+configuration. `blusser:booking-check` is covered by an authenticated integration
+test asserting no patient/configuration/grant counts change and an unknown clinic
+is refused. The backend configuration creation tests remain in place.
+
+Current urgent-fix checks: **40 backend tests / 4282 assertions**, **16 related
+browser regressions**, **3 real Sanctum/PostgreSQL browser tests**, TypeScript
+(as part of the production build), build and changed-file Pint passed. No tests
+were skipped or expectations relaxed. The eight unrelated files remain unchanged.
