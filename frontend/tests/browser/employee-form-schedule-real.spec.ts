@@ -112,6 +112,8 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   expect(employeePosts).toBe(0);
   expect(bodies[0].effective_from).toBe("2030-01-09"); // Clinic Asia/Tashkent is already the next day.
   expect(bodies[0].effective_to).toBeNull();
+  expect(bodies[0]).not.toHaveProperty("room_usage");
+  expect(bodies[0]).not.toHaveProperty("exclusive");
   expect(bodies[0].weekday).toBe(3);
   expect(bodies[1].weekday).toBe(5);
   expect(bodies[2].weekday).toBe(3);

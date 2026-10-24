@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { localDay } from "../../services/receptionTime";
-import { CalendarClock, PlusCircle, Trash2, Save } from "lucide-vue-next";
+import { CalendarClock, PlusCircle, Trash2, Save, Info } from "lucide-vue-next";
 import { session, can } from "../../services/session";
 import { clinicRequest, errorText } from "../../services/api";
 import {
@@ -20,6 +20,8 @@ const props = defineProps<{
   profileSpecialty: string;
 }>();
 const emit = defineEmits<{ save: [] }>();
+const roomUsage = ref<"shared" | "private">("shared");
+const previewRooms = ["101-xona", "102-xona", "103-xona"];
 const enabled = ref(false),
   loading = ref(false),
   error = ref(""),
@@ -87,6 +89,7 @@ async function cancelDraft() {
   await load();
 }
 function newRule() {
+  roomUsage.value = "shared";
   enabled.value = true;
   editing.value = {};
   completed.clear();
@@ -102,6 +105,7 @@ function newRule() {
   notice.value = "Yangi jadval. Mavjud jadvallar o‘zgarmaydi.";
 }
 function edit(rule: Rule) {
+  roomUsage.value = "shared";
   serviceIds.value = [...(doctor.value?.service_ids ?? [])];
   room.value = rule.room_id;
   from.value = rule.effective_from;
@@ -179,6 +183,7 @@ async function load() {
   }
 }
 watch(branch, () => {
+  roomUsage.value = "shared";
   editing.value = {};
   existing.value = [];
   room.value = "";
@@ -499,15 +504,76 @@ defineExpose({ validate, validateLink, commit });
               max="480"
               aria-label="Jadval qabul davomiyligi"
           /></label>
-          <template v-if="isDoctor"
-            ><label
-              >Qabul xonasi<select v-model="room" aria-label="Qabul xonasi">
-                <option value="">Tanlang</option>
-                <option v-for="r in rooms" :key="r.id" :value="r.id">
-                  {{ r.number }}
-                </option>
-              </select></label
-            >
+          <template v-if="isDoctor">
+            <div class="employee-schedule-room">
+              <label
+                >Qabul xonasi<select
+                  v-model="room"
+                  aria-label="Qabul xonasi"
+                  aria-describedby="employee-room-help"
+                >
+                  <option value="">Xonani tanlang</option>
+                  <option v-for="r in rooms" :key="r.id" :value="r.id">
+                    {{ r.number }}
+                  </option>
+                  <optgroup
+                    v-if="!rooms.length"
+                    label="Dizayn namunasi — saqlash uchun emas"
+                  >
+                    <option v-for="name in previewRooms" :key="name" disabled>
+                      {{ name }}
+                    </option>
+                  </optgroup>
+                </select></label
+              >
+              <p id="employee-room-help" class="e-hint">
+                Xonalar tanlangan filialning haqiqiy API ro‘yxatidan olinadi.
+                Ro‘yxat bo‘sh bo‘lsa, namunaviy xonalar faqat ko‘rish uchun
+                ko‘rsatiladi.
+              </p>
+            </div>
+            <fieldset class="employee-room-usage">
+              <legend>Xonadan foydalanish tartibi</legend>
+              <label :class="{ 'is-selected': roomUsage === 'shared' }"
+                ><input
+                  v-model="roomUsage"
+                  type="radio"
+                  name="employee-room-usage"
+                  value="shared"
+                /><span
+                  ><strong>Umumiy xona</strong
+                  ><small>Bir nechta shifokor foydalanishi mumkin</small></span
+                ></label
+              >
+              <label :class="{ 'is-selected': roomUsage === 'private' }"
+                ><input
+                  v-model="roomUsage"
+                  type="radio"
+                  name="employee-room-usage"
+                  value="private"
+                /><span
+                  ><strong>Shaxsiy xona</strong
+                  ><small>Faqat shu shifokorga biriktiriladi</small></span
+                ></label
+              >
+              <small class="e-hint"
+                >Bu tanlov hozircha UI namunasi; API’ga yuborilmaydi va xona
+                biriktirishini o‘zgartirmaydi.</small
+              >
+            </fieldset>
+            <div class="employee-room-info" role="status">
+              <Info :size="20" />
+              <p v-if="roomUsage === 'shared'">
+                Boshqa shifokorlar ham bu xonadan foydalanishi mumkin. Bir xil
+                vaqt oralig‘idagi bandlik va konfliktlar backend tomonidan
+                tekshiriladi.
+              </p>
+              <p v-else>
+                Bu xona faqat ushbu shifokor uchun biriktiriladi. Agar xona
+                boshqa shifokorga eksklyuziv bog‘langan bo‘lsa, backend saqlash
+                vaqtida rad etadi.
+              </p>
+            </div>
             <div class="employee-schedule-services">
               <label>Shifokorning xizmatlari</label
               ><label v-for="s in services" :key="s.id"

@@ -1433,3 +1433,71 @@
 .employee-schedule-details > .employee-schedule-branch-only {
   grid-column: 1 / -1;
 }
+.employee-room-usage {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.employee-room-usage legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.employee-room-usage > label {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  margin-bottom: 7px;
+  cursor: pointer;
+}
+.employee-room-usage > label.is-selected {
+  background: #eff5fc;
+  border-color: #9ac3ff;
+}
+.employees-ui .employee-room-usage input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  margin: 3px 0 0;
+  padding: 0;
+  accent-color: #0666ff;
+}
+.employee-room-usage strong {
+  font-size: 13px;
+}
+.employee-room-usage small {
+  display: block;
+  color: #607ba5;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.employee-room-info {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: #eff5fc;
+  color: #42628e;
+}
+.employee-room-info svg {
+  flex: 0 0 20px;
+  color: #0666ff;
+}
+.employee-room-info p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.employee-schedule-room {
+  min-width: 0;
+}
+.employee-room-usage:disabled {
+  opacity: 0.65;
+}
