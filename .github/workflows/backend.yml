@@ -1,10 +1,21 @@
+# Keep the existing "Backend Foundation / foundation" check name stable for branch rules.
+# Fast UI-only PRs validate frontend + mocked browser flows; backend, API,
+# infrastructure, dependency and workflow changes receive the full integration suite.
+# Every push to main runs the complete suite irrespective of changed paths.
 name: Backend Foundation
+
 on:
   pull_request:
   push:
     branches: [main]
+
 permissions:
   contents: read
+
+concurrency:
+  group: foundation-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   foundation:
     runs-on: ubuntu-latest
@@ -13,45 +24,109 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - name: Generate ephemeral local credentials
-        run: ./scripts/init-local-env
-      - name: Build backend
-        run: docker compose build backend
-      - name: Start PostgreSQL and migrate
+          fetch-depth: 2
+
+      - name: Select test scope (fail closed to full suite)
+        id: scope
+        shell: bash
         run: |
-          docker compose up -d --wait db
-          docker compose run --rm migrate
-      - name: Test real PostgreSQL runtime role
-        run: docker compose run --rm test
-      - name: Validate style, lockfile and PHP extensions
-        run: |
-          docker compose run --rm test vendor/bin/pint --test
-          docker compose run --rm test composer validate --strict
-          docker compose run --rm test composer check-platform-reqs
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "main push: full regression suite"
+            exit 0
+          fi
+          # The pull_request checkout is GitHub's synthetic merge commit.
+          # Its first parent is the target branch, so this diff includes all PR changes.
+          if ! git rev-parse 'HEAD^1' >/dev/null 2>&1; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "Cannot resolve merge base: use full regression suite"
+            exit 0
+          fi
+          git diff --name-only 'HEAD^1' HEAD > /tmp/blusser-changed-files.txt
+          cat /tmp/blusser-changed-files.txt
+          # Backend and API-sensitive changes must never skip real PostgreSQL tests.
+          # Workflow changes intentionally run full CI to validate this gate.
+          if grep -Eq '^(.github/|backend/|scripts/|compose\.ya?ml$|docker-compose[^/]*\.ya?ml$|frontend/src/services/|frontend/src/router/|frontend/playwright\.config\.ts$|frontend/package(-lock)?\.json$|frontend/tests/browser/.*-real\.spec\.ts$)' /tmp/blusser-changed-files.txt; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "Critical or integration-sensitive changes: full regression suite"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+            echo "UI/docs-only PR: frontend checks and mocked browser smoke tests"
+          fi
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
       - name: Frontend typecheck, unit tests and production build
         working-directory: frontend
         run: |
           npm ci
           npm test
           npm run build
+
+      - name: Install Chromium for lightweight UI regressions
+        if: steps.scope.outputs.full == 'false'
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Mocked browser regressions (UI-only PRs)
+        if: steps.scope.outputs.full == 'false'
+        working-directory: frontend
+        run: |
+          npx playwright test \
+            tests/browser/employee-permissions-ui.spec.ts \
+            tests/browser/employee-schedule-ui.spec.ts \
+            tests/browser/employee-pin-ui.spec.ts \
+            tests/browser/employee-form-schedule.spec.ts \
+            tests/browser/reception.spec.ts
+
+      - name: Generate ephemeral local credentials
+        if: steps.scope.outputs.full == 'true'
+        run: ./scripts/init-local-env
+
+      - name: Build backend
+        if: steps.scope.outputs.full == 'true'
+        run: docker compose build backend
+
+      - name: Start PostgreSQL and migrate
+        if: steps.scope.outputs.full == 'true'
+        run: |
+          docker compose up -d --wait db
+          docker compose run --rm migrate
+
+      - name: Test real PostgreSQL runtime role
+        if: steps.scope.outputs.full == 'true'
+        run: docker compose run --rm test
+
+      - name: Validate style, lockfile and PHP extensions
+        if: steps.scope.outputs.full == 'true'
+        run: |
+          docker compose run --rm test vendor/bin/pint --test
+          docker compose run --rm test composer validate --strict
+          docker compose run --rm test composer check-platform-reqs
+
       - name: Prepare synthetic browser fixtures in blusser_test only
+        if: steps.scope.outputs.full == 'true'
         run: |
           docker compose run --rm test php artisan test --filter=BrowserFixtureTest
           printf 'services:\n  backend:\n    environment:\n      DB_DATABASE: blusser_test\n' > /tmp/blusser-browser.yaml
           docker compose -f compose.yaml -f /tmp/blusser-browser.yaml up -d --wait backend
+
       - name: Browser regression with real Sanctum sessions
+        if: steps.scope.outputs.full == 'true'
         working-directory: frontend
         run: |
           npx playwright install --with-deps chromium
           npm run test:browser
+
       - name: HTTP smoke
-        run: |
-          curl --fail --silent http://localhost:8000/api/v1/health
+        if: steps.scope.outputs.full == 'true'
+        run: curl --fail --silent http://localhost:8000/api/v1/health
+
       - name: Clean disposable CI database
-        if: always()
+        if: always() && steps.scope.outputs.full == 'true'
         run: docker compose down -v
