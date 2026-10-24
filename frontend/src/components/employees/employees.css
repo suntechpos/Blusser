@@ -1430,3 +1430,6 @@
   gap: 7px;
   margin-top: 7px;
 }
+.employee-schedule-details > .employee-schedule-branch-only {
+  grid-column: 1 / -1;
+}

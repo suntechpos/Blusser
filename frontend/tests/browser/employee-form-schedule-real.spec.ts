@@ -42,10 +42,19 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   await section
     .getByLabel("Qabul xonasi", { exact: true })
     .selectOption({ label: "B101" });
-  await section.getByLabel("Ish kuni: Chorshanba", { exact: true }).check();
-  await section.getByLabel("Ish kuni: Juma", { exact: true }).check();
-  await section.getByLabel("Ish boshlanishi", { exact: true }).fill("18:00");
-  await section.getByLabel("Ish tugashi", { exact: true }).fill("19:00");
+  await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
+  await section
+    .getByRole("button", { name: "Yana bir kun qo‘shish", exact: true })
+    .click();
+  await section.getByLabel("Dushanba hafta kuni").selectOption("3");
+  await section
+    .getByRole("button", { name: "Yana bir kun qo‘shish", exact: true })
+    .click();
+  await section.getByLabel("Dushanba hafta kuni").selectOption("5");
+  await section
+    .getByLabel("Chorshanba boshlanish", { exact: true })
+    .fill("18:00");
+  await section.getByLabel("Chorshanba tugash", { exact: true }).fill("19:00");
   await section
     .getByLabel("Amal qilish boshlanish sanasi", { exact: true })
     .fill("2030-01-09");
@@ -123,6 +132,13 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
     "Juma",
   );
   await expect(section.getByLabel("Ish jadvalini saqlash")).not.toBeChecked();
+  await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
+  await expect(
+    section.getByLabel("Chorshanba boshlanish", { exact: true }),
+  ).toHaveValue("18:00");
+  await expect(
+    section.getByLabel("Juma boshlanish", { exact: true }),
+  ).toHaveValue("18:15");
   await section.getByLabel("Ish jadvalini saqlash").check();
   await section
     .getByLabel("Shifokor xizmati: Booking inline additional service", {
@@ -162,9 +178,8 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   await section
     .getByRole("button", { name: "Yangi jadval", exact: true })
     .click();
-  await expect(
-    section.getByLabel("Ish kuni: Chorshanba", { exact: true }),
-  ).not.toBeChecked();
+  await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
+  await expect(section.locator(".employee-schedule-day")).toHaveCount(0);
   await expect(section.getByLabel("Qabul xonasi", { exact: true })).toHaveValue(
     "",
   );
@@ -214,7 +229,9 @@ test("a new loginless doctor profile is retained when scheduling needs an accoun
   await section
     .getByLabel("Qabul xonasi", { exact: true })
     .selectOption({ label: "B101" });
-  await section.getByLabel("Ish kuni: Dushanba", { exact: true }).check();
+  await section
+    .getByRole("button", { name: "Yana bir kun qo‘shish", exact: true })
+    .click();
   await section
     .getByLabel("Amal qilish boshlanish sanasi", { exact: true })
     .fill("2030-01-07");
