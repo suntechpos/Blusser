@@ -4,7 +4,16 @@ import PagePermissions from "./PagePermissions.vue";
 import EmployeeScheduleSection from "./EmployeeScheduleSection.vue";
 import "./page-permissions.css";
 import DateField from "./DateField.vue";
-import { UserRound, Upload, Save, Eye, EyeOff, Info } from "lucide-vue-next";
+import PinDigits from "./PinDigits.vue";
+import {
+  UserRound,
+  Upload,
+  Save,
+  Eye,
+  EyeOff,
+  Info,
+  LockKeyhole,
+} from "lucide-vue-next";
 import {
   blankEmployee,
   clone,
@@ -61,6 +70,12 @@ const showPassword = ref(false);
 const cashierPin = ref("");
 const cashierPinConfirmation = ref("");
 const showPin = ref(false);
+watch(cashierPin, () => {
+  delete errors.value.cashier_pin;
+});
+watch(cashierPinConfirmation, () => {
+  delete errors.value.cashier_pin_confirmation;
+});
 const pageOptions = computed(() =>
   rolesStore.sections.value.map((section) => ({
     code: section.permissions[0]!.code,
@@ -361,43 +376,65 @@ function save(link = false) {
                   errors.branch
                 }}</small></label
               >
-              <div v-if="cashierSelected" class="e-label employee-pages">
-                <label
-                  >Kassa PIN-kodi<input
+              <section
+                v-if="cashierSelected"
+                class="employee-pages employee-pin-card"
+                aria-label="Kassa PIN sozlamalari"
+              >
+                <header class="employee-pin-header">
+                  <span class="employee-pin-icon"
+                    ><LockKeyhole :size="22"
+                  /></span>
+                  <div>
+                    <h3>Kassa PIN-kodi</h3>
+                    <p>Kassaga kirish uchun shaxsiy PIN</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="employee-pin-eye"
+                    :aria-label="
+                      showPin ? 'PINni yashirish' : 'PINni ko‘rsatish'
+                    "
+                    :aria-pressed="showPin"
+                    @click="showPin = !showPin"
+                  >
+                    <EyeOff v-if="showPin" :size="20" /><Eye
+                      v-else
+                      :size="20"
+                    />
+                  </button>
+                </header>
+                <p v-if="employee?.cashierPinSet" class="employee-pin-existing">
+                  PIN o‘rnatilgan. Yangilash uchun yangi PIN kiriting.
+                </p>
+                <div class="employee-pin-fields">
+                  <PinDigits
                     v-model="cashierPin"
-                    aria-label="Kassa PIN-kodi"
-                    :type="showPin ? 'text' : 'password'"
-                    inputmode="numeric"
-                    maxlength="4"
-                    autocomplete="new-password"
-                /></label>
-                <label
-                  >PIN-kodni tasdiqlash<input
+                    label="PIN-kod"
+                    input-label="Kassa PIN-kodi"
+                    :visible="showPin"
+                    :error="errors.cashier_pin"
+                  />
+                  <PinDigits
                     v-model="cashierPinConfirmation"
-                    aria-label="PIN-kodni tasdiqlash"
-                    :type="showPin ? 'text' : 'password'"
-                    inputmode="numeric"
-                    maxlength="4"
-                    autocomplete="new-password"
-                /></label>
-                <button
-                  type="button"
-                  class="e-button"
-                  @click="showPin = !showPin"
-                >
-                  {{ showPin ? "PINni yashirish" : "PINni ko‘rsatish" }}
-                </button>
-                <small v-if="employee?.cashierPinSet" class="e-hint"
-                  >Yangi PIN kiritilmasa, amaldagi PIN saqlanadi.</small
-                >
-                <small
-                  v-if="errors.cashier_pin || errors.cashier_pin_confirmation"
-                  class="e-error"
-                  >{{
-                    errors.cashier_pin || errors.cashier_pin_confirmation
-                  }}</small
-                >
-              </div>
+                    label="PIN-kodni tasdiqlash"
+                    input-label="PIN-kodni tasdiqlash"
+                    :visible="showPin"
+                    :error="
+                      cashierPinConfirmation.length === 4 &&
+                      cashierPin !== cashierPinConfirmation
+                        ? 'PIN-kodlar mos emas.'
+                        : errors.cashier_pin_confirmation
+                    "
+                  />
+                </div>
+                <p class="employee-pin-info">
+                  <Info :size="16" /><span
+                    >PIN-kod 4 ta raqamdan iborat bo‘ladi. Xodim tizimga login
+                    va parol bilan, kassaga esa shaxsiy PIN orqali kiradi.</span
+                  >
+                </p>
+              </section>
               <label
                 >Klinik bo‘lim (ixtiyoriy)<input
                   v-model="draft.department"
