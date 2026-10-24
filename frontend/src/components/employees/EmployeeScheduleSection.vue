@@ -33,7 +33,7 @@ const branch = ref(props.branchId),
   serviceIds = ref<string[]>([]),
   room = ref("");
 const days = ref<number[]>([]),
-  separate = ref(false),
+  separate = ref(true),
   start = ref("09:00"),
   end = ref("17:00"),
   minutes = ref(30),
@@ -85,7 +85,7 @@ function newRule() {
   room.value = "";
   from.value = "";
   to.value = "";
-  separate.value = false;
+  separate.value = true;
   error.value = "";
   notice.value = "Yangi jadval. Mavjud jadvallar o‘zgarmaydi.";
 }
@@ -119,9 +119,7 @@ function edit(rule: Rule) {
       { start: r.local_start, end: r.local_end },
     ]),
   );
-  separate.value = selected.some(
-    (r) => r.local_start !== rule.local_start || r.local_end !== rule.local_end,
-  );
+  separate.value = true;
 }
 async function load() {
   const n = ++serial;
@@ -194,11 +192,6 @@ watch(
   },
   { deep: true },
 );
-watch([start, end], () => {
-  if (!separate.value)
-    for (const day of days.value)
-      perDay.value[day] = { start: start.value, end: end.value };
-});
 function validate() {
   if (!enabled.value) return true;
   error.value = "";
@@ -467,8 +460,8 @@ defineExpose({ validate, validateLink, commit });
             <PlusCircle :size="19" />Yana bir kun qo‘shish
           </button>
         </div>
-        <div class="e-form-grid">
-          <label
+        <div class="e-form-grid employee-schedule-details">
+          <label :class="{ 'employee-schedule-branch-only': !isDoctor }"
             >Filial<select v-model="branch" aria-label="Jadval filiali">
               <option value="">Tanlang</option>
               <option

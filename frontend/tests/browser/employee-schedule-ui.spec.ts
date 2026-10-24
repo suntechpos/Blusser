@@ -40,14 +40,40 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
   await expect(
     section.getByRole("button", { name: "Jadvalni saqlash", exact: true }),
   ).toBeDisabled();
+  await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
+  await expect(
+    section.getByLabel("Ish kuni: Dushanba", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    section.getByRole("button", { name: "Yana bir kun qo‘shish", exact: true }),
+  ).toBeDisabled();
+  await page.setViewportSize({ width: 1536, height: 1000 });
+  const readonlyDates = section
+    .locator(".employee-schedule-details > label")
+    .filter({ hasText: /Amal qilish/ });
+  expect(
+    await readonlyDates.nth(0).evaluate((el) => el.getBoundingClientRect().top),
+  ).toBe(
+    await readonlyDates.nth(1).evaluate((el) => el.getBoundingClientRect().top),
+  );
+  await section.screenshot({
+    path: "/tmp/employee-schedule-default-readonly.png",
+  });
   await page.getByLabel("Lavozim *", { exact: true }).selectOption("Shifokor");
   await expect(
     section.getByLabel("Jadval mutaxassisligi").locator("option"),
   ).toHaveCount(2);
   await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
-  await section.getByLabel("Ish kuni: Dushanba", { exact: true }).check();
-  await section.getByLabel("Ish kuni: Seshanba", { exact: true }).check();
-  await section.getByLabel("Kunlarni alohida sozlash").check();
+  await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
+  await expect(
+    section.getByLabel("Ish kuni: Dushanba", { exact: true }),
+  ).toHaveCount(0);
+  const add = section.getByRole("button", {
+    name: "Yana bir kun qo‘shish",
+    exact: true,
+  });
+  await add.click();
+  await add.click();
   await section
     .getByLabel("Dushanba boshlanish", { exact: true })
     .fill("10:00");
@@ -97,11 +123,25 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
           ),
       ).toBe(1);
   }
-  await section.screenshot({ path: "/tmp/employee-schedule-ui-mobile.png" });
+  await section.screenshot({
+    path: "/tmp/employee-schedule-default-mobile.png",
+  });
+  await page.setViewportSize({ width: 1536, height: 1000 });
+  const dates = section
+    .locator(".employee-schedule-details > label")
+    .filter({ hasText: /Amal qilish/ });
+  expect(
+    await dates.nth(0).evaluate((el) => el.getBoundingClientRect().top),
+  ).toBe(await dates.nth(1).evaluate((el) => el.getBoundingClientRect().top));
+  await section.screenshot({
+    path: "/tmp/employee-schedule-default-desktop.png",
+  });
   await section.getByLabel("Kunlarni alohida sozlash").uncheck();
   await expect(
     section.getByLabel("Ish kuni: Chorshanba", { exact: true }),
   ).toBeChecked();
+  await section.getByLabel("Ish boshlanishi", { exact: true }).fill("08:00");
+  await section.getByLabel("Ish tugashi", { exact: true }).fill("18:00");
   await section.getByLabel("Kunlarni alohida sozlash").check();
   await expect(
     section.getByLabel("Chorshanba boshlanish", { exact: true }),
