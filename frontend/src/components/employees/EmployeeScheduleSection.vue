@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
 import DateField from "./DateField.vue";
+import { CalendarClock, PlusCircle, Trash2, Save } from "lucide-vue-next";
 import { session, can } from "../../services/session";
 import { clinicRequest, errorText } from "../../services/api";
 import {
@@ -17,6 +18,7 @@ const props = defineProps<{
   membershipId?: string | null;
   branchId: string;
 }>();
+const emit = defineEmits<{ save: [] }>();
 const enabled = ref(false),
   loading = ref(false),
   error = ref(""),
@@ -52,6 +54,26 @@ const names = [
 const isDoctor = computed(() => props.position === "Shifokor");
 let serial = 0;
 onBeforeUnmount(() => serial++);
+function addDay() {
+  const day = names.map((_, i) => i + 1).find((d) => !days.value.includes(d));
+  if (day) {
+    perDay.value[day] ??= { start: start.value, end: end.value };
+    days.value.push(day);
+  }
+}
+function changeDay(old: number, event: Event) {
+  const next = Number((event.target as HTMLSelectElement).value);
+  if (!next || (next !== old && days.value.includes(next))) return;
+  perDay.value[next] = { ...perDay.value[old]! };
+  days.value = days.value.map((d) => (d === old ? next : d));
+}
+async function cancelDraft() {
+  newRule();
+  enabled.value = false;
+  minutes.value = 30;
+  notice.value = "";
+  await load();
+}
 function newRule() {
   enabled.value = true;
   editing.value = {};
@@ -311,176 +333,245 @@ defineExpose({ validate, validateLink, commit });
 </script>
 <template>
   <section class="e-card employee-inline-schedule" aria-label="Ish jadvali">
-    <h2>Ish jadvali</h2>
-    <button
-      v-if="isDoctor && existing.length"
-      type="button"
-      class="e-button"
-      @click="newRule"
-    >
-      Yangi jadval
-    </button>
-    <p v-if="!isDoctor" class="e-hint">
-      Umumiy xodim ish jadvali uchun backend API mavjud emas. Bu lavozim jadvali
-      serverga saqlanmaydi; xodim profilini odatdagidek saqlash mumkin.
-    </p>
-    <label v-else class="employee-schedule-enable"
-      ><input
-        v-model="enabled"
-        type="checkbox"
-        aria-label="Ish jadvalini saqlash"
-      />Ish jadvalini saqlash / yangilash</label
-    >
-    <p v-if="isDoctor" class="e-hint">
-      Login hisobi faol bo‘lsin. Yangi hisob egasi avval vaqtinchalik parolini
-      almashtirishi kerak. Profil va jadval alohida API amallarida saqlanadi.
-    </p>
-    <p class="e-hint">
-      Jadval filiali xodimning kirish filiallariga biriktirilgan bo‘lsin. Faqat
-      tanlangan kunlar yaratiladi yoki yangilanadi. Boshqa mavjud jadvallar
-      o‘chirilmaydi.
-    </p>
-    <p v-if="loading" role="status">Jadval ma’lumotlari yuklanmoqda…</p>
-    <p v-if="error" class="e-error" role="alert">
-      {{ error }}
-      <button type="button" class="e-button" @click="load">
-        Jadvalni qayta yuklash
-      </button>
-    </p>
-    <p v-if="notice" role="status">{{ notice }}</p>
-    <fieldset
-      :disabled="!isDoctor || !enabled || loading"
-      class="employee-schedule-fields"
-    >
-      <label>Ish kunlari</label>
-      <div class="employee-weekdays">
-        <label v-for="(name, i) in names" :key="i"
-          ><input
-            v-model="days"
-            type="checkbox"
-            :value="i + 1"
-            :aria-label="'Ish kuni: ' + name"
-          />{{ name }}</label
-        >
+    <header class="employee-schedule-header">
+      <span class="employee-schedule-icon"><CalendarClock :size="26" /></span>
+      <div>
+        <h2>Ish jadvali</h2>
+        <p>Haftalik ish kunlari va vaqtlarini belgilang.</p>
       </div>
-      <label
-        ><input
-          v-model="separate"
-          type="checkbox"
-          aria-label="Kunlarni alohida sozlash"
-        />Kunlarni alohida sozlash</label
+    </header>
+    <div class="employee-schedule-body">
+      <button
+        v-if="isDoctor && existing.length"
+        type="button"
+        class="e-button"
+        @click="newRule"
       >
-      <div v-if="!separate" class="e-form-grid">
-        <label
-          >Ish boshlanishi<input
-            v-model="start"
-            type="time"
-            aria-label="Ish boshlanishi" /></label
-        ><label
-          >Ish tugashi<input v-model="end" type="time" aria-label="Ish tugashi"
-        /></label>
-      </div>
-      <div v-else class="employee-day-times">
-        <div v-for="day in days" :key="day" class="e-form-grid">
-          <strong>{{ names[day - 1] }}</strong
-          ><label
-            >Boshlanish<input
-              v-model="perDay[day]!.start"
+        Yangi jadval
+      </button>
+      <p v-if="!isDoctor" class="e-hint">
+        Umumiy xodim ish jadvali uchun backend API mavjud emas. Bu lavozim
+        jadvali serverga saqlanmaydi; xodim profilini odatdagidek saqlash
+        mumkin.
+      </p>
+      <label v-else class="employee-schedule-enable"
+        ><input
+          v-model="enabled"
+          type="checkbox"
+          aria-label="Ish jadvalini saqlash"
+        />Ish jadvalini saqlash / yangilash</label
+      >
+      <p v-if="isDoctor" class="e-hint">
+        Login hisobi faol bo‘lsin. Yangi hisob egasi avval vaqtinchalik parolini
+        almashtirishi kerak. Profil va jadval alohida API amallarida saqlanadi.
+      </p>
+      <p class="e-hint">
+        Jadval filiali xodimning kirish filiallariga biriktirilgan bo‘lsin.
+        Faqat tanlangan kunlar yaratiladi yoki yangilanadi. Boshqa mavjud
+        jadvallar o‘chirilmaydi.
+      </p>
+      <p v-if="loading" role="status">Jadval ma’lumotlari yuklanmoqda…</p>
+      <p v-if="error" class="e-error" role="alert">
+        {{ error }}
+        <button type="button" class="e-button" @click="load">
+          Jadvalni qayta yuklash
+        </button>
+      </p>
+      <p v-if="notice" role="status">{{ notice }}</p>
+      <fieldset
+        :disabled="!isDoctor || !enabled || loading"
+        class="employee-schedule-fields"
+      >
+        <label class="employee-schedule-mode"
+          ><input
+            v-model="separate"
+            type="checkbox"
+            aria-label="Kunlarni alohida sozlash"
+          />Kunlarni alohida sozlash</label
+        >
+        <p class="e-hint">
+          Har bir kun uchun alohida ish vaqtini belgilash mumkin. Tanlanmagan
+          kunlarda qabul o‘tkazilmaydi.
+        </p>
+        <template v-if="!separate">
+          <label>Ish kunlari</label>
+          <div class="employee-weekdays">
+            <label v-for="(name, i) in names" :key="i"
+              ><input
+                v-model="days"
+                type="checkbox"
+                :value="i + 1"
+                :aria-label="'Ish kuni: ' + name"
+              />{{ name }}</label
+            >
+          </div>
+        </template>
+        <div v-if="!separate" class="e-form-grid">
+          <label
+            >Ish boshlanishi<input
+              v-model="start"
               type="time"
-              :aria-label="names[day - 1] + ' boshlanish'" /></label
+              aria-label="Ish boshlanishi" /></label
           ><label
-            >Tugash<input
-              v-model="perDay[day]!.end"
+            >Ish tugashi<input
+              v-model="end"
               type="time"
-              :aria-label="names[day - 1] + ' tugash'"
+              aria-label="Ish tugashi"
           /></label>
         </div>
-      </div>
-      <div class="e-form-grid">
-        <label
-          >Filial<select v-model="branch" aria-label="Jadval filiali">
-            <option value="">Tanlang</option>
-            <option
-              v-for="b in session.branches.filter((b) => b.active)"
-              :key="b.id"
-              :value="b.id"
+        <div v-else class="employee-day-times">
+          <div v-for="day in days" :key="day" class="employee-schedule-day">
+            <label
+              >Hafta kuni<select
+                :value="day"
+                :aria-label="names[day - 1] + ' hafta kuni'"
+                @change="changeDay(day, $event)"
+              >
+                <option
+                  v-for="(name, i) in names"
+                  :key="i"
+                  :value="i + 1"
+                  :disabled="i + 1 !== day && days.includes(i + 1)"
+                >
+                  {{ name }}
+                </option>
+              </select></label
             >
-              {{ b.name }}
-            </option>
-          </select></label
-        >
-        <label
-          >Amal qilish boshlanish sanasi<DateField
-            v-model="from"
-            label="Amal qilish boshlanish sanasi"
-        /></label>
-        <label
-          >Amal qilish tugash sanasi<DateField
-            v-model="to"
-            label="Amal qilish tugash sanasi"
-            :min="from"
-        /></label>
-        <template v-if="isDoctor"
-          ><label
-            >Mutaxassislik<select
-              v-model="specialty"
-              aria-label="Jadval mutaxassisligi"
+            <label
+              >Ish boshlanishi<input
+                v-model="perDay[day]!.start"
+                type="time"
+                :aria-label="names[day - 1] + ' boshlanish'"
+            /></label>
+            <label
+              >Ish tugashi<input
+                v-model="perDay[day]!.end"
+                type="time"
+                :aria-label="names[day - 1] + ' tugash'"
+            /></label>
+            <button
+              type="button"
+              class="employee-schedule-remove"
+              :aria-label="names[day - 1] + ' kunini olib tashlash'"
+              @click="days = days.filter((d) => d !== day)"
             >
+              <Trash2 :size="20" />
+            </button>
+          </div>
+          <button
+            type="button"
+            class="employee-schedule-add"
+            :disabled="days.length === 7"
+            @click="addDay"
+          >
+            <PlusCircle :size="19" />Yana bir kun qo‘shish
+          </button>
+        </div>
+        <div class="e-form-grid">
+          <label
+            >Filial<select v-model="branch" aria-label="Jadval filiali">
               <option value="">Tanlang</option>
-              <option v-for="s in specialties" :key="s.id" :value="s.id">
-                {{ s.name }}
+              <option
+                v-for="b in session.branches.filter((b) => b.active)"
+                :key="b.id"
+                :value="b.id"
+              >
+                {{ b.name }}
               </option>
             </select></label
-          ><label
-            >Qabul xonasi<select v-model="room" aria-label="Qabul xonasi">
-              <option value="">Tanlang</option>
-              <option v-for="r in rooms" :key="r.id" :value="r.id">
-                {{ r.number }}
-              </option>
-            </select></label
-          ><label
-            >Qabul davomiyligi<input
+          >
+          <label v-if="isDoctor"
+            >Qabul davomiyligi (daqiqada)<input
               v-model.number="minutes"
               type="number"
               min="1"
               max="480"
               aria-label="Jadval qabul davomiyligi"
           /></label>
-          <div>
-            <label>Shifokorning xizmatlari</label
-            ><label v-for="s in services" :key="s.id"
-              ><input
-                v-model="serviceIds"
-                type="checkbox"
-                :value="s.id"
-                :aria-label="'Shifokor xizmati: ' + s.name"
-              />{{ s.name }}</label
+          <label
+            >Amal qilish boshlanish sanasi<DateField
+              v-model="from"
+              label="Amal qilish boshlanish sanasi"
+          /></label>
+          <label
+            >Amal qilish tugash sanasi (ixtiyoriy)<DateField
+              v-model="to"
+              label="Amal qilish tugash sanasi"
+              :min="from"
+          /></label>
+          <template v-if="isDoctor"
+            ><label
+              >Mutaxassislik<select
+                v-model="specialty"
+                aria-label="Jadval mutaxassisligi"
+              >
+                <option value="">Tanlang</option>
+                <option v-for="s in specialties" :key="s.id" :value="s.id">
+                  {{ s.name }}
+                </option>
+              </select></label
+            ><label
+              >Qabul xonasi<select v-model="room" aria-label="Qabul xonasi">
+                <option value="">Tanlang</option>
+                <option v-for="r in rooms" :key="r.id" :value="r.id">
+                  {{ r.number }}
+                </option>
+              </select></label
             >
-          </div></template
-        >
+            <div class="employee-schedule-services">
+              <label>Shifokorning xizmatlari</label
+              ><label v-for="s in services" :key="s.id"
+                ><input
+                  v-model="serviceIds"
+                  type="checkbox"
+                  :value="s.id"
+                  :aria-label="'Shifokor xizmati: ' + s.name"
+                />{{ s.name }}</label
+              >
+            </div></template
+          >
+        </div>
+      </fieldset>
+      <div v-if="isDoctor && existing.length" class="employee-existing-rules">
+        <h3>Serverdagi jadvallar</h3>
+        <p v-for="r in existing" :key="r.id">
+          {{ names[r.weekday - 1] }} · {{ r.local_start }}–{{ r.local_end }} ·
+          {{ r.effective_from }} — {{ r.effective_to || "cheklanmagan" }}
+          <button
+            type="button"
+            class="e-button"
+            @click="
+              completed.clear();
+              edit(r);
+              enabled = true;
+            "
+          >
+            Tahrirlash
+          </button>
+        </p>
       </div>
-    </fieldset>
-    <div v-if="isDoctor && existing.length" class="employee-existing-rules">
-      <h3>Serverdagi jadvallar</h3>
-      <p v-for="r in existing" :key="r.id">
-        {{ names[r.weekday - 1] }} · {{ r.local_start }}–{{ r.local_end }} ·
-        {{ r.effective_from }} — {{ r.effective_to || "cheklanmagan" }}
+      <p v-else-if="isDoctor && !loading && !error" class="e-hint">
+        Bu filialda shifokor jadvali topilmadi. Yangi jadvalni aniq tanlab
+        saqlang.
+      </p>
+      <footer class="employee-schedule-footer">
         <button
           type="button"
           class="e-button"
-          @click="
-            completed.clear();
-            edit(r);
-            enabled = true;
-          "
+          :disabled="loading || !isDoctor"
+          @click="cancelDraft"
         >
-          Tahrirlash
+          Bekor qilish
         </button>
-      </p>
+        <button
+          type="button"
+          class="e-button primary"
+          :disabled="loading || !isDoctor || !enabled"
+          @click="emit('save')"
+        >
+          <Save :size="18" />Jadvalni saqlash
+        </button>
+      </footer>
     </div>
-    <p v-else-if="isDoctor && !loading && !error" class="e-hint">
-      Bu filialda shifokor jadvali topilmadi. Yangi jadvalni aniq tanlab
-      saqlang.
-    </p>
   </section>
 </template>

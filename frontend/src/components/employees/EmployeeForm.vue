@@ -642,6 +642,7 @@ function save(link = false) {
       </section>
       <EmployeeScheduleSection
         ref="workSchedule"
+        @save="save(false)"
         :position="draft.position"
         :membership-id="draft.membershipId"
         :branch-id="draft.branch"
