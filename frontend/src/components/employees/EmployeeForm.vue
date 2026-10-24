@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, onBeforeUnmount, watch } from "vue";
+import PagePermissions from "./PagePermissions.vue";
+import EmployeeScheduleSection from "./EmployeeScheduleSection.vue";
+import "./page-permissions.css";
 import DateField from "./DateField.vue";
 import PinDigits from "./PinDigits.vue";
-import PagePermissions from "./PagePermissions.vue";
 import {
   UserRound,
   Upload,
@@ -20,6 +22,10 @@ import {
   type Employee,
 } from "../../mocks/employees";
 import { useRolesStore } from "../settings/store";
+const workSchedule = ref<InstanceType<typeof EmployeeScheduleSection>>();
+defineExpose({
+  commitSchedule: (employee: Employee) => workSchedule.value?.commit(employee),
+});
 const rolesStore = useRolesStore();
 const branches = computed(() => session.branches);
 import { session, can } from "../../services/session";
@@ -40,6 +46,17 @@ if (!props.employee) {
   draft.value.pageGrants = [];
   draft.value.branchIds = draft.value.branch ? [draft.value.branch] : [];
 }
+watch(
+  () => props.employee,
+  (e) => {
+    if (e) {
+      draft.value.id = e.id;
+      draft.value.version = e.version;
+      draft.value.membershipId = e.membershipId;
+      draft.value.cashierPinSet = e.cashierPinSet;
+    }
+  },
+);
 const errors = ref<Record<string, string>>({});
 watch(
   () => props.serverErrors,
@@ -168,6 +185,8 @@ function generate() {
   );
 }
 function save(link = false) {
+  if (link && workSchedule.value && !workSchedule.value.validateLink()) return;
+  if (workSchedule.value && !workSchedule.value.validate()) return;
   const d = draft.value;
   const e: Record<string, string> = {};
   for (const key of ["last", "first", "phone", "position", "branch"] as const)
@@ -357,14 +376,6 @@ function save(link = false) {
                   errors.branch
                 }}</small></label
               >
-              <PagePermissions
-                :options="pageOptions"
-                :grants="pageGrants"
-                :editable="can('employees.assign_role')"
-                :allowed-scopes="rolesStore.allowedScopes"
-                @toggle="togglePage"
-                @scope="setPageScope"
-              />
               <section
                 v-if="cashierSelected"
                 class="employee-pages employee-pin-card"
@@ -619,6 +630,22 @@ function save(link = false) {
           <p class="e-required">* Majburiy maydonlar</p>
         </div>
       </div>
+      <section class="e-card employee-form-permissions-card">
+        <PagePermissions
+          :options="pageOptions"
+          :grants="pageGrants"
+          :editable="can('employees.assign_role')"
+          :allowed-scopes="rolesStore.allowedScopes"
+          @toggle="togglePage"
+          @scope="setPageScope"
+        />
+      </section>
+      <EmployeeScheduleSection
+        ref="workSchedule"
+        :position="draft.position"
+        :membership-id="draft.membershipId"
+        :branch-id="draft.branch"
+      />
     </fieldset>
   </form>
 </template>

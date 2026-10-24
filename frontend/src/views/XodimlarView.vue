@@ -128,6 +128,21 @@ async function linkAccount(
     saving.value = false;
   }
 }
+const committedEmployeeId = ref("");
+const employeeRecoveryRequired = ref(false);
+async function recoverEmployee() {
+  await rolesStore.refresh("employees");
+  const row = rolesStore.state.value.employees.find(
+    (e) => e.id === committedEmployeeId.value,
+  );
+  if (!rolesStore.error.value && row) {
+    editing.value = row;
+    employeeRecoveryRequired.value = false;
+    saveError.value =
+      "Xodim serverdan qayta yuklandi. Jadvalni saqlashni davom ettirish mumkin.";
+  }
+}
+const employeeForm = ref<InstanceType<typeof EmployeeForm>>();
 const saving = ref(false);
 const serverErrors = ref<Record<string, string>>({});
 function roleLabel(e: Employee) {
@@ -182,6 +197,8 @@ function open(e: Employee) {
     : (e.branchIds?.[0] ?? "");
 }
 function form(e: Employee | null = null) {
+  committedEmployeeId.value = "";
+  employeeRecoveryRequired.value = false;
   editing.value = e ? clone(e) : null;
   screen.value = "form";
 }
@@ -193,11 +210,25 @@ async function save(
   if (saving.value) return;
   saving.value = true;
   serverErrors.value = {};
+  let employeeReloaded = false;
   try {
-    await rolesStore.saveEmployee(e, password, pin);
+    const id = await rolesStore.saveEmployee(e, password, pin, (id) => {
+      committedEmployeeId.value = id;
+    });
+    const saved = rolesStore.state.value.employees.find((row) => row.id === id);
+    if (!saved)
+      throw Error(
+        "Xodim serverga yozildi, lekin qayta yuklanmadi. Sahifani yangilang; takroriy xodim yaratmang.",
+      );
+    employeeReloaded = true;
+    editing.value = saved;
+    await employeeForm.value?.commitSchedule(saved);
+    committedEmployeeId.value = "";
     screen.value = "list";
     saveError.value = "";
   } catch (err) {
+    employeeRecoveryRequired.value =
+      !!committedEmployeeId.value && !employeeReloaded;
     saveError.value = errorText(err);
     if (axios.isAxiosError(err))
       serverErrors.value = Object.fromEntries(
@@ -298,10 +329,19 @@ const age = (date: string) => elapsed(date).split(" yil")[0];
       Qayta urinish
     </button>
     <p v-if="successNotice" role="status">{{ successNotice }}</p>
+    <button
+      v-if="employeeRecoveryRequired"
+      type="button"
+      class="e-button"
+      @click="recoverEmployee"
+    >
+      Saqlangan xodimni qayta yuklash
+    </button>
     <EmployeeForm
+      ref="employeeForm"
       v-if="screen === 'form'"
       :employee="editing"
-      :saving="saving"
+      :saving="saving || employeeRecoveryRequired"
       :server-errors="serverErrors"
       @cancel="screen = 'list'"
       @save="save"

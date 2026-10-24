@@ -45,12 +45,15 @@ test("every catalog page appears once, grouped by code with a fallback for futur
   );
   await newForm(page);
   const pages = serverPermissions.filter((p) => p.code === p.view);
+  await expect(panel(page).locator(".employee-permissions-group")).toHaveCount(
+    4,
+  );
   await expect(panel(page).getByRole("checkbox")).toHaveCount(pages.length + 1);
   for (const p of pages)
     await expect(checkbox(page, p.section_label)).toHaveCount(1);
   await expect(
     page
-      .getByRole("region", { name: "Boshqa bo‘limlar", exact: true })
+      .getByRole("region", { name: "Xodimlar va boshqaruv", exact: true })
       .getByRole("checkbox", { name: "Bo‘lim: Yangi bo‘lim" }),
   ).toBeDisabled();
   await checkbox(page, "Registratura").check();

@@ -147,16 +147,15 @@ const groups = computed(() => {
   return [
     ...definitions.map((g) => ({
       ...g,
-      pages: g.codes.flatMap((code) =>
-        options.value.filter((p) => p.code === code),
-      ),
+      pages: [
+        ...g.codes.flatMap((code) =>
+          options.value.filter((p) => p.code === code),
+        ),
+        ...(g.id === "management"
+          ? options.value.filter((p) => !known.has(p.code))
+          : []),
+      ],
     })),
-    {
-      id: "other",
-      label: "Boshqa bo‘limlar",
-      icon: Layers,
-      pages: options.value.filter((p) => !known.has(p.code)),
-    },
   ]
     .map((g) => ({
       ...g,
