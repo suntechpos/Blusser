@@ -1303,3 +1303,130 @@
     gap: 8px;
   }
 }
+
+/* Inline schedule presentation only; permission cards and PIN stay unchanged. */
+.e-card.employee-inline-schedule {
+  padding: 0;
+  overflow: hidden;
+}
+.employee-schedule-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 24px;
+  background: #eff5fc;
+}
+.employee-schedule-header h2 {
+  margin: 0;
+}
+.employee-schedule-header p {
+  margin: 5px 0 0;
+  color: #607ba5;
+  font-size: 13px;
+}
+.employee-schedule-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  height: 48px;
+  border-radius: 12px;
+  color: #0666ff;
+  background: #deebff;
+}
+.employee-schedule-body {
+  padding: 20px 24px;
+  min-width: 0;
+}
+.employee-schedule-mode {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+}
+.employee-schedule-day {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 20px;
+  padding: 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  margin: 10px 0;
+}
+.employee-schedule-day label {
+  min-width: 0;
+}
+.employee-schedule-remove {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  background: #fff0f2;
+  border: 0;
+  border-radius: 8px;
+  color: #dc3545;
+  cursor: pointer;
+}
+.employee-schedule-add {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px;
+  color: #0666ff;
+  background: #f8fbff;
+  border: 1px dashed #b8d4ff;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+}
+.employee-schedule-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.employee-schedule-fields > .e-form-grid {
+  border-top: 1px solid #e5edf8;
+  padding-top: 18px;
+  gap: 16px 24px;
+}
+.employee-schedule-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.employee-schedule-footer .e-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .employee-schedule-header,
+  .employee-schedule-body {
+    padding: 16px;
+  }
+  .employee-schedule-day {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .employee-schedule-remove {
+    justify-self: end;
+  }
+  .employee-schedule-fields > .e-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.employee-schedule-services {
+  max-height: 180px;
+  overflow-y: auto;
+  min-width: 0;
+}
+.employee-schedule-services > label:not(:first-child) {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+}

@@ -84,7 +84,9 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
       });
     return route.continue();
   });
-  await page.getByRole("button", { name: "Saqlash", exact: true }).click();
+  await section
+    .getByRole("button", { name: "Jadvalni saqlash", exact: true })
+    .click();
   await expect(section.getByRole("alert")).toContainText(
     "Jadval to‘liq saqlanmadi",
   );
@@ -132,7 +134,12 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
       r.request().method() === "PUT" && r.url().includes("/clinic/doctors/"),
   );
 
-  await section.getByLabel("Ish kuni: Chorshanba", { exact: true }).uncheck();
+  await section
+    .getByRole("button", {
+      name: "Chorshanba kunini olib tashlash",
+      exact: true,
+    })
+    .click();
   await section.getByLabel("Juma tugash", { exact: true }).fill("19:30");
   let updates = 0;
   page.on("request", (r) => {
