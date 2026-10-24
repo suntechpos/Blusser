@@ -21,7 +21,6 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ save: [] }>();
 const roomUsage = ref<"shared" | "private">("shared");
-const previewRooms = ["101-xona", "102-xona", "103-xona"];
 const enabled = ref(false),
   loading = ref(false),
   error = ref(""),
@@ -105,7 +104,8 @@ function newRule() {
   notice.value = "Yangi jadval. Mavjud jadvallar o‘zgarmaydi.";
 }
 function edit(rule: Rule) {
-  roomUsage.value = "shared";
+  roomUsage.value =
+    rooms.value.find((r) => r.id === rule.room_id)?.usage_mode ?? "shared";
   serviceIds.value = [...(doctor.value?.service_ids ?? [])];
   room.value = rule.room_id;
   from.value = rule.effective_from;
@@ -162,7 +162,11 @@ async function load() {
       from.value = localDay(new Date(), clinicZone.value);
     specialties.value = sp;
     services.value = sv;
-    rooms.value = rm.filter((r) => r.availability === "available");
+    rooms.value = rm.filter(
+      (r) =>
+        r.availability === "available" &&
+        (r.usage_mode !== "private" || r.exclusive_doctor_id === d?.id),
+    );
     doctor.value = d;
     const rules = d
       ? await scheduleList<Rule>("schedules", {
@@ -182,6 +186,10 @@ async function load() {
     if (n === serial) loading.value = false;
   }
 }
+watch(room, (id) => {
+  roomUsage.value =
+    rooms.value.find((r) => r.id === id)?.usage_mode ?? "shared";
+});
 watch(branch, () => {
   roomUsage.value = "shared";
   editing.value = {};
@@ -272,6 +280,7 @@ async function commit(employee: Employee) {
       doctor_id: "",
       branch_id: desired.branch,
       room_id: room.value,
+      room_usage: roomUsage.value,
       weekday: day,
       local_start: time.start,
       local_end: time.end,
@@ -333,6 +342,35 @@ async function commit(employee: Employee) {
       editing.value[r.weekday] = r;
       notice.value = `${completed.size} ta kun serverga saqlandi.`;
     });
+    const stored = await scheduleList<Rule>("schedules", {
+      doctor_id: d.id,
+      branch_id: desired.branch,
+    });
+    for (const day of days.value) {
+      const saved = editing.value[day];
+      const actual = stored.find((r) => r.id === saved?.id);
+      if (
+        !actual ||
+        actual.local_start !== saved?.local_start ||
+        actual.local_end !== saved?.local_end ||
+        actual.room_id !== saved?.room_id ||
+        actual.slot_minutes !== saved?.slot_minutes
+      )
+        throw Error(
+          "Saqlangan jadvalni serverdan tasdiqlab bo‘lmadi. Qayta urinib ko‘ring.",
+        );
+    }
+    const storedRoom = (await clinicRequest<Option>(`rooms/${room.value}`))
+      .data;
+    if (
+      storedRoom.usage_mode !== roomUsage.value ||
+      (roomUsage.value === "private" && storedRoom.exclusive_doctor_id !== d.id)
+    )
+      throw Error("Xona biriktirishini serverdan tasdiqlab bo‘lmadi.");
+    rooms.value = rooms.value.map((r) =>
+      r.id === storedRoom.id ? storedRoom : r,
+    );
+    existing.value = stored;
     error.value = "";
   } catch (e) {
     error.value = `Xodim saqlandi. Jadval to‘liq saqlanmadi: ${errorText(e)} Saqlangan kunlar takror yaratilmaydi; qayta urinib ko‘ring.`;
@@ -378,8 +416,9 @@ defineExpose({ validate, validateLink, commit });
         />Ish jadvalini saqlash / yangilash</label
       >
       <p v-if="isDoctor" class="e-hint">
-        Login hisobi faol bo‘lsin. Yangi hisob egasi avval vaqtinchalik parolini
-        almashtirishi kerak. Profil va jadval alohida API amallarida saqlanadi.
+        Login hisobi faol bo‘lsin. Vakolatli administrator jadvalni xodim
+        birinchi kirishidan oldin ham sozlashi mumkin. Profil va jadval alohida
+        API amallarida saqlanadi.
       </p>
       <p class="e-hint">
         Jadval filiali xodimning kirish filiallariga biriktirilgan bo‘lsin.
@@ -516,20 +555,14 @@ defineExpose({ validate, validateLink, commit });
                   <option v-for="r in rooms" :key="r.id" :value="r.id">
                     {{ r.number }}
                   </option>
-                  <optgroup
-                    v-if="!rooms.length"
-                    label="Dizayn namunasi — saqlash uchun emas"
-                  >
-                    <option v-for="name in previewRooms" :key="name" disabled>
-                      {{ name }}
-                    </option>
-                  </optgroup>
                 </select></label
               >
               <p id="employee-room-help" class="e-hint">
-                Xonalar tanlangan filialning haqiqiy API ro‘yxatidan olinadi.
-                Ro‘yxat bo‘sh bo‘lsa, namunaviy xonalar faqat ko‘rish uchun
-                ko‘rsatiladi.
+                {{
+                  rooms.length
+                    ? "Tanlangan filialning faol qabul xonalari."
+                    : "Bu filialda qabul xonasi mavjud emas"
+                }}
               </p>
             </div>
             <fieldset class="employee-room-usage">
@@ -555,10 +588,6 @@ defineExpose({ validate, validateLink, commit });
                   ><strong>Shaxsiy xona</strong
                   ><small>Faqat shu shifokorga biriktiriladi</small></span
                 ></label
-              >
-              <small class="e-hint"
-                >Bu tanlov hozircha UI namunasi; API’ga yuborilmaydi va xona
-                biriktirishini o‘zgartirmaydi.</small
               >
             </fieldset>
             <div class="employee-room-info" role="status">

@@ -69,9 +69,6 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
   await expect(
     section.getByText("Bu xona faqat ushbu shifokor", { exact: false }),
   ).toBeVisible();
-  await expect(
-    section.getByText("Bu tanlov hozircha UI namunasi", { exact: false }),
-  ).toBeVisible();
   await section.getByRole("radio", { name: /Umumiy xona/ }).check();
   await expect(
     section.getByText("Bir xil vaqt oralig‘idagi bandlik", { exact: false }),
@@ -165,7 +162,7 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
   ).toHaveLength(0);
 });
 
-test("empty room API shows disabled design samples without inventing selectable room IDs", async ({
+test("empty room API shows honest empty state without demo IDs", async ({
   page,
 }) => {
   await editorSession(page);
@@ -189,9 +186,9 @@ test("empty room API shows disabled design samples without inventing selectable 
   await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
   const rooms = section.getByLabel("Qabul xonasi", { exact: true });
   await expect(rooms).toHaveValue("");
-  for (const name of ["101-xona", "102-xona", "103-xona"])
-    await expect(
-      rooms.locator("option").filter({ hasText: name }),
-    ).toHaveAttribute("disabled", "");
+  await expect(
+    section.getByText("Bu filialda qabul xonasi mavjud emas", { exact: true }),
+  ).toBeVisible();
+  await expect(rooms.locator("option")).toHaveCount(1);
   await expect(rooms.locator("option:not([disabled])")).toHaveCount(1);
 });

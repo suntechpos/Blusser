@@ -11,6 +11,7 @@ const props = defineProps<{ membershipId?: string | null; branchId: string }>();
 interface Room {
   id: string;
   number: string;
+  usage_mode?: "shared" | "private";
 }
 interface Exception {
   id: string;
@@ -81,7 +82,7 @@ function dayRules(day: number) {
 function roomName(id: string) {
   return rooms.value.find((r) => r.id === id)?.number ?? "—";
 }
-// The current API has no room-usage contract. Never infer exclusive/shared usage.
+// Display only the room usage returned by the API; unknown values remain a dash.
 </script>
 <template>
   <div class="employee-schedule-readonly" aria-label="Saqlangan ish jadvali">
@@ -126,7 +127,17 @@ function roomName(id: string) {
                   </td>
                   <td>{{ r.slot_minutes }} daqiqa</td>
                   <td>{{ roomName(r.room_id) }}</td>
-                  <td>—</td>
+                  <td>
+                    {{
+                      rooms.find((room) => room.id === r.room_id)
+                        ?.usage_mode === "shared"
+                        ? "Umumiy xona"
+                        : rooms.find((room) => room.id === r.room_id)
+                              ?.usage_mode === "private"
+                          ? "Shaxsiy xona"
+                          : "—"
+                    }}
+                  </td>
                 </tr>
                 <tr v-if="!dayRules(i + 1).length" class="no-reception">
                   <th scope="row">{{ name }}</th>

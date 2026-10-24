@@ -10,6 +10,10 @@ import {
   type Room,
 } from "../../mocks/departmentsRooms";
 const props = defineProps<{
+  apiRooms?: boolean;
+  branches?: { id: string; name: string }[];
+  saving?: boolean;
+  serverError?: string;
   kind: "department" | "room";
   item: Department | Room | null;
   departments: Department[];
@@ -22,6 +26,7 @@ const emit = defineEmits<{
 }>();
 const roomMode = props.kind === "room";
 const draft = ref({
+  availability: "available" as "available" | "unavailable",
   id: "",
   name: "",
   branch: "",
@@ -45,9 +50,20 @@ watch(
   },
 );
 function save() {
-  errors.value = roomMode
-    ? roomErrors(draft.value, props.rooms, props.departments)
-    : departmentErrors(draft.value, props.departments, props.rooms);
+  if (props.saving) return;
+  errors.value = props.apiRooms
+    ? Object.fromEntries(
+        [
+          ["name", draft.value.name.trim()],
+          ["branch", draft.value.branch],
+          ["type", draft.value.type],
+        ]
+          .filter(([, v]) => !v)
+          .map(([k]) => [k, "Majburiy maydon."]),
+      )
+    : roomMode
+      ? roomErrors(draft.value, props.rooms, props.departments)
+      : departmentErrors(draft.value, props.departments, props.rooms);
   if (Object.keys(errors.value).length) return;
   if (roomMode) {
     const { id, name, branch, departmentId, type, floor, active, note } =
@@ -61,6 +77,7 @@ function save() {
       floor,
       active,
       note,
+      availability: draft.value.availability,
     });
   } else {
     const { id, name, branch, note, active, icon } = draft.value;
@@ -80,10 +97,10 @@ function save() {
     :class="{ 'dr-room-modal': roomMode }"
     :title="
       roomMode
-        ? item
+        ? item?.id
           ? 'Xonani tahrirlash'
           : 'Xona qo‘shish'
-        : item
+        : item?.id
           ? 'Bo‘limni tahrirlash'
           : 'Bo‘lim qo‘shish'
     "
@@ -94,6 +111,10 @@ function save() {
     "
     @close="emit('close')"
     ><form class="dr-form" novalidate @submit.prevent="save">
+      <p v-if="serverError" class="dr-error" role="alert">{{ serverError }}</p>
+      <p v-if="apiRooms" class="dr-help">
+        Bo‘lim, qavat va izoh mavjud rooms API tomonidan saqlanmaydi.
+      </p>
       <label class="dr-field"
         >{{ roomMode ? "Xona nomi yoki raqami" : "Bo‘lim nomi" }} <em>*</em
         ><input
@@ -117,16 +138,24 @@ function save() {
             v-model="draft.branch"
             aria-label="Filial"
             aria-required="true"
+            :disabled="apiRooms && !!item?.id"
             :aria-invalid="!!errors.branch"
           >
             <option value="" disabled>Tanlang</option>
-            <option v-for="b in FACILITY_BRANCHES" :key="b">
+            <option v-for="b in apiRooms ? [] : FACILITY_BRANCHES" :key="b">
               {{ b }}
+            </option>
+            <option
+              v-for="b in apiRooms ? branches : []"
+              :key="b.id"
+              :value="b.id"
+            >
+              {{ b.name }}
             </option></select
           ><small v-if="errors.branch" class="dr-error">{{
             errors.branch
           }}</small></label
-        ><label v-if="roomMode" class="dr-field"
+        ><label v-if="roomMode && !apiRooms" class="dr-field"
           >Bo‘lim <em>*</em
           ><select
             v-model="draft.departmentId"
@@ -155,13 +184,22 @@ function save() {
             :aria-invalid="!!errors.type"
           >
             <option value="" disabled>Tanlang</option>
+            <option
+              v-if="
+                apiRooms &&
+                draft.type &&
+                !(ROOM_TYPES as readonly string[]).includes(draft.type)
+              "
+            >
+              {{ draft.type }}
+            </option>
             <option v-for="type in ROOM_TYPES" :key="type">
               {{ type }}
             </option></select
           ><small v-if="errors.type" class="dr-error">{{
             errors.type
           }}</small></label
-        ><label class="dr-field"
+        ><label v-if="!apiRooms" class="dr-field"
           >Qavat<input
             v-model="draft.floor"
             aria-label="Qavat"
@@ -186,7 +224,7 @@ function save() {
             <option :value="false">Faol emas</option>
           </select></span
         ></label
-      ><label v-if="roomMode" class="dr-field"
+      ><label v-if="roomMode && !apiRooms" class="dr-field"
         >Izoh (ixtiyoriy)<textarea
           v-model="draft.note"
           aria-label="Izoh (ixtiyoriy)"
@@ -194,10 +232,21 @@ function save() {
           rows="3"
         />
       </label>
+      <label v-if="apiRooms" class="dr-field"
+        >Foydalanishga yaroqliligi<select
+          v-model="draft.availability"
+          aria-label="Foydalanishga yaroqliligi"
+        >
+          <option value="available">Foydalanish mumkin</option>
+          <option value="unavailable">Foydalanib bo‘lmaydi</option>
+        </select></label
+      >
       <footer>
         <button type="button" class="e-button" @click="emit('close')">
           Bekor qilish</button
-        ><button type="submit" class="e-button primary">Saqlash</button>
+        ><button type="submit" class="e-button primary" :disabled="saving">
+          Saqlash
+        </button>
       </footer>
     </form></EmployeeDialog
   >

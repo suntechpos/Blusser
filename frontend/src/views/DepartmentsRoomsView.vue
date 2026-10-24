@@ -17,8 +17,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-vue-next";
+import ApiRoomsPanel from "../components/departments/ApiRoomsPanel.vue";
+const apiRooms = ref<InstanceType<typeof ApiRoomsPanel>>();
 import FacilityForm from "../components/departments/FacilityForm.vue";
-import RoomIcon from "../components/departments/RoomIcon";
+import { can } from "../services/session";
 import "../components/employees/employees.css";
 import {
   createFacilities,
@@ -29,7 +31,7 @@ import {
 } from "../mocks/departmentsRooms";
 const fixtures = createFacilities();
 const departments = ref(fixtures.departments);
-const rooms = ref(fixtures.rooms);
+const rooms = ref<Room[]>([]);
 const tab = ref<"departments" | "rooms">("departments");
 const departmentQuery = ref(""),
   departmentBranch = ref(""),
@@ -87,9 +89,6 @@ const pageCount = computed(() =>
 const departmentPageCount = computed(() =>
   Math.max(1, Math.ceil(filteredDepartments.value.length / 8)),
 );
-const displayedRooms = computed(() =>
-  filteredRooms.value.slice((page.value - 1) * 8, page.value * 8),
-);
 const displayedDepartments = computed(() =>
   filteredDepartments.value.slice(
     (departmentPage.value - 1) * 8,
@@ -109,10 +108,8 @@ watch(
   departmentPageCount,
   (n) => (departmentPage.value = Math.min(departmentPage.value, n)),
 );
-function count(d: Department) {
-  return rooms.value.filter(
-    (r) => r.departmentId === d.id && r.branch === d.branch,
-  ).length;
+function count(_d: Department) {
+  return "—"; // Department-room links are not part of the current rooms contract.
 }
 function showRooms(d: Department) {
   roomQuery.value = "";
@@ -126,6 +123,10 @@ function open(
   kind: "department" | "room",
   item: Department | Room | null = null,
 ) {
+  if (kind === "room") {
+    apiRooms.value?.open();
+    return;
+  }
   editing.value = item ? { ...item } : null;
   modal.value = kind;
 }
@@ -136,16 +137,6 @@ function saveDepartment(d: Department) {
   } else {
     d.id = `B-${String(Math.max(...departments.value.map((x) => Number(x.id.slice(2)))) + 1).padStart(3, "0")}`;
     departments.value.push(d);
-  }
-  modal.value = null;
-}
-function saveRoom(r: Room) {
-  if (r.id) {
-    const i = rooms.value.findIndex((x) => x.id === r.id);
-    rooms.value[i] = r;
-  } else {
-    r.id = `XN-${String(Math.max(...rooms.value.map((x) => Number(x.id.slice(3)))) + 1).padStart(3, "0")}`;
-    rooms.value.push(r);
   }
   modal.value = null;
 }
@@ -162,7 +153,7 @@ function arrowTab(value: "departments" | "rooms") {
 <template>
   <section
     class="employees-ui dr-ui"
-    aria-description="Frontend namoyishi: faqat xotirada, bazaga yozilmaydi."
+    aria-description="Xonalar server orqali boshqariladi. Bo‘limlar namoyish rejimida."
   >
     <header class="dr-heading">
       <div>
@@ -171,6 +162,7 @@ function arrowTab(value: "departments" | "rooms") {
       </div>
       <button
         class="e-button primary"
+        :disabled="tab === 'rooms' && !can('rooms.create')"
         @click="open(tab === 'departments' ? 'department' : 'room')"
       >
         <Plus :size="20" />{{
@@ -207,6 +199,10 @@ function arrowTab(value: "departments" | "rooms") {
       role="tabpanel"
       :aria-labelledby="tab === 'departments' ? 'departments-tab' : 'rooms-tab'"
     >
+      <p v-if="tab === 'departments'" class="dr-help">
+        Bo‘limlar hozircha namoyish rejimida; ularning o‘zgarishlari serverga
+        saqlanmaydi. Xonalar alohida haqiqiy API orqali boshqariladi.
+      </p>
       <template v-if="tab === 'departments'"
         ><div class="dr-filters">
           <label class="dr-search"
@@ -259,6 +255,8 @@ function arrowTab(value: "departments" | "rooms") {
                 <td>
                   <button
                     class="dr-count"
+                    disabled
+                    title="Bo‘lim-xona bog‘lanishi mavjud API’da qo‘llanmaydi"
                     :aria-label="d.name + ' xonalarini ko‘rish'"
                     @click="showRooms(d)"
                   >
@@ -314,116 +312,7 @@ function arrowTab(value: "departments" | "rooms") {
               <ChevronRight :size="17" />
             </button>
           </nav></div></template
-      ><template v-else
-        ><div class="dr-filters rooms">
-          <label class="dr-search"
-            ><Search :size="21" /><input
-              v-model="roomQuery"
-              aria-label="Xonalarni qidirish"
-              placeholder="Xona nomi yoki raqami bo‘yicha qidirish..." /></label
-          ><select v-model="roomBranch" aria-label="Xonalar filial filtri">
-            <option value="">Barcha filiallar</option>
-            <option v-for="b in FACILITY_BRANCHES" :key="b">
-              {{ b }}
-            </option></select
-          ><select v-model="roomDepartment" aria-label="Xonalar bo‘lim filtri">
-            <option value="">Barcha bo‘limlar</option>
-            <option v-for="d in availableDepartments" :key="d.id" :value="d.id">
-              {{ d.name }}
-            </option></select
-          ><select v-model="roomStatus" aria-label="Xonalar holat filtri">
-            <option value="">Barcha holatlar</option>
-            <option value="true">Faol</option>
-            <option value="false">Faol emas</option>
-          </select>
-        </div>
-        <div class="dr-scroll">
-          <table class="dr-rooms">
-            <thead>
-              <tr>
-                <th>Xona</th>
-                <th>Filial</th>
-                <th>Bo‘lim</th>
-                <th>Xona turi</th>
-                <th>Qavat</th>
-                <th>Holati</th>
-                <th>Amallar</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in displayedRooms" :key="r.id">
-                <td>
-                  <div class="dr-name">
-                    <span class="dr-symbol"><RoomIcon :size="25" /></span>
-                    <div>
-                      <b>{{ r.name }}</b
-                      ><small>ID: {{ r.id }}</small>
-                    </div>
-                  </div>
-                </td>
-                <td>{{ r.branch }}</td>
-                <td>
-                  {{
-                    departments.find((d) => d.id === r.departmentId)?.name ??
-                    "—"
-                  }}
-                </td>
-                <td>{{ r.type }}</td>
-                <td>{{ r.floor ? r.floor + "-qavat" : "—" }}</td>
-                <td>
-                  <span class="dr-badge" :class="{ inactive: !r.active }">{{
-                    r.active ? "Faol" : "Faol emas"
-                  }}</span>
-                </td>
-                <td>
-                  <button
-                    class="dr-edit"
-                    :aria-label="r.name + ' xonasini tahrirlash'"
-                    @click="open('room', r)"
-                  >
-                    <Pencil :size="21" />
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="!displayedRooms.length">
-                <td colspan="7" class="dr-empty">
-                  Xona topilmadi. Qidiruv yoki filtrlarni o‘zgartiring.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="dr-pagination">
-          <span
-            >{{ filteredRooms.length ? (page - 1) * 8 + 1 : 0 }} –
-            {{ Math.min(page * 8, filteredRooms.length) }} /
-            {{ filteredRooms.length }} ta xona</span
-          >
-          <nav aria-label="Xonalar sahifalari">
-            <button
-              aria-label="Oldingi xonalar sahifasi"
-              :disabled="page === 1"
-              @click="page--"
-            >
-              <ChevronLeft :size="17" /></button
-            ><button
-              v-for="n in pageCount"
-              :key="n"
-              :class="{ selected: page === n }"
-              :aria-label="n + '-xonalar sahifasi'"
-              :aria-current="page === n ? 'page' : undefined"
-              @click="page = n"
-            >
-              {{ n }}</button
-            ><button
-              aria-label="Keyingi xonalar sahifasi"
-              :disabled="page === pageCount"
-              @click="page++"
-            >
-              <ChevronRight :size="17" />
-            </button>
-          </nav></div
-      ></template>
+      ><ApiRoomsPanel v-else ref="apiRooms" />
     </article>
     <FacilityForm
       v-if="modal"
@@ -433,7 +322,6 @@ function arrowTab(value: "departments" | "rooms") {
       :rooms="rooms"
       @close="modal = null"
       @save-department="saveDepartment"
-      @save-room="saveRoom"
     />
   </section>
 </template>
