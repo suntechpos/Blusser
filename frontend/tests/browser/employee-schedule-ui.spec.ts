@@ -62,6 +62,21 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
     section.getByLabel("Qabul xonasi", { exact: true }).locator("option"),
   ).toHaveCount(2);
   await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  await expect(
+    section.getByRole("radio", { name: /Umumiy xona/ }),
+  ).toBeChecked();
+  await section.getByRole("radio", { name: /Shaxsiy xona/ }).check();
+  await expect(
+    section.getByText("Bu xona faqat ushbu shifokor", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    section.getByText("Bu tanlov hozircha UI namunasi", { exact: false }),
+  ).toBeVisible();
+  await section.getByRole("radio", { name: /Umumiy xona/ }).check();
+  await expect(
+    section.getByText("Bir xil vaqt oralig‘idagi bandlik", { exact: false }),
+  ).toBeVisible();
+
   await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
   await expect(
     section.getByLabel("Ish kuni: Dushanba", { exact: true }),
@@ -148,4 +163,35 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
       ["POST", "PATCH", "PUT", "DELETE"].includes(r.method),
     ),
   ).toHaveLength(0);
+});
+
+test("empty room API shows disabled design samples without inventing selectable room IDs", async ({
+  page,
+}) => {
+  await editorSession(page);
+  for (const path of [
+    "specialties",
+    "appointments/configuration-services",
+    "rooms",
+  ])
+    await page.route(`**/api/v1/clinic/${path}**`, (route) =>
+      route.fulfill({ json: { data: [], meta: { total: 0 } } }),
+    );
+  await page.getByRole("button", { name: "Xodimlar", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Xodim qo‘shish", exact: true })
+    .click();
+  await page.getByLabel("Lavozim *", { exact: true }).selectOption("Shifokor");
+  const section = page.getByRole("region", {
+    name: "Ish jadvali",
+    exact: true,
+  });
+  await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
+  const rooms = section.getByLabel("Qabul xonasi", { exact: true });
+  await expect(rooms).toHaveValue("");
+  for (const name of ["101-xona", "102-xona", "103-xona"])
+    await expect(
+      rooms.locator("option").filter({ hasText: name }),
+    ).toHaveAttribute("disabled", "");
+  await expect(rooms.locator("option:not([disabled])")).toHaveCount(1);
 });
