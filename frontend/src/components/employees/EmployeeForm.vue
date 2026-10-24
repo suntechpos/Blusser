@@ -644,6 +644,7 @@ function save(link = false) {
         ref="workSchedule"
         @save="save(false)"
         :position="draft.position"
+        :profile-specialty="draft.specialty"
         :membership-id="draft.membershipId"
         :branch-id="draft.branch"
       />

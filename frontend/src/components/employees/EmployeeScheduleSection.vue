@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
-import DateField from "./DateField.vue";
+import { localDay } from "../../services/receptionTime";
 import { CalendarClock, PlusCircle, Trash2, Save } from "lucide-vue-next";
 import { session, can } from "../../services/session";
 import { clinicRequest, errorText } from "../../services/api";
@@ -17,6 +17,7 @@ const props = defineProps<{
   position: string;
   membershipId?: string | null;
   branchId: string;
+  profileSpecialty: string;
 }>();
 const emit = defineEmits<{ save: [] }>();
 const enabled = ref(false),
@@ -29,7 +30,7 @@ const doctor = ref<DoctorRecord>(),
   rooms = ref<Option[]>([]),
   existing = ref<Rule[]>([]);
 const branch = ref(props.branchId),
-  specialty = ref(""),
+  clinicZone = ref(""),
   serviceIds = ref<string[]>([]),
   room = ref("");
 const days = ref<number[]>([]),
@@ -51,6 +52,17 @@ const names = [
   "Shanba",
   "Yakshanba",
 ];
+const specialty = computed(() => {
+  const name = props.profileSpecialty
+    .trim()
+    .normalize("NFKC")
+    .toLocaleLowerCase();
+  if (!name) return doctor.value?.specialty_id ?? "";
+  const matches = specialties.value.filter(
+    (s) => s.name?.trim().normalize("NFKC").toLocaleLowerCase() === name,
+  );
+  return matches.length === 1 ? matches[0]!.id : "";
+});
 const isDoctor = computed(() => props.position === "Shifokor");
 let serial = 0;
 onBeforeUnmount(() => serial++);
@@ -83,14 +95,13 @@ function newRule() {
   start.value = "09:00";
   end.value = "17:00";
   room.value = "";
-  from.value = "";
+  from.value = clinicZone.value ? localDay(new Date(), clinicZone.value) : "";
   to.value = "";
   separate.value = true;
   error.value = "";
   notice.value = "Yangi jadval. Mavjud jadvallar o‘zgarmaydi.";
 }
 function edit(rule: Rule) {
-  specialty.value = doctor.value?.specialty_id ?? "";
   serviceIds.value = [...(doctor.value?.service_ids ?? [])];
   room.value = rule.room_id;
   from.value = rule.effective_from;
@@ -127,7 +138,7 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    const [sp, sv, rm, d] = await Promise.all([
+    const [sp, sv, rm, d, context] = await Promise.all([
       scheduleList<Option>("specialties", { status: "active" }),
       scheduleList<Option>("appointments/configuration-services", {
         status: "active",
@@ -139,8 +150,12 @@ async function load() {
       props.membershipId
         ? employeeDoctor(props.membershipId)
         : Promise.resolve(undefined),
+      clinicRequest<{ timezone: string }>("context"),
     ]);
     if (n !== serial) return;
+    clinicZone.value = context.data.timezone;
+    if (!Object.keys(editing.value).length)
+      from.value = localDay(new Date(), clinicZone.value);
     specialties.value = sp;
     services.value = sv;
     rooms.value = rm.filter((r) => r.availability === "available");
@@ -154,7 +169,6 @@ async function load() {
     if (n !== serial) return;
     existing.value = rules;
     if (!enabled.value) {
-      specialty.value = d?.specialty_id ?? "";
       serviceIds.value = [...(d?.service_ids ?? [])];
       if (existing.value[0]) edit(existing.value[0]);
     }
@@ -199,6 +213,9 @@ function validate() {
     error.value = "Bu lavozim uchun umumiy ish jadvali API mavjud emas.";
   else if (loading.value)
     error.value = "Jadval ma’lumotlari yuklanishini kuting.";
+  else if (!specialty.value)
+    error.value =
+      "Yuqoridagi profil mutaxassisligi server katalogidagi yagona faol mutaxassislikka mos kelishi kerak.";
   else if (
     !branch.value ||
     !specialty.value ||
@@ -254,8 +271,9 @@ async function commit(employee: Employee) {
       local_start: time.start,
       local_end: time.end,
       slot_minutes: minutes.value,
-      effective_from: from.value,
-      effective_to: to.value || null,
+      effective_from:
+        previous?.effective_from ?? localDay(new Date(), clinicZone.value),
+      effective_to: previous ? previous.effective_to : null,
       breaks: previous?.breaks ?? [],
     };
   });
@@ -481,28 +499,7 @@ defineExpose({ validate, validateLink, commit });
               max="480"
               aria-label="Jadval qabul davomiyligi"
           /></label>
-          <label
-            >Amal qilish boshlanish sanasi<DateField
-              v-model="from"
-              label="Amal qilish boshlanish sanasi"
-          /></label>
-          <label
-            >Amal qilish tugash sanasi (ixtiyoriy)<DateField
-              v-model="to"
-              label="Amal qilish tugash sanasi"
-              :min="from"
-          /></label>
           <template v-if="isDoctor"
-            ><label
-              >Mutaxassislik<select
-                v-model="specialty"
-                aria-label="Jadval mutaxassisligi"
-              >
-                <option value="">Tanlang</option>
-                <option v-for="s in specialties" :key="s.id" :value="s.id">
-                  {{ s.name }}
-                </option>
-              </select></label
             ><label
               >Qabul xonasi<select v-model="room" aria-label="Qabul xonasi">
                 <option value="">Tanlang</option>
