@@ -48,20 +48,18 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
     section.getByRole("button", { name: "Yana bir kun qo‘shish", exact: true }),
   ).toBeDisabled();
   await page.setViewportSize({ width: 1536, height: 1000 });
-  const readonlyDates = section
-    .locator(".employee-schedule-details > label")
-    .filter({ hasText: /Amal qilish/ });
-  expect(
-    await readonlyDates.nth(0).evaluate((el) => el.getBoundingClientRect().top),
-  ).toBe(
-    await readonlyDates.nth(1).evaluate((el) => el.getBoundingClientRect().top),
-  );
+  await expect(
+    section.getByLabel("Amal qilish boshlanish sanasi", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    section.getByLabel("Amal qilish tugash sanasi", { exact: true }),
+  ).toHaveCount(0);
   await section.screenshot({
     path: "/tmp/employee-schedule-default-readonly.png",
   });
   await page.getByLabel("Lavozim *", { exact: true }).selectOption("Shifokor");
   await expect(
-    section.getByLabel("Jadval mutaxassisligi").locator("option"),
+    section.getByLabel("Qabul xonasi", { exact: true }).locator("option"),
   ).toHaveCount(2);
   await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
   await expect(section.getByLabel("Kunlarni alohida sozlash")).toBeChecked();
@@ -92,14 +90,13 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
     .getByRole("button", { name: "Dushanba kunini olib tashlash" })
     .click();
   await expect(section.locator(".employee-schedule-day")).toHaveCount(2);
-  await section.getByLabel("Jadval mutaxassisligi").selectOption("ui-option");
+  await page
+    .getByPlaceholder("Mutaxassislikni kiriting", { exact: true })
+    .fill("UI option");
   await section
     .getByLabel("Qabul xonasi", { exact: true })
     .selectOption("ui-option");
   await section.getByLabel("Shifokor xizmati: UI option").check();
-  await section
-    .getByLabel("Amal qilish boshlanish sanasi", { exact: true })
-    .fill("2030-01-01");
   await section.getByLabel("Chorshanba tugash", { exact: true }).fill("09:00");
   await section
     .getByRole("button", { name: "Jadvalni saqlash", exact: true })
@@ -127,12 +124,6 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
     path: "/tmp/employee-schedule-default-mobile.png",
   });
   await page.setViewportSize({ width: 1536, height: 1000 });
-  const dates = section
-    .locator(".employee-schedule-details > label")
-    .filter({ hasText: /Amal qilish/ });
-  expect(
-    await dates.nth(0).evaluate((el) => el.getBoundingClientRect().top),
-  ).toBe(await dates.nth(1).evaluate((el) => el.getBoundingClientRect().top));
   await section.screenshot({
     path: "/tmp/employee-schedule-default-desktop.png",
   });

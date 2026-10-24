@@ -3,6 +3,7 @@ test.use({ viewport: { width: 1536, height: 1024 } });
 test("inline doctor schedule saves multiple days, retries partial writes and reloads real rules without another employee or doctor", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2030-01-08T21:30:00Z"));
   await page.goto("/");
   await page.getByLabel("Login", { exact: true }).fill("booking.doctor");
   await page
@@ -23,14 +24,15 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   });
   await expect(
     section
-      .getByLabel("Jadval mutaxassisligi")
+      .getByLabel("Qabul xonasi", { exact: true })
       .locator("option")
-      .filter({ hasText: "Booking specialty" }),
+      .filter({ hasText: "B101" }),
   ).toHaveCount(1);
+  await expect(section.getByLabel("Jadval mutaxassisligi")).toHaveCount(0);
+  await expect(
+    section.getByLabel("Amal qilish boshlanish sanasi", { exact: true }),
+  ).toHaveCount(0);
   await section.getByLabel("Ish jadvalini saqlash").check();
-  await section
-    .getByLabel("Jadval mutaxassisligi")
-    .selectOption({ label: "Booking specialty" });
   await section
     .getByLabel("Shifokor xizmati: Booking consultation", { exact: true })
     .check();
@@ -55,12 +57,6 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
     .getByLabel("Chorshanba boshlanish", { exact: true })
     .fill("18:00");
   await section.getByLabel("Chorshanba tugash", { exact: true }).fill("19:00");
-  await section
-    .getByLabel("Amal qilish boshlanish sanasi", { exact: true })
-    .fill("2030-01-09");
-  await section
-    .getByLabel("Amal qilish tugash sanasi", { exact: true })
-    .fill("2030-01-11");
   await section.getByLabel("Kunlarni alohida sozlash").check();
   await section.getByLabel("Juma boshlanish", { exact: true }).fill("18:15");
   await section.getByLabel("Juma tugash", { exact: true }).fill("19:15");
@@ -114,6 +110,8 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   expect(scheduleUpdates).toBe(2);
   expect(doctorPosts).toBe(1);
   expect(employeePosts).toBe(0);
+  expect(bodies[0].effective_from).toBe("2030-01-09"); // Clinic Asia/Tashkent is already the next day.
+  expect(bodies[0].effective_to).toBeNull();
   expect(bodies[0].weekday).toBe(3);
   expect(bodies[1].weekday).toBe(5);
   expect(bodies[2].weekday).toBe(3);
@@ -122,6 +120,46 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   expect(bodies[4].local_end).toBe("19:00");
   expect(bodies[5].weekday).toBe(5);
   expect(bodies[5].local_start).toBe("18:15");
+  // Give existing server rules a finite end date; editing must preserve it too.
+  await page.evaluate(async (doctorId) => {
+    const modulePath = "/src/services/api.ts";
+    const { clinicRequest } = await import(modulePath);
+    const rules = (
+      await clinicRequest("schedules", {
+        params: { doctor_id: doctorId, per_page: 100 },
+      })
+    ).data.data;
+    for (const r of rules) {
+      const {
+        id,
+        doctor_id,
+        branch_id,
+        room_id,
+        weekday,
+        local_start,
+        local_end,
+        slot_minutes,
+        effective_from,
+        breaks,
+      } = r;
+      await clinicRequest(`schedules/${id}`, {
+        method: "PUT",
+        body: {
+          doctor_id,
+          branch_id,
+          room_id,
+          weekday,
+          local_start,
+          local_end,
+          slot_minutes,
+          effective_from,
+          effective_to: "2030-01-31",
+          breaks,
+        },
+      });
+    }
+  }, bodies[0].doctor_id);
+  await page.clock.setFixedTime(new Date("2030-01-10T21:30:00Z"));
   await page.reload();
   await page.getByRole("row").filter({ hasText: "inline clinician" }).click();
   await page.getByRole("button", { name: "Tahrirlash", exact: true }).click();
@@ -165,6 +203,8 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
   await page.getByRole("button", { name: "Saqlash", exact: true }).click();
   await expect(page.getByLabel("Xodimlarni qidirish")).toBeVisible();
   expect(updates).toBe(1);
+  expect(bodies[bodies.length - 1].effective_from).toBe("2030-01-09");
+  expect(bodies[bodies.length - 1].effective_to).toBe("2030-01-31");
   const changedDoctor = await doctorUpdate;
   expect(changedDoctor.status()).toBe(200);
   expect((await changedDoctor.json()).service_ids).toHaveLength(1);
@@ -189,6 +229,7 @@ test("inline doctor schedule saves multiple days, retries partial writes and rel
 test("a new loginless doctor profile is retained when scheduling needs an account, then retry patches it", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2030-01-08T21:30:00Z"));
   await page.goto("/");
   await page.getByLabel("Login", { exact: true }).fill("booking.doctor");
   await page
@@ -215,14 +256,15 @@ test("a new loginless doctor profile is retained when scheduling needs an accoun
   });
   await expect(
     section
-      .getByLabel("Jadval mutaxassisligi")
+      .getByLabel("Qabul xonasi", { exact: true })
       .locator("option")
-      .filter({ hasText: "Booking specialty" }),
+      .filter({ hasText: "B101" }),
   ).toHaveCount(1);
+  await expect(section.getByLabel("Jadval mutaxassisligi")).toHaveCount(0);
+  await expect(
+    section.getByLabel("Amal qilish boshlanish sanasi", { exact: true }),
+  ).toHaveCount(0);
   await section.getByLabel("Ish jadvalini saqlash").check();
-  await section
-    .getByLabel("Jadval mutaxassisligi")
-    .selectOption({ label: "Booking specialty" });
   await section
     .getByLabel("Shifokor xizmati: Booking consultation", { exact: true })
     .check();
@@ -232,12 +274,6 @@ test("a new loginless doctor profile is retained when scheduling needs an accoun
   await section
     .getByRole("button", { name: "Yana bir kun qo‘shish", exact: true })
     .click();
-  await section
-    .getByLabel("Amal qilish boshlanish sanasi", { exact: true })
-    .fill("2030-01-07");
-  await section
-    .getByLabel("Amal qilish tugash sanasi", { exact: true })
-    .fill("2030-01-07");
   let posts = 0,
     patches = 0,
     doctorWrites = 0;
