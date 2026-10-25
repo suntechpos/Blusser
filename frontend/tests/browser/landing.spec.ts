@@ -98,7 +98,7 @@ test("original logo loads in header and footer without stretching", async ({
   expect(unexpected).toEqual([]);
 });
 
-test("feature rows follow scroll in opposite directions and reverse without losing cards", async ({
+test("feature rows run seamless, opposite-direction continuous ribbons without scrolling", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -119,39 +119,93 @@ test("feature rows follow scroll in opposite directions and reverse without losi
     "Kassa va moliya",
     "Filiallar boshqaruvi",
   ];
-  await expect(page.locator(".q5 .qc b")).toHaveText(quick);
-  await expect(page.locator(".q6 .qc b")).toHaveText(modules);
-  const initialTop = await shift(page, ".q5"),
-    initialBottom = await shift(page, ".q6");
-  await scrollTo(page, 300);
-  await expect.poll(() => shift(page, ".q5")).toBeLessThan(initialTop - 1);
-  await expect
-    .poll(() => shift(page, ".q6"))
-    .toBeGreaterThan(initialBottom + 1);
-  const forward = [await shift(page, ".q5"), await shift(page, ".q6")];
-  await scrollTo(page, 0);
-  await expect.poll(() => shift(page, ".q5")).toBeGreaterThan(forward[0]! + 1);
-  await expect.poll(() => shift(page, ".q6")).toBeLessThan(forward[1]! - 1);
-  await scrollTo(page, 100000);
-  for (const selector of [".q5", ".q6"]) {
-    expect(Math.abs(await shift(page, selector))).toBeLessThan(150);
-    const visibleWidths = await page.locator(selector).evaluate((el) => {
-      const row = el.getBoundingClientRect(),
-        clip = el.parentElement!.getBoundingClientRect();
-      return {
-        left: row.left,
-        right: row.right,
-        clipLeft: clip.left,
-        clipRight: clip.right,
-      };
-    });
-    expect(visibleWidths.left).toBeLessThanOrEqual(visibleWidths.clipLeft + 1);
-    expect(visibleWidths.right).toBeGreaterThanOrEqual(
-      visibleWidths.clipRight - 1,
-    );
+  for (const [selector, labels] of [
+    [".q5", quick],
+    [".q6", modules],
+  ] as const) {
+    const groups = page.locator(`${selector} .marquee-group`);
+    await expect(groups).toHaveCount(2);
+    await expect(groups.nth(0).locator(".qc b")).toHaveText(labels);
+    await expect(groups.nth(1).locator(".qc b")).toHaveText(labels);
+    await expect(groups.nth(1)).toHaveAttribute("aria-hidden", "true");
   }
-  await expect(page.locator(".q5 .qc")).toHaveCount(5);
-  await expect(page.locator(".q6 .qc")).toHaveCount(6);
+
+  const movement = await page.evaluate(() => {
+    const sample = (selector: string) => {
+      const track = document.querySelector<HTMLElement>(selector)!;
+      const groups = [...track.querySelectorAll<HTMLElement>(".marquee-group")];
+      const animation = track.getAnimations()[0]!;
+      if (!animation) throw new Error(`Missing continuous marquee: ${selector}`);
+      const getX = () => new DOMMatrixReadOnly(getComputedStyle(track).transform).m41;
+      animation.pause();
+      animation.currentTime = 1000;
+      const start = getX();
+      animation.currentTime = 2000;
+      const end = getX();
+      animation.play();
+      return {
+        delta: end - start,
+        widthA: groups[0]!.getBoundingClientRect().width,
+        widthB: groups[1]!.getBoundingClientRect().width,
+        viewportWidth: track.parentElement!.clientWidth,
+        iteration: getComputedStyle(track).animationIterationCount,
+      };
+    };
+    return [sample(".q5"), sample(".q6")];
+  });
+  expect(movement[0]!.delta).toBeGreaterThan(0);
+  expect(movement[1]!.delta).toBeLessThan(0);
+  for (const row of movement) {
+    expect(row.widthA).toBeGreaterThanOrEqual(row.viewportWidth);
+    expect(row.widthB).toBeCloseTo(row.widthA, 1);
+    expect(row.iteration).toBe("infinite");
+  }
+  // The old implementation only moved during scroll. The new one keeps
+  // running on its own and uses two equal-width groups for a jump-free seam.
+  await scrollTo(page, 400);
+  await expect(page.locator(".q5")).toHaveCSS("animation-name", "blusser-ribbon-right");
+  await expect(page.locator(".q6")).toHaveCSS("animation-name", "blusser-ribbon-left");
+});
+
+test("six module cards reveal in a staggered right-left alternating sequence", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const records: { label: string; direction: string; delay: number }[] = [];
+    Reflect.set(window, "blusserModuleMotion", records);
+    const original = Element.prototype.animate;
+    Element.prototype.animate = function (keyframes, options) {
+      if (this.classList.contains("card")) {
+        const frames = Array.isArray(keyframes) ? keyframes : [];
+        const first = frames[0] as Keyframe | undefined;
+        records.push({
+          label: this.querySelector("h3")?.textContent?.trim() ?? "",
+          direction: String(first?.transform ?? ""),
+          delay: typeof options === "object" ? Number(options.delay ?? 0) : 0,
+        });
+      }
+      return original.call(this, keyframes, options);
+    };
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await guest(page);
+  await page.locator(".card").first().scrollIntoViewIfNeeded();
+  await page.locator(".card").last().scrollIntoViewIfNeeded();
+  const records = await page.evaluate(() =>
+    Reflect.get(window, "blusserModuleMotion") as {
+      label: string; direction: string; delay: number;
+    }[],
+  );
+  const names = ["Registratura", "Bemorlar", "Shifokorlar",
+    "Laboratoriya", "Hisobotlar", "Kassa va to‘lovlar"];
+  expect(records).toHaveLength(6);
+  for (let i = 0; i < names.length; i++) {
+    const item = records.find((record) => record.label === names[i]);
+    expect(item).toBeDefined();
+    expect(item!.delay).toBe(i * 100);
+    expect(item!.direction).toContain(i % 2 === 0 ? "24px" : "-24px");
+  }
 });
 
 test("reveals finish visibly after scrolling and refresh", async ({ page }) => {
@@ -290,15 +344,15 @@ test("mobile preserves menu, FAQ, card counts and zero horizontal overflow", asy
       { exact: true },
     ),
   ).toBeVisible();
-  expect(await shift(page, ".q5")).toBe(0);
-  expect(await shift(page, ".q6")).toBe(0);
+  await expect(page.locator(".q5")).toHaveCSS("animation-name", "blusser-ribbon-right");
+  await expect(page.locator(".q6")).toHaveCSS("animation-name", "blusser-ribbon-left");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await expect(page.locator(".q5 .qc")).toHaveCount(5);
-  await expect(page.locator(".q6 .qc")).toHaveCount(6);
+  await expect(page.locator(".q5 .qc")).toHaveCount(10);
+  await expect(page.locator(".q6 .qc")).toHaveCount(12);
   await scrollTo(page, 0);
   await page.screenshot({
     path: "/tmp/landing-mobile.png",
@@ -307,8 +361,8 @@ test("mobile preserves menu, FAQ, card counts and zero horizontal overflow", asy
   });
   await page.setViewportSize({ width: 768, height: 1024 });
   await scrollTo(page, 300);
-  expect(await shift(page, ".q5")).toBe(0);
-  expect(await shift(page, ".q6")).toBe(0);
+  await expect(page.locator(".q5")).toHaveCSS("animation-name", "blusser-ribbon-right");
+  await expect(page.locator(".q6")).toHaveCSS("animation-name", "blusser-ribbon-left");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

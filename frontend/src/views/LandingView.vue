@@ -33,36 +33,11 @@ onMounted(() => {
   const root = landing.value;
   if (!root) return;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const compact = window.matchMedia("(max-width: 1000px)");
   const animations = new Set<Animation>();
-  const rows = [...root.querySelectorAll<HTMLElement>(".q5, .q6")];
   let observer: IntersectionObserver | undefined;
-  let frame = 0;
-  let stopped = false;
 
-  const updateRows = () => {
-    frame = 0;
-    if (stopped) return;
-    for (const [index, row] of rows.entries()) {
-      if (reduced.matches || compact.matches) {
-        row.style.removeProperty("transform");
-        row.style.removeProperty("--card-travel");
-        continue;
-      }
-      const viewport = row.parentElement!;
-      const bounds = viewport.getBoundingClientRect();
-      const travel = Math.min(36, viewport.clientWidth * 0.025);
-      const progress = Math.max(0, Math.min(1,
-        (window.innerHeight - bounds.top) / (window.innerHeight + bounds.height),
-      ));
-      row.style.setProperty("--card-travel", `${travel}px`);
-      const x = index === 0 ? -travel * progress : -travel * (1 - progress);
-      row.style.transform = `translate3d(${x}px, 0, 0)`;
-    }
-  };
-  const schedule = () => {
-    if (!frame && !stopped) frame = window.requestAnimationFrame(updateRows);
-  };
+  // The two continuous card ribbons use CSS animation instead of scroll
+  // listeners; only section reveal requires JavaScript.
   const configure = () => {
     observer?.disconnect();
     for (const animation of animations) animation.cancel();
@@ -87,22 +62,13 @@ onMounted(() => {
       }, { threshold: 0.08 });
       root.querySelectorAll("[data-reveal]").forEach((element) => observer!.observe(element));
     }
-    schedule();
   };
   configure();
-  window.addEventListener("scroll", schedule, { passive: true });
-  window.addEventListener("resize", schedule, { passive: true });
   reduced.addEventListener("change", configure);
-  compact.addEventListener("change", schedule);
   disposeMotion = () => {
-    stopped = true;
     observer?.disconnect();
-    window.cancelAnimationFrame(frame);
     animations.forEach((animation) => animation.cancel());
-    window.removeEventListener("scroll", schedule);
-    window.removeEventListener("resize", schedule);
     reduced.removeEventListener("change", configure);
-    compact.removeEventListener("change", schedule);
   };
 });
 onUnmounted(() => disposeMotion());
@@ -205,8 +171,16 @@ const foot = [
         </div>
       </section>
 
-      <section class="wrap"><div class="feature-window"><div class="q5"><div v-for="(q, i) in quick" :key="q[1] as string" class="qc" data-reveal :data-reveal-delay="i * 60"><span class="ic"><component :is="q[0]" :size="20" /></span><div><b>{{ q[1] }}</b><small>{{ q[2] }}</small></div></div></div></div></section>
-      <section id="features" class="wrap"><div class="feature-window"><div class="q6"><div v-for="(m, i) in modules" :key="m[1] as string" class="qc" data-reveal :data-reveal-delay="i * 50"><span class="ic"><component :is="m[0]" :size="20" /></span><div><b>{{ m[1] }}</b><small>{{ m[2] }}</small></div></div></div></div></section>
+      <section class="wrap" aria-label="Blusser afzalliklari"><div class="feature-window"><div class="q5" aria-label="Imkoniyatlar, uzluksiz harakatlanuvchi lenta">
+        <div v-for="copy in 2" :key="copy" class="marquee-group" :aria-hidden="copy === 2 ? 'true' : undefined">
+          <div v-for="q in quick" :key="q[1] as string" class="qc"><span class="ic"><component :is="q[0]" :size="20" /></span><div><b>{{ q[1] }}</b><small>{{ q[2] }}</small></div></div>
+        </div>
+      </div></div></section>
+      <section id="features" class="wrap" aria-label="Blusser modullari"><div class="feature-window"><div class="q6" aria-label="Modullar, uzluksiz harakatlanuvchi lenta">
+        <div v-for="copy in 2" :key="copy" class="marquee-group" :aria-hidden="copy === 2 ? 'true' : undefined">
+          <div v-for="m in modules" :key="m[1] as string" class="qc"><span class="ic"><component :is="m[0]" :size="20" /></span><div><b>{{ m[1] }}</b><small>{{ m[2] }}</small></div></div>
+        </div>
+      </div></div></section>
 
       <section class="wrap cmp">
         <div class="cm bad" data-reveal="left"><span class="pill r">Hozirgi holat</span><div class="ph paper" aria-hidden="true"><img src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&amp;fit=crop&amp;w=560&amp;q=78" loading="lazy" alt="" /></div><ul><li v-for="b in bad" :key="b"><X :size="14" class="mk r" />{{ b }}</li></ul></div>
@@ -216,7 +190,7 @@ const foot = [
 
       <section class="wrap sec"><h2 data-reveal>Blusser bilan nimalarni boshqarasiz?</h2><p class="sub">Klinikangizning barcha jarayonlari uchun yagona, qulay va samarali yechim.</p>
         <div class="g3">
-          <article v-for="(c, i) in cards" :key="c.title" class="card" data-reveal :data-reveal-delay="(i % 3) * 80">
+          <article v-for="(c, i) in cards" :key="c.title" class="card" :data-reveal="i % 2 === 0 ? 'right' : 'left'" :data-reveal-delay="i * 100">
             <div class="card-h"><span class="ic big"><component :is="c.icon" :size="26" /></span><div><h3>{{ c.title }}</h3><p>{{ c.text }}</p></div></div>
             <div class="pv"><small>{{ c.head }}</small>
               <div v-if="c.title === 'Hisobotlar'" class="mini wide"><i v-for="b in bars" :key="b[0]" :style="{ height: b[1] + '%' }"><em>{{ b[0] }}</em></i></div>
@@ -459,22 +433,47 @@ h1{font-size:clamp(38px,5.6vw,64px);line-height:1.04;margin:20px 0 18px;font-wei
 .lp *, .lp *::before, .lp *::after{scroll-behavior:auto!important;transition:none!important}
 }
 
-/* Original wordmark and bounded, scroll-driven feature rows. */
+/* Original branding, seamless opposite-direction marquee and staggered cards. */
 .lp .hd .logo{flex-shrink:0}
 .lp .brand-image{display:block;width:164px;height:auto;max-width:100%;object-fit:contain}
 .lp .ft .footer-brand{display:inline-flex;background:#fff;border-radius:10px;padding:8px 12px;margin-bottom:0}
 .lp .ft .brand-image{width:180px}
-.lp .feature-window{overflow:clip;padding:10px 0 12px}
-.lp .feature-window .q5,.lp .feature-window .q6{width:calc(100% + var(--card-travel,0px));margin:0;will-change:transform}
+.lp .feature-window{overflow:hidden;padding:10px 0 12px}
 .lp #features .feature-window{padding-top:4px}
+.lp .feature-window .q5,.lp .feature-window .q6{
+  display:flex;gap:0;align-items:stretch;width:max-content;margin:0;
+  will-change:transform;animation:blusser-ribbon-right 43s linear infinite;
+}
+.lp .feature-window .q6{animation-name:blusser-ribbon-left;animation-duration:49s}
+.lp .feature-window .marquee-group{display:flex;align-items:stretch;flex:none;gap:14px;padding-right:14px}
+.lp .feature-window .qc{min-height:83px;flex:none}
+.lp .feature-window .q5 .qc{width:clamp(265px,19vw,330px)}
+.lp .feature-window .q6 .qc{width:clamp(240px,16.5vw,300px)}
+/* Each track has TWO identical groups. Their padding includes the seam gap,
+   so exactly half the track is one complete repeat: no reset jump or empty space. */
+@keyframes blusser-ribbon-right{
+  from{transform:translate3d(-50%,0,0)}
+  to{transform:translate3d(0,0,0)}
+}
+@keyframes blusser-ribbon-left{
+  from{transform:translate3d(0,0,0)}
+  to{transform:translate3d(-50%,0,0)}
+}
 .lp [data-reveal]{scroll-margin-top:84px}
 .lp [data-reveal]:focus-within{opacity:1!important;transform:none!important}
-@media(max-width:1000px){
-.lp .feature-window .q5,.lp .feature-window .q6{width:100%;transform:none!important;will-change:auto}
+@media(max-width:640px){
+.lp .brand-image{width:148px}
+.lp .feature-window .q5 .qc{width:245px}
+.lp .feature-window .q6 .qc{width:245px}
 }
-@media(max-width:640px){.lp .brand-image{width:148px}}
 @media(prefers-reduced-motion:reduce){
-.lp .feature-window .q5,.lp .feature-window .q6{width:100%;transform:none!important;will-change:auto}
+  .lp .feature-window .q5,.lp .feature-window .q6{width:100%;animation:none!important;transform:none!important;will-change:auto}
+  .lp .feature-window .marquee-group:nth-child(2){display:none}
+  .lp .feature-window .marquee-group{display:grid;gap:14px;padding-right:0;width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .lp .feature-window .qc{width:auto!important;min-width:0}
+}
+@media(max-width:640px) and (prefers-reduced-motion:reduce){
+  .lp .feature-window .marquee-group{grid-template-columns:1fr}
 }
 
 </style>
