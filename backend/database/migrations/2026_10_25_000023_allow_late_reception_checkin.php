@@ -15,11 +15,11 @@ return new class extends Migration
 
         $original = DB::selectOne('SELECT pg_get_functiondef(?::regprocedure) AS sql', [self::SIGNATURE])->sql;
         $before = 'a.starts_at<clock_timestamp() OR NOT governance.booking_slot_valid';
-        // Reception check-in is allowed from 60 minutes before the appointment
-        // until 60 minutes after its scheduled end. The original booked slot,
+        // Keep the existing advance check-in behavior while allowing arrivals
+        // until 60 minutes after the scheduled end. The original booked slot,
         // active reservation, patient eligibility, doctor, room, tenant, and
         // optimistic-version checks remain intact; do not reschedule the slot.
-        $after = "(a.starts_at > clock_timestamp() + interval '60 minutes' OR a.ends_at + interval '60 minutes' < clock_timestamp()) OR NOT governance.booking_slot_valid";
+        $after = "a.ends_at + interval '60 minutes' < clock_timestamp() OR NOT governance.booking_slot_valid";
         if (substr_count($original, $before) !== 1) {
             throw new RuntimeException('Booking command changed; review the check-in rule manually.');
         }
