@@ -123,6 +123,20 @@ export async function bookingSession(
         id: path.split("/").at(-1), service_id: ids.service,
       } });
     }
+    if (path.endsWith("/queue-tickets") && method === "GET") {
+      record();
+      const status = url.searchParams.get("status");
+      const branch = url.searchParams.get("branch_id");
+      const rows = state.tickets.filter((t) =>
+        (!status || t.status === status) && (!branch || t.branch_id === branch),
+      );
+      const page = Number(url.searchParams.get("page") || 1);
+      const size = Number(url.searchParams.get("per_page") || 8);
+      return route.fulfill({ json: {
+        data: rows.slice((page - 1) * size, page * size),
+        meta: { page, per_page: size, total: rows.length },
+      } });
+    }
     if (path.endsWith("/appointments/booking-options")) {
       record();
       return route.fulfill({
