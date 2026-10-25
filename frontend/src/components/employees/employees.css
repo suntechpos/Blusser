@@ -1419,39 +1419,81 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.employee-schedule-services {
-  max-height: 180px;
-  overflow-y: auto;
-  min-width: 0;
-}
-.employee-booking-service-create {
-  grid-column: 1 / -1;
+.employee-schedule-services { min-width: 0; }
+.employee-service-picker { position: relative; display: grid; gap: 9px; min-width: 0; }
+.employee-service-trigger {
   display: flex;
-  align-items: end;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
-  padding: 12px;
-  border: 1px solid #dbe7fa;
-  border-radius: 10px;
-}
-.employee-booking-service-create > label {
-  flex: 1 1 240px;
-  min-width: 0;
-}
-.employee-booking-service-create input {
   width: 100%;
+  min-height: 46px;
+  padding: 10px 13px;
+  border: 1px solid #c8dbfa;
+  background: #fff;
+  border-radius: 9px;
+  color: #0d2451;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.employee-booking-service-create > .e-error,
-.employee-booking-service-create > .e-hint {
-  flex-basis: 100%;
-  margin: 0;
+.employee-service-trigger:disabled { background: #f5f8fd; opacity: .7; cursor: default; }
+.employee-service-trigger:focus-visible,
+.employee-service-dropdown input:focus-visible,
+.employee-service-chip button:focus-visible { outline: 2px solid #1674ff; outline-offset: 2px; }
+.employee-service-dropdown {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d5e3fc;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 6px 22px #1b61ac10;
 }
-.employee-schedule-services > label:not(:first-child) {
+.employee-service-dropdown > input {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 8px 12px;
+  border: 1px solid #c8dbfa;
+  border-radius: 8px;
+  font: inherit;
+}
+.employee-service-options { max-height: 220px; overflow-y: auto; display: grid; gap: 4px; }
+.employee-service-options > label {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-top: 7px;
+  gap: 10px;
+  padding: 8px 7px;
+  border-radius: 6px;
+  cursor: pointer;
 }
+.employee-service-options > label:hover { background: #f0f6ff; }
+.employee-service-options input { flex-shrink: 0; }
+.employee-service-selected { display: flex; flex-wrap: wrap; gap: 8px; }
+.employee-service-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 5px 7px 5px 10px;
+  border: 1px solid #c8dbfa;
+  border-radius: 7px;
+  background: #eef5ff;
+  color: #0d55c4;
+  font-size: 13px;
+}
+.employee-service-chip > button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.employee-service-picker > .e-hint { margin: 0; }
 .employee-schedule-details > .employee-schedule-branch-only {
   grid-column: 1 / -1;
 }
