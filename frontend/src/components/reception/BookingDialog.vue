@@ -77,10 +77,12 @@ onBeforeUnmount(() => {
 });
 const departments = computed(() => [
   ...new Map(
-    doctors.value.map((d) => [
-      d.specialty_id,
-      { id: d.specialty_id, name: d.specialty_name },
-    ]),
+    doctors.value
+      .filter((d) => d.specialty_id)
+      .map((d) => [
+        d.specialty_id!,
+        { id: d.specialty_id!, name: d.specialty_name || "Bo‘lim" },
+      ]),
   ).values(),
 ]);
 const eligibleDoctors = computed(() =>
@@ -189,7 +191,7 @@ watch(
     // A selected doctor supplies the optional specialty filter automatically.
     // This must not be required before showing the doctor list.
     const doctor = chosenDoctor.value;
-    if (doctor) draft.value.departmentId = doctor.specialty_id;
+    if (doctor) draft.value.departmentId = doctor.specialty_id || "";
     if (!services.value.some((s) => s.id === draft.value.serviceId))
       draft.value.serviceId = "";
   },
@@ -291,7 +293,7 @@ async function save() {
         errors.value.date_of_birth = "Tug‘ilgan sana kelajakda bo‘lmasin.";
     }
   }
-  for (const field of ["branchId", "departmentId", "doctorId", "serviceId"] as const)
+  for (const field of ["branchId", "doctorId", "serviceId"] as const)
     if (!draft.value[field]) errors.value[field] = "Tanlang.";
   if (!draft.value.date || draft.value.date < today.value)
     errors.value.date = "O‘tgan sanaga qabul yaratib bo‘lmaydi.";
@@ -506,9 +508,9 @@ const summary = computed(() => chosenDoctor.value?.name);
                 errors.branchId
               }}</small></label
             ><label
-              >Bo‘lim <span>*</span
-              ><select v-model="draft.departmentId" aria-label="Bo‘lim *">
-                <option value="">Bo‘limni tanlang</option>
+              >Bo‘lim (ixtiyoriy)
+              <select v-model="draft.departmentId" aria-label="Bo‘lim">
+                <option value="">Barcha bo‘limlar</option>
                 <option v-for="d in departments" :key="d.id" :value="d.id">
                   {{ d.name }}
                 </option></select
