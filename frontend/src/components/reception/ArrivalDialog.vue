@@ -95,7 +95,7 @@ watch([branchId, mode], async () => {
   const serial = ++catalogSequence;
   doctors.value = [];
   catalogError.value = "";
-  if (mode.value !== "walk_in" || !branchId.value) return;
+  if (mode.value === "patient" || !branchId.value) return;
   catalogLoading.value = true;
   try {
     const result = await bookingCatalog(branchId.value);
@@ -287,7 +287,7 @@ async function submit() {
                 <input v-model="appointmentId" type="radio" name="arrival-appointment" :value="a.id" :disabled="a.status !== 'scheduled'" />
                 <span>
                   <strong>{{ localTime(a.starts_at, zone) }} · {{ a.status === 'scheduled' ? 'Yozilgan' : a.status }}</strong>
-                  <small>Shifokor ID: {{ a.doctor_id }} · Xizmat ID: {{ a.service_id }}</small>
+                  <small>{{ doctors.find((d) => d.id === a.doctor_id)?.name ?? 'Shifokor' }} · {{ doctors.find((d) => d.id === a.doctor_id)?.services.find((s) => s.id === a.service_id)?.name ?? 'Qabul xizmati' }}</small>
                 </span>
               </label>
             </template>
