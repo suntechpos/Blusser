@@ -890,7 +890,8 @@ function focusSearch() {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(entry, i) in unifiedRows" :key="entry.source === 'appointment' ? entry.appointment.id : entry.ticket.id">
+              <tr v-for="(entry, i) in unifiedRows" :key="entry.source === 'appointment' ? entry.appointment.id : entry.ticket.id"
+                :class="{ 'rp-new-booking': entry.source === 'appointment' && entry.appointment.id === highlight }">
                 <td>{{ (page - 1) * 8 + i + 1 }}</td>
                 <template v-if="entry.source === 'appointment'">
                   <td><div class="rp-person">
@@ -917,7 +918,7 @@ function focusSearch() {
               </tr>
               <tr v-if="!loading && !error && !unifiedRows.length">
                 <td colspan="6" class="rp-empty">
-                  Bu sanada bemor topilmadi. Boshqa sanani tekshiring yoki filtrlarni o‘zgartiring.
+                  Bemor topilmadi. Boshqa sanani tekshiring yoki filtrlarni o‘zgartiring.
                 </td>
               </tr>
             </tbody>
