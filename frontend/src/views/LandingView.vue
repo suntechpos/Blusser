@@ -26,48 +26,74 @@ onMounted(() => {
   m.setAttribute("content", "Blusser — xususiy klinikalar uchun yagona boshqaruv platformasi: registratura, bemorlar, shifokorlar, laboratoriya va kassa.");
 });
 
-// Content stays visible by default. Reveal only once it enters the viewport;
-// unsupported observers/animations and reduced motion need no hidden-state fallback.
+// Content stays visible if motion is unsupported or disabled. Animate both
+// on entry and on exit, so scrolling backwards naturally reverses the reveal.
 let disposeMotion = () => {};
 onMounted(() => {
   const root = landing.value;
   if (!root) return;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const animations = new Set<Animation>();
+  const animations = new Map<HTMLElement, Animation>();
+  let active = new WeakSet<HTMLElement>();
   let observer: IntersectionObserver | undefined;
 
-  // The two continuous card ribbons use CSS animation instead of scroll
-  // listeners; only section reveal requires JavaScript.
   const configure = () => {
     observer?.disconnect();
-    for (const animation of animations) animation.cancel();
+    animations.forEach((animation) => animation.cancel());
     animations.clear();
-    if (!reduced.matches && typeof window.IntersectionObserver === "function") {
-      observer = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          observer?.unobserve(entry.target);
-          const element = entry.target as HTMLElement;
+    active = new WeakSet<HTMLElement>();
+
+    if (reduced.matches || typeof window.IntersectionObserver !== "function")
+      return;
+
+    observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const element = entry.target as HTMLElement;
+        const visible = entry.isIntersecting;
+        if (visible === active.has(element)) continue;
+
+        if (visible) {
+          active.add(element);
+          const previous = animations.get(element);
+          if (previous) {
+            previous.reverse();
+            continue;
+          }
           if (typeof element.animate !== "function") continue;
+
           const direction = element.dataset.reveal;
           const from = direction === "left" ? "translate3d(-24px,0,0)"
-            : direction === "right" ? "translate3d(24px,0,0)" : "translate3d(0,20px,0)";
+            : direction === "right" ? "translate3d(24px,0,0)"
+            : "translate3d(0,20px,0)";
           const animation = element.animate([
-            { opacity: 0, transform: from }, { opacity: 1, transform: "translate3d(0,0,0)" },
-          ], { duration: 600, delay: Number(element.dataset.revealDelay ?? 0),
-            easing: "cubic-bezier(.2,.65,.3,1)", fill: "backwards" });
-          animations.add(animation);
-          animation.onfinish = () => animations.delete(animation);
+            { opacity: 0, transform: from },
+            { opacity: 1, transform: "translate3d(0,0,0)" },
+          ], {
+            duration: 650,
+            delay: Number(element.dataset.revealDelay ?? 0),
+            easing: "cubic-bezier(.2,.65,.3,1)",
+            fill: "both",
+          });
+          animations.set(element, animation);
+        } else {
+          active.delete(element);
+          // Keep the finished animation (fill: both) to reverse towards its
+          // original entry position. Re-entering plays it forwards again.
+          animations.get(element)?.reverse();
         }
-      }, { threshold: 0.08 });
-      root.querySelectorAll("[data-reveal]").forEach((element) => observer!.observe(element));
-    }
+      }
+    }, { threshold: 0.08 });
+    root.querySelectorAll<HTMLElement>("[data-reveal]").forEach((element) =>
+      observer!.observe(element),
+    );
   };
+
   configure();
   reduced.addEventListener("change", configure);
   disposeMotion = () => {
     observer?.disconnect();
     animations.forEach((animation) => animation.cancel());
+    animations.clear();
     reduced.removeEventListener("change", configure);
   };
 });
@@ -171,12 +197,12 @@ const foot = [
         </div>
       </section>
 
-      <section class="wrap" aria-label="Blusser afzalliklari"><div class="feature-window"><div class="q5" aria-label="Imkoniyatlar, uzluksiz harakatlanuvchi lenta">
+      <section class="wrap" aria-label="Blusser afzalliklari"><div class="feature-window" data-reveal><div class="q5" aria-label="Imkoniyatlar, uzluksiz harakatlanuvchi lenta">
         <div v-for="copy in 2" :key="copy" class="marquee-group" :aria-hidden="copy === 2 ? 'true' : undefined">
           <div v-for="q in quick" :key="q[1] as string" class="qc"><span class="ic"><component :is="q[0]" :size="20" /></span><div><b>{{ q[1] }}</b><small>{{ q[2] }}</small></div></div>
         </div>
       </div></div></section>
-      <section id="features" class="wrap" aria-label="Blusser modullari"><div class="feature-window"><div class="q6" aria-label="Modullar, uzluksiz harakatlanuvchi lenta">
+      <section id="features" class="wrap" aria-label="Blusser modullari"><div class="feature-window" data-reveal><div class="q6" aria-label="Modullar, uzluksiz harakatlanuvchi lenta">
         <div v-for="copy in 2" :key="copy" class="marquee-group" :aria-hidden="copy === 2 ? 'true' : undefined">
           <div v-for="m in modules" :key="m[1] as string" class="qc"><span class="ic"><component :is="m[0]" :size="20" /></span><div><b>{{ m[1] }}</b><small>{{ m[2] }}</small></div></div>
         </div>
@@ -188,7 +214,7 @@ const foot = [
         <div class="cm good" data-reveal="right"><span class="pill g">Blusser bilan</span><div class="ph doc" aria-hidden="true"><img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&amp;fit=crop&amp;w=560&amp;q=78" loading="lazy" alt="" /></div><ul><li v-for="g in good" :key="g"><Check :size="14" class="mk g" />{{ g }}</li></ul></div>
       </section>
 
-      <section class="wrap sec"><h2 data-reveal>Blusser bilan nimalarni boshqarasiz?</h2><p class="sub">Klinikangizning barcha jarayonlari uchun yagona, qulay va samarali yechim.</p>
+      <section class="wrap sec"><h2 data-reveal>Blusser bilan nimalarni boshqarasiz?</h2><p class="sub" data-reveal data-reveal-delay="80">Klinikangizning barcha jarayonlari uchun yagona, qulay va samarali yechim.</p>
         <div class="g3">
           <article v-for="(c, i) in cards" :key="c.title" class="card" :data-reveal="i % 2 === 0 ? 'right' : 'left'" :data-reveal-delay="i * 100">
             <div class="card-h"><span class="ic big"><component :is="c.icon" :size="26" /></span><div><h3>{{ c.title }}</h3><p>{{ c.text }}</p></div></div>
@@ -204,7 +230,7 @@ const foot = [
         <div class="w-row"><div class="w4"><div v-for="w in why" :key="w[1] as string" class="qc col"><span class="ic"><component :is="w[0]" :size="20" /></span><div><b>{{ w[1] }}</b><small>{{ w[2] }}</small></div></div></div><div class="ph doc2" aria-hidden="true"><img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&amp;fit=crop&amp;w=560&amp;q=78" loading="lazy" alt="" /><span class="doc2-shield"><ShieldCheck :size="28" /></span></div></div>
       </section>
 
-      <section id="pricing" class="wrap sec"><h2 data-reveal>Tariflar</h2><p class="sub">Klinikangiz ehtiyojiga mos tarifni tanlang.</p>
+      <section id="pricing" class="wrap sec"><h2 data-reveal>Tariflar</h2><p class="sub" data-reveal data-reveal-delay="80">Klinikangiz ehtiyojiga mos tarifni tanlang.</p>
         <div class="g3 plans"><article v-for="(p, i) in plans" :key="p.name" class="plan" data-reveal :data-reveal-delay="i * 80" :class="{ hot: p.hot }"><span v-if="p.hot" class="pop">Eng ommabop</span><h3>{{ p.name }}</h3><p class="sub s2">{{ p.sub }}</p>
           <ul><li v-for="i in p.items" :key="i"><Check :size="14" class="mk g" />{{ i }}</li></ul><b class="price">{{ p.price }}</b>
           <a class="btn sm" :class="p.hot ? 'pri' : 'out'" :href="demoHref">{{ p.cta }} <ArrowRight :size="14" /></a></article></div>
@@ -442,9 +468,9 @@ h1{font-size:clamp(38px,5.6vw,64px);line-height:1.04;margin:20px 0 18px;font-wei
 .lp #features .feature-window{padding-top:4px}
 .lp .feature-window .q5,.lp .feature-window .q6{
   display:flex;gap:0;align-items:stretch;width:max-content;margin:0;
-  will-change:transform;animation:blusser-ribbon-right 43s linear infinite;
+  will-change:transform;animation:blusser-ribbon-right 105s linear infinite;
 }
-.lp .feature-window .q6{animation-name:blusser-ribbon-left;animation-duration:49s}
+.lp .feature-window .q6{animation-name:blusser-ribbon-left;animation-duration:115s}
 .lp .feature-window .marquee-group{display:flex;align-items:stretch;flex:none;gap:14px;padding-right:14px}
 .lp .feature-window .qc{min-height:83px;flex:none}
 .lp .feature-window .q5 .qc{width:clamp(265px,19vw,330px)}
