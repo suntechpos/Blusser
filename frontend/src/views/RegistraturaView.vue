@@ -96,6 +96,8 @@ interface Row extends BookingAppointment {
   serviceName: string;
 }
 const rows = ref<Row[]>([]),
+  // Saving a booking on another date must not replace the current live queue.
+  recentBooking = ref<{ appointment: BookingAppointment; date: string } | null>(null),
   booking = ref(false),
   arrival = ref(false),
   bookingPreset = ref<BookingPreset>({}),
@@ -696,8 +698,19 @@ function openBooking(partial: BookingPreset = {}) {
   };
   booking.value = true;
 }
-async function saved(appointment: BookingAppointment, date: string) {
+async function saved(appointment: BookingAppointment, date: string, reveal = false) {
   booking.value = false;
+  // The reception desk is a selected-day view. Saving a future booking
+  // must not silently switch away from today's waiting walk-in patients.
+  // Offer an explicit link to the booked day instead.
+  if (!reveal && (date !== listDate.value || appointment.branch_id !== branch.value)) {
+    recentBooking.value = { appointment, date };
+    toast.value = `Bemor ${uzDate(date)} sanasiga muvaffaqiyatli yozildi.`;
+    highlight.value = "";
+    await Promise.all([load(), loadQueueCount(), loadSide()]);
+    return;
+  }
+  recentBooking.value = null;
   listRevision++;
   clearTimeout(searchTimer);
   // These are one booking-reveal transition, not independent user filter edits.
@@ -760,6 +773,10 @@ async function saved(appointment: BookingAppointment, date: string) {
     }
   }
 }
+function revealRecentBooking() {
+  const pending = recentBooking.value;
+  if (pending) void saved(pending.appointment, pending.date, true);
+}
 function bookSlot(slot: BookingSlot) {
   openBooking({
     doctorId: scheduleDoctor.value,
@@ -818,7 +835,13 @@ function focusSearch() {
 
     <div v-if="toast" class="rp-toast" role="status">
       {{ toast }}
-      <button aria-label="Xabarni yopish" @click="toast = ''">×</button>
+      <button
+        v-if="recentBooking"
+        type="button"
+        class="rp-link"
+        @click="revealRecentBooking"
+      >Yozilgan qabulni ko‘rish ({{ uzDate(recentBooking.date) }})</button>
+      <button aria-label="Xabarni yopish" @click="toast = ''; recentBooking = null">×</button>
     </div>
     <div class="rp-stats">
       <article v-for="s in stats" :key="s.name" class="rp-stat" :class="s.tone">
