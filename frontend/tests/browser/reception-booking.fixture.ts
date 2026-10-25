@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { receptionSession } from "./reception.fixture";
 import { allServerGrants } from "./access.fixture";
+import { localDay } from "../../src/services/receptionTime";
 export const ids = {
   branch: "10000000-0000-4000-8000-000000000001",
   other: "10000000-0000-4000-8000-000000000002",
@@ -101,7 +102,7 @@ export async function bookingSession(
       const branch = url.searchParams.get("branch_id");
       const appointments = state.rows.filter((a) =>
         (!branch || a.branch_id === branch) &&
-        new Date(a.starts_at).toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" }) === day,
+        localDay(a.starts_at, "Asia/Tashkent") === day,
       );
       const tickets = state.tickets.filter((t) =>
         (!branch || t.branch_id === branch) && t.local_date === day,
