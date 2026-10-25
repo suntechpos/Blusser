@@ -165,6 +165,8 @@ test("feature rows run seamless, opposite-direction continuous ribbons without s
   await scrollTo(page, 400);
   await expect(page.locator(".q5")).toHaveCSS("animation-name", "blusser-ribbon-right");
   await expect(page.locator(".q6")).toHaveCSS("animation-name", "blusser-ribbon-left");
+  await expect(page.locator(".q5")).toHaveCSS("animation-duration", "105s");
+  await expect(page.locator(".q6")).toHaveCSS("animation-duration", "115s");
 });
 
 test("six module cards reveal in a staggered right-left alternating sequence", async ({
@@ -275,6 +277,38 @@ test("reveals finish visibly after scrolling and refresh", async ({ page }) => {
   await expect
     .poll(() => pricing.evaluate((el) => getComputedStyle(el).opacity))
     .toBe("1");
+});
+
+test("sections and cards reverse on exit and replay every time they enter the viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await guest(page);
+
+  const rate = (selector: string) => page.locator(selector).first().evaluate((el) => {
+    const animations = el.getAnimations();
+    const reveal = animations.find((item) => item.effect instanceof KeyframeEffect);
+    return reveal?.playbackRate ?? 0;
+  });
+
+  // A card and a later section both have to reverse on the way out,
+  // then play forwards again when scrolling back to that same content.
+  for (const selector of [".g3 .card", "#pricing .plan", "#faq", ".cta"]) {
+    await page.locator(selector).first().scrollIntoViewIfNeeded();
+    await expect.poll(() => rate(selector)).toBe(1);
+    await scrollTo(page, 0);
+    await expect.poll(() => rate(selector)).toBe(-1);
+    await page.locator(selector).first().scrollIntoViewIfNeeded();
+    await expect.poll(() => rate(selector)).toBe(1);
+  }
+
+  // Return to the top: the first card goes back to its hidden entry state,
+  // but reappears normally the next time it intersects.
+  await scrollTo(page, 0);
+  await expect.poll(() => rate(".g3 .card")).toBe(-1);
+  await page.locator(".g3 .card").first().scrollIntoViewIfNeeded();
+  await expect.poll(() => rate(".g3 .card")).toBe(1);
 });
 
 test("missing IntersectionObserver leaves public content visible", async ({
