@@ -19,7 +19,7 @@ async function prepare(page: Page, date = "2026-10-28", time = "10:30") {
     .getByRole("button", { name: /Aliyeva Mohira/ })
     .click();
   await dialog(page)
-    .getByLabel("Bo‘lim", { exact: true })
+    .getByLabel("Bo‘lim *", { exact: true })
     .selectOption(ids.specialty);
   await dialog(page)
     .getByLabel("Shifokor *", { exact: true })
@@ -257,7 +257,7 @@ test("empty/error/loading states and mobile dialog keep working", async ({
     .getByRole("button", { name: /Aliyeva Mohira/ })
     .click();
   await dialog(page)
-    .getByLabel("Bo‘lim", { exact: true })
+    .getByLabel("Bo‘lim *", { exact: true })
     .selectOption(ids.specialty);
   await dialog(page)
     .getByLabel("Shifokor *", { exact: true })
@@ -414,7 +414,7 @@ test("new patient is default; failed appointment retries the saved patient witho
     .getByLabel("Tug‘ilgan sana", { exact: true })
     .fill("1994-03-12");
   await dialog(page)
-    .getByLabel("Bo‘lim", { exact: true })
+    .getByLabel("Bo‘lim *", { exact: true })
     .selectOption(ids.specialty);
   await dialog(page)
     .getByLabel("Shifokor *", { exact: true })
