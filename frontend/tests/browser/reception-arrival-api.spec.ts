@@ -35,6 +35,7 @@ test("existing patient joins real API-shaped walk-in queue once; ticket persists
         number: 7, version: 1, kind: "walk_in", status: "waiting", local_date: "2026-10-23",
       };
       tickets.push(ticket);
+      fixture.state.tickets.push({ ...ticket, appointment_id: null });
       return route.fulfill({ status: 201, json: { visit: { id: ticket.visit_id, status: "queued" }, ticket } });
     }
     const params = new URL(req.url()).searchParams;
@@ -53,9 +54,13 @@ test("existing patient joins real API-shaped walk-in queue once; ticket persists
   expect(fixture.requests.find((r) => r.method === "POST" && r.path.endsWith("/queue-tickets"))?.headers["idempotency-key"]).toMatch(/^[0-9a-f-]{36}$/);
   expect(fixture.requests.filter((r) => r.method === "POST" && r.path.endsWith("/visits"))).toHaveLength(0);
   await form.getByRole("button", { name: "Yopish" }).click();
+  await expect(page.locator(".rp-tabs")).toContainText("Barcha bemorlar");
+  await expect(page.locator(".rp-list tbody")).toContainText("Aliyeva Mohira");
+  await expect(page.locator(".rp-list tbody")).toContainText("№7");
   await page.getByRole("button", { name: "Jonli navbat", exact: false }).first().click();
   await expect(page.locator(".rp-table-scroll")).toContainText("№7");
   await page.reload();
+  await expect(page.locator(".rp-list tbody")).toContainText("№7");
   await expect(page.locator(".rp-stats")).toContainText("Jonli navbat");
   await page.getByRole("button", { name: "Jonli navbat", exact: false }).first().click();
   await expect(page.locator(".rp-table-scroll")).toContainText("№7");
