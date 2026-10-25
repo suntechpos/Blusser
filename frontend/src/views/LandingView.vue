@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
-import blusserLogo from "../assets/blusser-logo-transparent.png";
+import blusserLogoDark from "../assets/blusser-logo-dark.svg";
+import blusserLogoWhite from "../assets/blusser-logo-white.svg";
 import {
   ArrowRight, Building2, CalendarDays, Check, ChevronDown, Cloud,
   CreditCard, FlaskConical, Headphones, Mail, Menu, Monitor, Network, Phone,
@@ -154,7 +155,7 @@ const foot = [
   <div ref="landing" class="lp">
     <header class="hd">
       <div class="wrap hd-in">
-        <a class="logo" href="#top" aria-label="Blusser" @click.prevent="go('top')"><img class="brand-image" :src="blusserLogo" alt="Blusser — Medical Software" width="2146" height="733" fetchpriority="high" /></a>
+        <a class="logo" href="#top" aria-label="Blusser" @click.prevent="go('top')"><img class="brand-image" :src="blusserLogoDark" alt="Blusser — Medical Software" width="1230" height="345" fetchpriority="high" /></a>
         <nav class="nav" aria-label="Asosiy">
           <button v-for="n in nav" :key="n[1]" @click="go(n[1])">{{ n[0] }}<ChevronDown v-if="n[0] === 'Imkoniyatlar'" :size="12" /></button>
         </nav>
@@ -244,7 +245,7 @@ const foot = [
     </main>
 
     <footer id="contact" class="ft"><div class="wrap" data-reveal>
-      <div class="ft-g"><div><a class="logo footer-brand" href="#top" @click.prevent="go('top')"><img class="brand-image" :src="blusserLogo" alt="Blusser — Medical Software" width="2146" height="733" loading="lazy" /></a><p>Zamonaviy klinikalar uchun yagona raqamli boshqaruv platformasi.</p><div class="soc"><Send :size="16" /><span>IG</span><span>YT</span><span>in</span></div></div>
+      <div class="ft-g"><div><a class="logo footer-brand" href="#top" @click.prevent="go('top')"><img class="brand-image" :src="blusserLogoWhite" alt="Blusser — Medical Software" width="1230" height="345" loading="lazy" /></a><p>Zamonaviy klinikalar uchun yagona raqamli boshqaruv platformasi.</p><div class="soc"><Send :size="16" /><span>IG</span><span>YT</span><span>in</span></div></div>
         <div v-for="c in foot" :key="c[0] as string"><h4>{{ c[0] }}</h4><button v-for="l in c[1] as string[][]" :key="l[0]" @click="go(l[1])">{{ l[0] }}</button></div>
         <div><h4>Aloqa</h4><a href="mailto:info@blusser.uz"><Mail :size="14" /> info@blusser.uz</a><a href="tel:+998900000000"><Phone :size="14" /> +998 90 000 00 00</a><a href="https://t.me/" rel="noopener"><Send :size="14" /> Telegram</a></div></div>
       <div class="ft-b"><span>© 2026 Blusser. Barcha huquqlar himoyalangan.</span><span>Sog‘lom jamiyat uchun raqamli yechimlar.</span></div></div></footer>
@@ -462,7 +463,7 @@ h1{font-size:clamp(38px,5.6vw,64px);line-height:1.04;margin:20px 0 18px;font-wei
 /* Original branding, seamless opposite-direction marquee and staggered cards. */
 .lp .hd .logo{flex-shrink:0}
 .lp .brand-image{display:block;width:164px;height:auto;max-width:100%;object-fit:contain}
-.lp .ft .footer-brand{display:inline-flex;background:#fff;border-radius:10px;padding:8px 12px;margin-bottom:0}
+.lp .ft .footer-brand{display:inline-flex;background:transparent;border-radius:0;padding:0;margin-bottom:0}
 .lp .ft .brand-image{width:180px}
 .lp .feature-window{overflow:hidden;padding:10px 0 12px}
 .lp #features .feature-window{padding-top:4px}
