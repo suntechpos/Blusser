@@ -156,7 +156,7 @@ watch(
           (d) => d.id === props.preset?.doctorId,
         );
         if (doctor) {
-          draft.value.departmentId = doctor.specialty_id;
+          draft.value.departmentId = doctor.specialty_id ?? "";
           draft.value.doctorId = doctor.id;
           if (doctor.services.some((s) => s.id === props.preset?.serviceId))
             draft.value.serviceId = props.preset!.serviceId!;
