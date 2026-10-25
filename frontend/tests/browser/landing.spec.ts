@@ -73,6 +73,10 @@ test("original logo loads in header and footer without stretching", async ({
     exact: true,
   });
   await expect(logos).toHaveCount(2);
+  await expect(logos.nth(0)).toHaveAttribute("src", /blusser-logo-dark\.svg/);
+  await expect(logos.nth(1)).toHaveAttribute("src", /blusser-logo-white\.svg/);
+  await expect(page.locator(".ft .footer-brand"))
+    .toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   for (const logo of await logos.all()) {
     await logo.scrollIntoViewIfNeeded();
     await expect
