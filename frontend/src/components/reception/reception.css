@@ -1246,3 +1246,43 @@
 .rp-configuration form {
   margin-top: 14px;
 }
+
+
+/* Server-backed arrival modal; scoped to the existing reception dialog. */
+.rp-dialog .rp-arrival-fields {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.rp-dialog .rp-arrival-appointment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-top: 8px;
+  border: 1px solid #dce7f9;
+  border-radius: 8px;
+}
+.rp-dialog .rp-arrival-appointment input[type="radio"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+}
+.rp-dialog .rp-arrival-appointment strong,
+.rp-dialog .rp-arrival-appointment small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.rp-dialog .rp-arrival-appointment small {
+  color: #6983a7;
+  font-size: 12px;
+  margin-top: 3px;
+}
+@media (max-width: 680px) {
+  .rp-dialog .rp-arrival-modes {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
