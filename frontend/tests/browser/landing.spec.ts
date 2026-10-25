@@ -64,6 +64,23 @@ async function scrollTo(page: Page, top: number) {
   );
 }
 
+test("landing has one vertical document scrollbar", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await guest(page);
+  const landing = page.locator(".lp");
+  await expect(landing).toHaveCSS("overflow-x", "clip");
+  await expect(landing).toHaveCSS("overflow-y", "visible");
+  await expect.poll(() =>
+    page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
+  ).toBe(true);
+  await scrollTo(page, 600);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+  expect(await landing.evaluate((element) => element.scrollTop)).toBe(0);
+  expect(await page.evaluate(() =>
+    document.documentElement.scrollWidth <= window.innerWidth,
+  )).toBe(true);
+});
+
 test("original logo loads in header and footer without stretching", async ({
   page,
 }) => {
