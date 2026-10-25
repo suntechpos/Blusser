@@ -1136,3 +1136,10 @@
 .sv-category-dialog.sv-category-dialog {
   transform: translateY(8px);
 }
+
+/* The category status control keeps the existing inline status appearance. */
+.sv-manage-list button.sv-status {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}

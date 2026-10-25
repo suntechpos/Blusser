@@ -7,17 +7,24 @@ import {
   serviceDraft,
   validateService,
   serviceTypes,
-  catalogBranches,
   type Catalog,
+  type CatalogBranch,
   type CatalogService,
   type ServiceDraft,
-} from "../../mocks/servicesCatalog";
-const props = defineProps<{ catalog: Catalog; service?: CatalogService }>();
+} from "../../services/serviceCatalog";
+const props = defineProps<{
+  catalog: Catalog;
+  branches: CatalogBranch[];
+  service?: CatalogService;
+  saving?: boolean;
+  serverError?: string;
+  statusAllowed?: boolean;
+}>();
 const emit = defineEmits<{ close: []; save: [draft: ServiceDraft] }>();
 const draft = ref(
   props.service
     ? serviceDraft(props.service)
-    : blankService(props.catalog.services, props.catalog.categories),
+    : blankService(props.catalog.categories, props.branches),
 );
 const initial = JSON.stringify(draft.value),
   errors = ref<Record<string, string>>({}),
@@ -41,7 +48,13 @@ function toggleBranch(id: string) {
     : [...draft.value.branchIds, id];
 }
 function save() {
-  errors.value = validateService(draft.value, props.catalog, props.service);
+  if (props.saving) return;
+  errors.value = validateService(
+    draft.value,
+    props.catalog,
+    props.branches,
+    props.service,
+  );
   if (!Object.keys(errors.value).length)
     emit("save", { ...draft.value, branchIds: [...draft.value.branchIds] });
 }
@@ -56,14 +69,18 @@ function save() {
         : 'Yangi xizmat ma’lumotlarini kiriting'
     "
     :icon="FolderPlus"
-    :dirty="dirty"
+    :dirty="!saving && dirty"
     @close="emit('close')"
     ><form
       id="sv-service-form"
       class="sv-form"
       novalidate
+      :inert="saving || undefined"
+      :aria-busy="saving"
+      :data-permission="service ? 'services.update' : 'services.create'"
       @submit.prevent="save"
     >
+      <p v-if="serverError" class="sv-error" role="alert">{{ serverError }}</p>
       <div class="sv-name-code">
         <label
           >Xizmat nomi <em>*</em
@@ -114,15 +131,17 @@ function save() {
         <legend>Filiallar <em>*</em></legend>
         <div class="sv-branch-selection">
           <span v-for="id in draft.branchIds" :key="id" class="sv-branch-chip"
-            >{{ catalogBranches.find((b) => b.id === id)?.name
+            >{{ branches.find((b) => b.id === id)?.name
             }}<button
               type="button"
-              :aria-label="`${catalogBranches.find((b) => b.id === id)?.name}ni olib tashlash`"
+              :data-permission="service ? 'services.update' : 'services.create'"
+              :aria-label="`${branches.find((b) => b.id === id)?.name}ni olib tashlash`"
               @click="toggleBranch(id)"
             >
               <X :size="14" /></button></span
           ><button
             type="button"
+            :data-permission="service ? 'services.update' : 'services.create'"
             class="sv-branch-expand"
             aria-label="Filiallarni tanlash"
             :aria-expanded="branchesOpen"
@@ -133,7 +152,7 @@ function save() {
           </button>
         </div>
         <div v-if="branchesOpen" class="sv-branch-options">
-          <label v-for="b in catalogBranches" :key="b.id"
+          <label v-for="b in branches" :key="b.id"
             ><input
               type="checkbox"
               :checked="draft.branchIds.includes(b.id)"
@@ -150,6 +169,7 @@ function save() {
         <span>Vaqt bo‘yicha yozilish</span
         ><button
           type="button"
+          :data-permission="service ? 'services.update' : 'services.create'"
           role="switch"
           class="sv-switch"
           aria-label="Vaqt bo‘yicha yozilish"
@@ -167,7 +187,7 @@ function save() {
             ><input
               v-model="draft.price"
               aria-label="Narxi"
-              inputmode="numeric"
+              inputmode="decimal"
               placeholder="0"
               :aria-invalid="!!errors.price"
             /><span>so‘m</span></span
@@ -219,7 +239,7 @@ function save() {
           maxlength="2000"
         />
       </label>
-      <div class="sv-active-row">
+      <div v-if="!service || statusAllowed" class="sv-active-row">
         <div>
           <strong>Faol holat</strong
           ><small>Xizmat katalogning faol ro‘yxatida ko‘rinadi</small>
@@ -227,6 +247,7 @@ function save() {
         <button
           type="button"
           class="sv-switch"
+          :data-permission="service ? 'services.delete' : 'services.create'"
           role="switch"
           aria-label="Xizmat faol holati"
           :aria-checked="draft.active"
@@ -236,19 +257,23 @@ function save() {
           <span /></button
         ><span>{{ draft.active ? "Faol" : "Faol emas" }}</span>
       </div>
-      <p class="sv-local-note">
-        Lokal namuna · umumiy narx, haqiqiy bazaga yozilmaydi
-      </p>
     </form>
     <template #footer="{ close }"
       ><footer class="sv-modal-footer">
         <small><em>*</em> Majburiy maydonlar</small
-        ><button class="sv-button" type="button" @click="close">
+        ><button
+          class="sv-button"
+          type="button"
+          :disabled="saving"
+          @click="close"
+        >
           Bekor qilish</button
         ><button
           class="sv-button sv-primary"
           type="submit"
           form="sv-service-form"
+          :disabled="saving"
+          :data-permission="service ? 'services.update' : 'services.create'"
         >
           <Check :size="19" />Saqlash
         </button>

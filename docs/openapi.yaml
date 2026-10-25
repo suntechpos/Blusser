@@ -9638,10 +9638,10 @@
     "/api/v1/clinic/appointments/configuration-services": {
       "get": {
         "operationId": "bookingConfigurationServicesGet",
-        "summary": "Booking-only service listing",
+        "summary": "List the shared service catalog with statistics and real category/branch lookups",
         "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "doctors.view"
+          "services.view"
         ],
         "security": [
           {
@@ -9654,7 +9654,9 @@
             "in": "query",
             "schema": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
             }
           },
           {
@@ -9663,7 +9665,8 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 100,
+              "default": 50
             }
           },
           {
@@ -9679,29 +9682,50 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "maxLength": 32
+              "enum": [
+                "active",
+                "inactive",
+                "all"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
             "name": "from",
             "in": "query",
             "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
+              "type": "string"
+            },
+            "description": "ISO date or date-time creation timestamp filter; from inclusive, to exclusive."
           },
           {
             "name": "to",
             "in": "query",
             "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
+              "type": "string"
+            },
+            "description": "ISO date or date-time creation timestamp filter; from inclusive, to exclusive."
           }
         ],
         "responses": {
           "200": {
-            "description": "Authorized scheduling response.",
+            "description": "Authorized catalog response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -9714,23 +9738,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/BookingConfigurationService"
-                      }
-                    },
-                    "meta": {
-                      "$ref": "#/components/schemas/Meta"
-                    }
-                  },
-                  "required": [
-                    "data",
-                    "meta"
-                  ]
+                  "$ref": "#/components/schemas/CatalogServicesPage"
                 }
               }
             }
@@ -9755,16 +9763,36 @@
           },
           "429": {
             "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Catalog read unavailable; no SQL details exposed.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
-        "description": "Uses existing services.view (entire_clinic); creation additionally requires services.create (entire_clinic). Audited and idempotent scheduling governance boundary. No grants or existing service changes."
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history."
       },
       "post": {
         "operationId": "bookingConfigurationServicesPost",
-        "summary": "Booking-only service creation",
+        "summary": "Create a service in the shared appointment catalog",
         "x-implementation-status": "implemented",
         "x-required-permissions": [
-          "doctors.create"
+          "services.view",
+          "services.create"
         ],
         "security": [
           {
@@ -9792,7 +9820,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Authorized scheduling response.",
+            "description": "Authorized catalog response.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -9805,7 +9833,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BookingConfigurationService"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CatalogService"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BookingConfigurationService"
+                    }
+                  ]
                 }
               }
             }
@@ -9832,17 +9867,1000 @@
             "$ref": "#/components/responses/Failure429"
           }
         },
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history. Full catalog input omits code and generates a unique tenant-local XZ code. Legacy {code,name,active} scheduling setup input remains compatible and returns its original minimal service projection; it does not invent price/category metadata.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SpecialtyInput"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CatalogServiceInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SpecialtyInput"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/appointments/configuration-services/{id}": {
+      "get": {
+        "operationId": "catalogServiceGet",
+        "summary": "Get service details",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "services.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized catalog response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogService"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Catalog read unavailable; no SQL details exposed.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
         },
-        "description": "Uses existing services.view (entire_clinic); creation additionally requires services.create (entire_clinic). Audited and idempotent scheduling governance boundary. No grants or existing service changes."
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history."
+      },
+      "put": {
+        "operationId": "catalogServicePut",
+        "summary": "Edit a service with optimistic version control",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "services.view",
+          "services.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Current integer record version, preferably quoted, e.g. \"3\". Missing returns 428; stale returns 409.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"?[1-9][0-9]{0,17}\"?$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized catalog response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogService"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "428": {
+            "description": "If-Match with the current record version is required.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogServiceInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/appointments/configuration-services/{id}/status": {
+      "post": {
+        "operationId": "catalogServiceStatus",
+        "summary": "Activate or deactivate a service without deleting history",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "services.view",
+          "services.delete"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Current integer record version, preferably quoted, e.g. \"3\". Missing returns 428; stale returns 409.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"?[1-9][0-9]{0,17}\"?$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized catalog response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogService"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "428": {
+            "description": "If-Match with the current record version is required.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogStatusInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/appointments/configuration-services/export": {
+      "get": {
+        "operationId": "catalogServiceExport",
+        "summary": "Export all filtered service rows (maximum 10000)",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "services.view",
+          "categories.view",
+          "categories.export"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive",
+                "all"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ISO date or date-time creation timestamp filter; from inclusive, to exclusive."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ISO date or date-time creation timestamp filter; from inclusive, to exclusive."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized catalog response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "attachment; filename=\"blusser-services.csv\""
+              }
+            },
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Catalog read unavailable; no SQL details exposed.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history. Export is separately audited. Uses all filtered rows irrespective of page/per_page. More than 10000 matches returns 422 rather than truncating silently."
+      }
+    },
+    "/api/v1/clinic/service-categories": {
+      "get": {
+        "operationId": "serviceCategoriesGet",
+        "summary": "List real service categories and service counts",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "services.view",
+          "categories.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive",
+                "all"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ISO date or date-time creation timestamp filter; from inclusive, to exclusive."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "ISO date or date-time creation timestamp filter; from inclusive, to exclusive."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized catalog response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogCategoriesPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "503": {
+            "description": "Catalog read unavailable; no SQL details exposed.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history."
+      },
+      "post": {
+        "operationId": "serviceCategoriesPost",
+        "summary": "Create a service category",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "services.view",
+          "categories.view",
+          "categories.create"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Authorized catalog response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceCategory"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        },
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceCategoryInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/service-categories/{id}": {
+      "put": {
+        "operationId": "serviceCategoryPut",
+        "summary": "Edit a service category",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "services.view",
+          "categories.view",
+          "categories.update"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Current integer record version, preferably quoted, e.g. \"3\". Missing returns 428; stale returns 409.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"?[1-9][0-9]{0,17}\"?$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized catalog response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceCategory"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "428": {
+            "description": "If-Match with the current record version is required.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceCategoryInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/service-categories/{id}/status": {
+      "post": {
+        "operationId": "serviceCategoryStatus",
+        "summary": "Change category status while retaining linked services",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "services.view",
+          "categories.view",
+          "categories.status"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Current integer record version, preferably quoted, e.g. \"3\". Missing returns 428; stale returns 409.",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"?[1-9][0-9]{0,17}\"?$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized catalog response.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceCategory"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          },
+          "428": {
+            "description": "If-Match with the current record version is required.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogStatusInput"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -12384,6 +13402,480 @@
           },
           "active": {
             "type": "boolean"
+          }
+        }
+      },
+      "CatalogService": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "code",
+          "name",
+          "category_id",
+          "service_type",
+          "branch_ids",
+          "price",
+          "timed",
+          "duration_minutes",
+          "turnaround",
+          "turnaround_unit",
+          "description",
+          "active",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "service_type": {
+            "type": "string",
+            "enum": [
+              "consultation",
+              "laboratory",
+              "diagnostic",
+              "procedure",
+              "other"
+            ]
+          },
+          "branch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "uniqueItems": true,
+            "description": "Explicit catalog branch assignments; an empty list on legacy records retains previous clinic-wide eligibility."
+          },
+          "price": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
+            "description": "Exact nonnegative numeric(14,2) value; send a decimal string, never a JSON floating-point number."
+          },
+          "timed": {
+            "type": "boolean"
+          },
+          "duration_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 480
+          },
+          "turnaround": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
+            "description": "Positive exact result time for laboratory services, otherwise null."
+          },
+          "turnaround_unit": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "CatalogServiceInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "category_id",
+          "service_type",
+          "branch_ids",
+          "price",
+          "timed",
+          "duration_minutes",
+          "turnaround",
+          "turnaround_unit",
+          "description",
+          "active"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "category_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "service_type": {
+            "type": "string",
+            "enum": [
+              "consultation",
+              "laboratory",
+              "diagnostic",
+              "procedure",
+              "other"
+            ]
+          },
+          "branch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
+            "description": "Exact nonnegative numeric(14,2) value; send a decimal string, never a JSON floating-point number."
+          },
+          "timed": {
+            "type": "boolean"
+          },
+          "duration_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 480
+          },
+          "turnaround": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
+            "description": "Positive exact result time for laboratory services, otherwise null."
+          },
+          "turnaround_unit": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "timed": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "duration_minutes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 480
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "duration_minutes": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "service_type": {
+                  "const": "consultation"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "timed": {
+                  "const": true
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "service_type": {
+                  "const": "laboratory"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "turnaround": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
+                  "description": "Must be strictly positive."
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ServiceCategoryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "description",
+          "color",
+          "active"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "blue",
+              "cyan",
+              "green",
+              "purple",
+              "orange",
+              "pink",
+              "slate"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ServiceCategory": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "description",
+          "color",
+          "active",
+          "service_count",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "blue",
+              "cyan",
+              "green",
+              "purple",
+              "orange",
+              "pink",
+              "slate"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "service_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "CatalogStatusInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CatalogBranch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "active"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CatalogStats": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "total",
+          "active",
+          "inactive",
+          "categories"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "inactive": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "categories": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "description": "Whole authorized tenant catalog statistics, independent of table filters."
+      },
+      "CatalogServicesPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta",
+          "stats",
+          "categories",
+          "branches"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogService"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/CatalogStats"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceCategory"
+            }
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogBranch"
+            }
+          }
+        }
+      },
+      "CatalogCategoriesPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta",
+          "stats",
+          "categories",
+          "branches"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceCategory"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/CatalogStats"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceCategory"
+            }
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogBranch"
+            }
           }
         }
       }

@@ -465,7 +465,7 @@
     "section_label": "Xizmatlar",
     "view": "services.view",
     "parent": null,
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "services.create",
@@ -474,7 +474,7 @@
     "section_label": "Xizmatlar",
     "view": "services.view",
     "parent": null,
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "services.update",
@@ -483,7 +483,7 @@
     "section_label": "Xizmatlar",
     "view": "services.view",
     "parent": null,
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "services.delete",
@@ -492,7 +492,7 @@
     "section_label": "Xizmatlar",
     "view": "services.view",
     "parent": null,
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "categories.view",
@@ -501,7 +501,7 @@
     "section_label": "Xizmat kategoriyalari",
     "view": "categories.view",
     "parent": "services.view",
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "categories.create",
@@ -510,7 +510,7 @@
     "section_label": "Xizmat kategoriyalari",
     "view": "categories.view",
     "parent": "services.view",
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "categories.update",
@@ -519,7 +519,7 @@
     "section_label": "Xizmat kategoriyalari",
     "view": "categories.view",
     "parent": "services.view",
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "categories.status",
@@ -528,7 +528,7 @@
     "section_label": "Xizmat kategoriyalari",
     "view": "categories.view",
     "parent": "services.view",
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "categories.export",
@@ -537,7 +537,7 @@
     "section_label": "Xizmat kategoriyalari",
     "view": "categories.view",
     "parent": "services.view",
-    "ui_only": true
+    "ui_only": false
   },
   {
     "code": "finance.view",
