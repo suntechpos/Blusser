@@ -11,8 +11,8 @@ export interface BookingService {
 export interface BookingDoctor {
   id: string;
   name: string;
-  specialty_id: string;
-  specialty_name: string;
+  specialty_id: string | null;
+  specialty_name: string | null;
   services: BookingService[];
 }
 export interface BookingSlot {

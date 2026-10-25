@@ -197,6 +197,94 @@ final class ServiceCatalogTest extends FoundationTestCase
         $this->assertSame($service['id'], DB::connection('migration')->table('doctor_services')->where('doctor_id', $doctor['id'])->value('service_id'));
     }
 
+    public function test_admin_can_book_configured_doctor_before_first_login_without_catalog_specialty(): void
+    {
+        $a = $this->fixture()['a'];
+        $db = DB::connection('migration');
+        $doctorUser = (string) Str::uuid();
+        $doctorMembership = (string) Str::uuid();
+        $db->table('users')->insert([
+            'id' => $doctorUser,
+            'login' => 'synthetic.unrotated.doctor',
+            'name' => 'New configurable doctor',
+            'password_hash' => $db->table('users')->where('id', $a['user'])->value('password_hash'),
+            'must_change_password' => true,
+        ]);
+        $db->table('tenant_memberships')->insert([
+            'id' => $doctorMembership,
+            'tenant_id' => $a['tenant'],
+            'user_id' => $doctorUser,
+            'role_id' => $a['role'],
+        ]);
+        $db->table('membership_branches')->insert([
+            'id' => (string) Str::uuid(),
+            'tenant_id' => $a['tenant'],
+            'membership_id' => $doctorMembership,
+            'branch_id' => $a['branch'],
+        ]);
+
+        $service = $this->command($a, 'services', $this->payload($a, $this->category($a)));
+        $scheduling = app(Scheduling::class);
+        $doctor = $scheduling->command($this->actor($a['user']), $a['tenant'], 'doctors', 'create', null, [
+            'membership_id' => $doctorMembership,
+            'specialty_id' => null,
+            'branch_ids' => [$a['branch']],
+            'service_ids' => [$service['id']],
+            'active' => true,
+        ], (string) Str::uuid());
+        $room = $scheduling->command($this->actor($a['user']), $a['tenant'], 'rooms', 'create', null, [
+            'branch_id' => $a['branch'],
+            'number' => '102',
+            'service_type' => 'consultation',
+            'active' => true,
+            'availability' => 'available',
+        ], (string) Str::uuid());
+        $scheduling->command($this->actor($a['user']), $a['tenant'], 'schedules', 'create', null, [
+            'doctor_id' => $doctor['id'],
+            'branch_id' => $a['branch'],
+            'room_id' => $room['id'],
+            'weekday' => 1,
+            'local_start' => '09:00',
+            'local_end' => '10:00',
+            'slot_minutes' => 30,
+            'effective_from' => '2030-01-01',
+            'effective_to' => null,
+            'breaks' => [],
+        ], (string) Str::uuid());
+
+        $options = app(Appointments::class)->bookingOptions($this->actor($a['user']), $a['tenant'], ['branch_id' => $a['branch']]);
+        $this->assertSame(1, $options['meta']['total']);
+        $this->assertSame($doctor['id'], $options['data'][0]['id']);
+        $this->assertNull($options['data'][0]['specialty_id']);
+        $this->assertSame($service['id'], $options['data'][0]['services'][0]['id']);
+
+        $filters = [
+            'service_id' => $service['id'],
+            'branch_id' => $a['branch'],
+            'from' => '2030-01-07T00:00:00+05:00',
+            'to' => '2030-01-08T00:00:00+05:00',
+        ];
+        $slots = app(Availability::class)->get($this->actor($a['user']), $a['tenant'], $doctor['id'], $filters);
+        $this->assertSame(3, $slots['meta']['total']);
+
+        $patient = app(Patients::class)->command($this->actor($a['user']), $a['tenant'], 'create', null, [
+            'name' => 'New booking patient',
+            'date_of_birth' => '1990-01-01',
+            'branch_id' => $a['branch'],
+        ], (string) Str::uuid());
+        $appointment = app(Appointments::class)->command($this->actor($a['user']), $a['tenant'], 'create', null, [
+            'patient_id' => $patient['patient']['id'],
+            'doctor_id' => $doctor['id'],
+            'service_id' => $service['id'],
+            'branch_id' => $a['branch'],
+            'room_id' => $room['id'],
+            'starts_at' => '2030-01-07T09:00:00+05:00',
+            'ends_at' => '2030-01-07T09:20:00+05:00',
+        ], (string) Str::uuid());
+        $this->assertSame($doctor['id'], $appointment['doctor_id']);
+        $this->assertTrue($db->table('users')->where('id', $doctorUser)->value('must_change_password'));
+    }
+
     public function test_parallel_creates_generate_unique_codes_and_parallel_updates_reject_stale_versions(): void
     {
         $a = $this->fixture()['a'];
