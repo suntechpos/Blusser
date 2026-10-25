@@ -32,6 +32,7 @@ import {
   localDay,
   localTime,
   dayRange,
+  nextDay,
   type BookingDoctor,
   type BookingAppointment,
   type BookingSlot,
@@ -111,17 +112,24 @@ interface QueueTicket {
   kind: "scheduled" | "walk_in";
   local_date: string;
   version: number;
+  visit_id: string;
+  appointment_id: string | null;
 }
 interface QueueRow extends QueueTicket {
   patientName: string;
   patientNumber: string;
   doctorName: string;
 }
+type UnifiedEntry =
+  | { source: "appointment"; appointment: Row }
+  | { source: "walk_in"; ticket: QueueRow; serviceName: string };
+const unifiedRows = ref<UnifiedEntry[]>([]);
+const allDayCount = ref<number | null>(null);
 const queueRows = ref<QueueRow[]>([]);
 const queueCount = ref<number | null>(null);
 let queueCountSequence = 0;
 const tabs = computed(() => [
-  { id: "all", name: "Barcha bemorlar", count: counts.value.all ?? 0 },
+  { id: "all", name: "Barcha bemorlar", count: allDayCount.value ?? counts.value.all ?? 0 },
   { id: "walk_in", name: "Jonli navbat", count: queueCount.value ?? "—" },
   {
     id: "scheduled",
@@ -133,8 +141,8 @@ const tabs = computed(() => [
 ]);
 const stats = computed(() => [
   {
-    name: "Tanlangan sana qabullari",
-    value: String(counts.value.all ?? 0),
+    name: "Tanlangan sana bemorlari",
+    value: String(allDayCount.value ?? counts.value.all ?? 0),
     icon: Users,
     tone: "blue",
   },
@@ -232,7 +240,10 @@ async function loadQueueCount() {
     if (alive && serial === queueCountSequence) queueCount.value = null;
   }
 }
-watch([branch, listDate, () => session.epoch], () => void loadQueueCount(), { immediate: true });
+watch([branch, listDate, () => session.epoch], () => {
+  allDayCount.value = null;
+  void loadQueueCount();
+}, { immediate: true });
 
 async function loadQueue(serial: number, revision: number) {
   queueRows.value = [];
@@ -268,13 +279,141 @@ async function loadQueue(serial: number, revision: number) {
     if (alive && serial === listSerial && revision === listRevision) loading.value = false;
   }
 }
+// One branch-local calendar day, fetched through the existing reception overview.
+// Only walk-ins are added to appointments: a scheduled check-in has BOTH an
+// appointment and a ticket and must never be displayed/counted twice.
+async function loadUnified(serial: number, revision: number) {
+  unifiedRows.value = [];
+  if (!branch.value || !zone.value || !listDate.value || !can("reception.view")) {
+    if (alive && serial === listSerial) {
+      error.value = "Filial va Registratura ruxsatini tekshiring.";
+      loading.value = false;
+    }
+    return;
+  }
+  try {
+    const response = await clinicRequest<{
+      appointments?: BookingAppointment[];
+      tickets?: QueueTicket[];
+    }>("reception/overview", {
+      params: { branch_id: branch.value, local_date: listDate.value },
+    });
+    // A queue ticket linked to a scheduled appointment is represented by that
+    // appointment. Unscheduled walk-ins do not have an appointment row.
+    const bookings = (response.data.appointments ?? []).filter((a) =>
+      (!doctor.value || a.doctor_id === doctor.value) &&
+      (!status.value || a.status === status.value),
+    );
+    const walkIns = (response.data.tickets ?? []).filter((t) =>
+      t.kind === "walk_in" &&
+      !t.appointment_id &&
+      (!doctor.value || t.doctor_id === doctor.value) &&
+      (!status.value ||
+        (status.value === "checked_in" && ["waiting", "called", "skipped"].includes(t.status)) ||
+        t.status === status.value),
+    );
+    // Search patient names, phones and numbers through the existing permission-
+    // checked Patients API, rather than querying queue IDs as patient names.
+    let visibleBookings = bookings;
+    let visibleWalkIns = walkIns;
+    const term = query.value.trim();
+    if (term) {
+      const matched = new Set<string>();
+      if (can("patients.view")) {
+        for (let currentPage = 1; ; currentPage++) {
+          const result = await clinicRequest<{ data: Patient[]; meta: { total: number } }>(
+            "patients", { params: { q: term, page: currentPage, per_page: 100, status: "active" } },
+          );
+          result.data.data.forEach((p) => matched.add(p.id));
+          if (!result.data.data.length || currentPage * 100 >= result.data.meta.total) break;
+        }
+      }
+      visibleBookings = bookings.filter((a) => matched.has(a.patient_id));
+      visibleWalkIns = walkIns.filter((t) => matched.has(t.patient_id));
+    }
+    const combined = [
+      ...visibleBookings
+        .sort((a, b) => a.starts_at.localeCompare(b.starts_at) || a.id.localeCompare(b.id))
+        .map((appointment) => ({ source: "appointment" as const, appointment })),
+      ...visibleWalkIns
+        .sort((a, b) => a.number - b.number || a.id.localeCompare(b.id))
+        .map((ticket) => ({ source: "walk_in" as const, ticket })),
+    ];
+    const selected = combined.slice((page.value - 1) * 8, page.value * 8);
+    const appointments = selected.filter((e) => e.source === "appointment").map((e) => e.appointment);
+    const projected = await present(appointments);
+    const patients = new Map<string, Patient>();
+    const live = selected.filter((e) => e.source === "walk_in");
+    if (can("patients.view")) {
+      await Promise.all([...new Set(live.map((e) => e.ticket.patient_id))].map(async (id) => {
+        const r = await clinicRequest<Patient>("patients/" + id);
+        patients.set(id, r.data);
+      }));
+    }
+    const visits = new Map<string, string>();
+    if (can("visits.view")) {
+      await Promise.all(live.map(async ({ ticket }) => {
+        try {
+          const response = await clinicRequest<{ service_id: string }>(
+            "visits/" + ticket.visit_id,
+          );
+          visits.set(ticket.visit_id, response.data.service_id);
+        } catch {
+          // Queue visibility does not imply permission to view every visit.
+          // Do not hide the valid queue ticket when service detail is unavailable.
+        }
+      }));
+    }
+    if (alive && serial === listSerial && revision === listRevision) {
+      const mapped = new Map(projected.map((a) => [a.id, a]));
+      unifiedRows.value = selected.flatMap((entry): UnifiedEntry[] => {
+        if (entry.source === "appointment") {
+          const a = mapped.get(entry.appointment.id);
+          return a ? [{ source: "appointment", appointment: a }] : [];
+        }
+        const t = entry.ticket;
+        const d = doctors.value.find((d) => d.id === t.doctor_id);
+        return [{
+          source: "walk_in",
+          ticket: {
+            ...t,
+            patientName: patients.get(t.patient_id)?.name ?? "Bemor ma’lumoti uchun ruxsat kerak",
+            patientNumber: patients.get(t.patient_id)?.patient_number ?? "—",
+            doctorName: d?.name ?? "Shifokor ma’lumoti uchun ruxsat kerak",
+          },
+          serviceName: d?.services.find((service) => service.id === visits.get(t.visit_id))?.name ?? "Jonli navbat",
+        }];
+      });
+      rows.value = projected;
+      total.value = combined.length;
+      allDayCount.value = (response.data.appointments?.length ?? 0) +
+        (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && !t.appointment_id).length;
+      counts.value = {
+        all: (response.data.appointments?.length ?? 0) +
+          (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && !t.appointment_id).length,
+        scheduled: (response.data.appointments ?? []).filter((a) => a.status === "scheduled").length,
+        in_progress: (response.data.appointments ?? []).filter((a) => a.status === "in_progress").length +
+          (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && t.status === "in_progress").length,
+        completed: (response.data.appointments ?? []).filter((a) => a.status === "completed").length +
+          (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && t.status === "completed").length,
+      };
+    }
+    return { rows: projected, total: combined.length };
+  } catch (e) {
+    if (alive && serial === listSerial && revision === listRevision) error.value = errorText(e);
+  } finally {
+    if (alive && serial === listSerial && revision === listRevision) loading.value = false;
+  }
+}
 async function load() {
   const serial = ++listSerial;
   const revision = listRevision;
   loading.value = true;
   error.value = "";
   rows.value = [];
+  unifiedRows.value = [];
   total.value = 0;
+  if (tab.value === "all") return await loadUnified(serial, revision);
   if (tab.value === "walk_in") {
     await loadQueue(serial, revision);
     return;
@@ -673,6 +812,7 @@ function focusSearch() {
             >Sana filtri
             <DateField v-model="listDate" label="Qabullar sanasi" /></label
           ><button class="rp-link" @click="listDate = today">Bugun</button
+           ><button class="rp-link" @click="listDate = nextDay(today)">Ertaga</button
           ><span>{{ uzDate(listDate) }} qabullari</span>
         </div>
         <p v-if="catalogError" role="alert" class="rp-error">
@@ -737,6 +877,49 @@ function focusSearch() {
               </tr>
               <tr v-if="!loading && !error && !queueRows.length">
                 <td colspan="5" class="rp-empty">Tanlangan sanada navbat topilmadi.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else-if="tab === 'all'" class="rp-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Bemor</th><th>Shifokor / Xizmat</th>
+                <th>Holat</th><th>Vaqt / Navbat</th><th>Amallar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(entry, i) in unifiedRows" :key="entry.source === 'appointment' ? entry.appointment.id : entry.ticket.id"
+                :class="{ 'rp-new-booking': entry.source === 'appointment' && entry.appointment.id === highlight }">
+                <td>{{ (page - 1) * 8 + i + 1 }}</td>
+                <template v-if="entry.source === 'appointment'">
+                  <td><div class="rp-person">
+                    <span class="rp-avatar">{{ initials(entry.appointment.patientName) }}</span>
+                    <div><strong>{{ entry.appointment.patientName }}</strong>
+                      <small>{{ entry.appointment.patientNumber }} · {{ entry.appointment.phone || 'Telefon kiritilmagan' }}</small>
+                    </div>
+                  </div></td>
+                  <td><strong>{{ entry.appointment.doctorName }}</strong><small>{{ entry.appointment.serviceName }}</small></td>
+                  <td><span class="rp-badge" :class="entry.appointment.status">{{ statusLabels[entry.appointment.status] }}</span></td>
+                  <td><strong>{{ entry.appointment.time }}</strong></td>
+                  <td><button class="rp-button rp-soft" :disabled="!canReception('detail')" @click="detail = entry.appointment"><Eye :size="16" /> Ko‘rish</button></td>
+                </template>
+                <template v-else>
+                  <td><div class="rp-person">
+                    <span class="rp-avatar">{{ initials(entry.ticket.patientName) }}</span>
+                    <div><strong>{{ entry.ticket.patientName }}</strong><small>{{ entry.ticket.patientNumber }}</small></div>
+                  </div></td>
+                  <td><strong>{{ entry.ticket.doctorName }}</strong><small>{{ entry.serviceName }}</small></td>
+                  <td><span class="rp-badge checked_in">{{ entry.ticket.status === 'waiting' ? 'Navbatda' : entry.ticket.status === 'called' ? 'Chaqirildi' : entry.ticket.status === 'in_progress' ? 'Qabulda' : entry.ticket.status === 'completed' ? 'Yakunlangan' : entry.ticket.status }}</span></td>
+                  <td><strong>№{{ entry.ticket.number }}</strong><small>Jonli navbat</small></td>
+                  <td><button class="rp-button rp-soft" @click="tab = 'walk_in'"><ClipboardList :size="16" /> Navbat</button></td>
+                </template>
+              </tr>
+              <tr v-if="!loading && !error && !unifiedRows.length">
+                <td colspan="6" class="rp-empty">
+                  Bemor topilmadi. Boshqa sanani tekshiring yoki filtrlarni o‘zgartiring.
+                </td>
               </tr>
             </tbody>
           </table>
@@ -975,7 +1158,7 @@ function focusSearch() {
               <CalendarDays :size="23" />Qabulga yozish</button
             ><button
               @click="
-                toast = 'Jonli navbat bu bosqichda ulanmagan.';
+                tab = 'walk_in';
                 doctor = '';
                 status = '';
                 query = '';

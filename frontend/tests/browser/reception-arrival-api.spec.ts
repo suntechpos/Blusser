@@ -35,6 +35,7 @@ test("existing patient joins real API-shaped walk-in queue once; ticket persists
         number: 7, version: 1, kind: "walk_in", status: "waiting", local_date: "2026-10-23",
       };
       tickets.push(ticket);
+      fixture.state.tickets.push({ ...ticket, appointment_id: null });
       return route.fulfill({ status: 201, json: { visit: { id: ticket.visit_id, status: "queued" }, ticket } });
     }
     const params = new URL(req.url()).searchParams;
@@ -53,9 +54,13 @@ test("existing patient joins real API-shaped walk-in queue once; ticket persists
   expect(fixture.requests.find((r) => r.method === "POST" && r.path.endsWith("/queue-tickets"))?.headers["idempotency-key"]).toMatch(/^[0-9a-f-]{36}$/);
   expect(fixture.requests.filter((r) => r.method === "POST" && r.path.endsWith("/visits"))).toHaveLength(0);
   await form.getByRole("button", { name: "Yopish" }).click();
+  await expect(page.locator(".rp-tabs")).toContainText("Barcha bemorlar");
+  await expect(page.locator(".rp-list tbody")).toContainText("Aliyeva Mohira");
+  await expect(page.locator(".rp-list tbody")).toContainText("№7");
   await page.getByRole("button", { name: "Jonli navbat", exact: false }).first().click();
   await expect(page.locator(".rp-table-scroll")).toContainText("№7");
   await page.reload();
+  await expect(page.locator(".rp-list tbody")).toContainText("№7");
   await expect(page.locator(".rp-stats")).toContainText("Jonli navbat");
   await page.getByRole("button", { name: "Jonli navbat", exact: false }).first().click();
   await expect(page.locator(".rp-table-scroll")).toContainText("№7");
@@ -116,4 +121,42 @@ test("scheduled patient check-in uses appointment version, shows server ticket a
   await form.getByRole("button", { name: "Keldi — navbatga qo‘shish" }).click();
   await expect(form).toContainText("Navbat raqami: 2");
   expect(calls).toBe(1);
+});
+
+test("all patients combines scheduled bookings and walk-ins once, with date filtering after reload", async ({ page }) => {
+  const fixture = await bookingSession(page);
+  fixture.state.rows.push({
+    id: "70000000-0000-4000-8000-000000000020",
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    room_id: ids.room, service_id: ids.service,
+    starts_at: "2026-10-23T05:30:00Z", ends_at: "2026-10-23T06:00:00Z",
+    status: "checked_in", version: 2,
+  });
+  fixture.state.tickets.push({
+    id: "80000000-0000-4000-8000-000000000020",
+    visit_id: "90000000-0000-4000-8000-000000000020",
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    appointment_id: "70000000-0000-4000-8000-000000000020",
+    kind: "scheduled", status: "waiting", local_date: "2026-10-23",
+    number: 1, version: 1,
+  });
+  fixture.state.tickets.push({
+    id: "80000000-0000-4000-8000-000000000021",
+    visit_id: "90000000-0000-4000-8000-000000000021",
+    patient_id: "60000000-0000-4000-8000-000000000002",
+    doctor_id: ids.doctor, branch_id: ids.branch,
+    appointment_id: null, kind: "walk_in", status: "waiting",
+    local_date: "2026-10-23", number: 2, version: 1,
+  });
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-24");
+  await expect(page.locator(".rp-list tbody")).not.toContainText("№2");
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-23");
+  await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
+  await expect(page.locator(".rp-list tbody")).toContainText("Aliyeva Mohira");
+  await expect(page.locator(".rp-list tbody")).toContainText("Bemor 2");
+  await expect(page.locator(".rp-list tbody")).toContainText("№2");
+  await expect(page.locator(".rp-stats")).toContainText("Tanlangan sana bemorlari");
+  await page.reload();
+  await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
+  await expect(page.locator(".rp-list tbody")).toContainText("№2");
 });

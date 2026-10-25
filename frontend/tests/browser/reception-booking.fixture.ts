@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { receptionSession } from "./reception.fixture";
 import { allServerGrants } from "./access.fixture";
+import { localDay } from "../../src/services/receptionTime";
 export const ids = {
   branch: "10000000-0000-4000-8000-000000000001",
   other: "10000000-0000-4000-8000-000000000002",
@@ -37,6 +38,7 @@ export async function bookingSession(
     listDelay: 0,
     duration: 30 as number | null,
     rows: [] as any[],
+    tickets: [] as any[],
   };
   await page.route("**/api/v1/clinic/**", async (route) => {
     const request = route.request(),
@@ -93,6 +95,51 @@ export async function bookingSession(
           timezone: "Asia/Tashkent",
         },
       });
+    }
+    if (path.endsWith("/reception/overview")) {
+      record();
+      const day = url.searchParams.get("local_date") || "2026-10-23";
+      const branch = url.searchParams.get("branch_id");
+      const appointments = state.rows.filter((a) =>
+        (!branch || a.branch_id === branch) &&
+        localDay(a.starts_at, "Asia/Tashkent") === day,
+      );
+      const tickets = state.tickets.filter((t) =>
+        (!branch || t.branch_id === branch) && t.local_date === day,
+      );
+      return route.fulfill({
+        json: {
+          local_date: day,
+          timezone: "Asia/Tashkent",
+          appointments, tickets, visits: [],
+          counts: { scheduled: appointments.filter((a) => a.status === "scheduled").length,
+            waiting: tickets.filter((t) => t.status === "waiting").length },
+        },
+      });
+    }
+    if (/\/visits\/[^/]+$/.test(path) && method === "GET") {
+      record();
+      return route.fulfill({ json: {
+        id: path.split("/").at(-1), service_id: ids.service,
+      } });
+    }
+    if (path.endsWith("/queue-tickets") && method === "GET") {
+      record();
+      const status = url.searchParams.get("status");
+      const branch = url.searchParams.get("branch_id");
+      const date = url.searchParams.get("from")
+        ? localDay(url.searchParams.get("from")!, "Asia/Tashkent") : null;
+      const rows = state.tickets.filter((t) =>
+        (!status || t.status === status) &&
+        (!branch || t.branch_id === branch) &&
+        (!date || t.local_date === date),
+      );
+      const page = Number(url.searchParams.get("page") || 1);
+      const size = Number(url.searchParams.get("per_page") || 8);
+      return route.fulfill({ json: {
+        data: rows.slice((page - 1) * size, page * size),
+        meta: { page, per_page: size, total: rows.length },
+      } });
     }
     if (path.endsWith("/appointments/booking-options")) {
       record();

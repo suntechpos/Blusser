@@ -70,6 +70,10 @@ export async function receptionSession(page: Page, grants:Record<string,string>=
           timezone: "Asia/Tashkent",
         },
       });
+    if (path.endsWith("/clinic/reception/overview")) {
+      return route.fulfill({ json: { local_date: u.searchParams.get("local_date"),
+        timezone: "Asia/Tashkent", appointments: [], visits: [], tickets: [], counts: {} } });
+    }
     if (path.endsWith("/clinic/patients") && req.method() === "GET") {
       const q = u.searchParams.get("q") || "";
       const data = rows.filter((r) =>

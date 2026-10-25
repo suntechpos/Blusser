@@ -341,6 +341,9 @@ test("appointment table paginates on server, filters status/search and reveals a
     ).toISOString(),
     status: "scheduled",
   }));
+  // Appointment-specific server paging remains covered in its own tab.
+  // The "Barcha bemorlar" tab now intentionally combines overview rows.
+  await page.getByRole("button", { name: /Oldindan yozilgan/ }).first().click();
   await page.getByLabel("Qabullar sanasi").fill("2026-10-28");
   await expect(page.locator("tbody tr")).toHaveCount(8);
   await page
@@ -370,6 +373,7 @@ test("appointment table paginates on server, filters status/search and reveals a
   await expect(page.getByLabel("Ro‘yxatdan bemor qidirish")).toHaveValue("");
 
   await page.reload();
+  await page.getByRole("button", { name: /Oldindan yozilgan/ }).first().click();
   await page.getByLabel("Qabullar sanasi").fill("2026-10-28");
   await expect(page.locator("tbody tr")).toHaveCount(8);
 
