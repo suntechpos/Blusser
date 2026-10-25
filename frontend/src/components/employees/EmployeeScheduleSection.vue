@@ -420,6 +420,13 @@ function validate() {
     isDoctor.value &&
     receivesPatients.value &&
     days.value.some((d) => patientDays.value[d]) &&
+    !serviceIds.value.length
+  )
+    error.value = "Bemor qabuli uchun kamida bitta qabul xizmatini tanlang yoki qo‘shing.";
+  else if (
+    isDoctor.value &&
+    receivesPatients.value &&
+    days.value.some((d) => patientDays.value[d]) &&
     !room.value
   )
     error.value = "Qabul xonasini tanlang.";
