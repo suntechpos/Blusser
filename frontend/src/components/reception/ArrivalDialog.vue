@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import axios from "axios";
 import ReceptionDialog from "./ReceptionDialog.vue";
 import ReceptionPatientSearch from "./ReceptionPatientSearch.vue";
@@ -165,6 +165,11 @@ async function createPatient() {
     if (!alive) return;
     selected.value = patientChoice(result.data);
     creating.value = false;
+    // The selected-patient watcher clears confirmation when selection changes.
+    // Wait until it has run before marking patient-only registration complete.
+    // Otherwise a successful POST loses its success message and re-enables submit.
+    await nextTick();
+    if (!alive) return;
     if (mode.value === "patient") {
       completed.value = true;
       confirmation.value = "Bemor bazaga muvaffaqiyatli saqlandi: " + result.data.patient_number;

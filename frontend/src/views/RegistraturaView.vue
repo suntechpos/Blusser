@@ -169,7 +169,7 @@ const tabs = computed(() => [
 ]);
 const stats = computed(() => [
   {
-    name: "Tanlangan sana bemorlari",
+    name: "Qabullar va navbat",
     value: String(allDayCount.value ?? counts.value.all ?? 0),
     icon: Users,
     tone: "blue",
@@ -278,11 +278,11 @@ function updateListState(update: () => void) {
 async function loadQueueCount() {
   const serial = ++queueCountSequence;
   queueCount.value = null;
-  if (!branch.value || !zone.value || !listDate.value || !can("queues.view")) return;
+  if (!branch.value || !zone.value || !today.value || !can("queues.view")) return;
   try {
     const r = await clinicRequest<{ meta: { total: number } }>("queue-tickets", {
       params: { branch_id: branch.value, status: "waiting",
-        ...dayRange(listDate.value, zone.value), page: 1, per_page: 1 },
+        ...dayRange(today.value, zone.value), page: 1, per_page: 1 },
     });
     if (alive && serial === queueCountSequence) queueCount.value = r.data.meta.total;
   } catch {
@@ -291,12 +291,17 @@ async function loadQueueCount() {
 }
 watch([branch, listDate, () => session.epoch], () => {
   allDayCount.value = null;
+}, { immediate: true });
+// Re-read today's queue count when reception refreshes its selected booking
+// date too. The API date remains TODAY; this prevents a stale "0" when the
+// initial queue count loaded before a new ticket was registered.
+watch([branch, today, listDate, () => session.epoch], () => {
   void loadQueueCount();
 }, { immediate: true });
 
 async function loadQueue(serial: number, revision: number) {
   queueRows.value = [];
-  if (!can("queues.view") || !branch.value || !zone.value || !listDate.value) {
+  if (!can("queues.view") || !branch.value || !zone.value || !today.value) {
     error.value = "Navbatlarni ko‘rish uchun ruxsat va filial kerak.";
     loading.value = false;
     return;
@@ -306,7 +311,7 @@ async function loadQueue(serial: number, revision: number) {
       "queue-tickets",
       { params: { branch_id: branch.value,
         ...(doctor.value ? { doctor_id: doctor.value } : {}),
-        ...dayRange(listDate.value, zone.value), page: page.value, per_page: 8 } },
+        ...dayRange(today.value, zone.value), page: page.value, per_page: 8 } },
     );
     const patients = await Promise.all(r.data.data.map(async (row) => {
       if (!can("patients.view")) return null;
@@ -328,9 +333,10 @@ async function loadQueue(serial: number, revision: number) {
     if (alive && serial === listSerial && revision === listRevision) loading.value = false;
   }
 }
-// One branch-local calendar day, fetched through the existing reception overview.
-// Only walk-ins are added to appointments: a scheduled check-in has BOTH an
-// appointment and a ticket and must never be displayed/counted twice.
+// Show appointments on the user-selected day alongside TODAY'S walk-in
+// queue in this branch. Selecting tomorrow must never hide patients waiting
+// at reception now. A scheduled check-in has both an appointment and a ticket,
+// so only unbooked walk-ins are added to avoid counting it twice.
 async function loadUnified(serial: number, revision: number) {
   unifiedRows.value = [];
   if (!branch.value || !zone.value || !listDate.value || !can("reception.view")) {
@@ -347,15 +353,25 @@ async function loadUnified(serial: number, revision: number) {
     }>("reception/overview", {
       params: { branch_id: branch.value, local_date: listDate.value },
     });
-    // A queue ticket linked to a scheduled appointment is represented by that
-    // appointment. Unscheduled walk-ins do not have an appointment row.
+    const liveResponse = listDate.value === today.value
+      ? response
+      : await clinicRequest<{
+          appointments?: BookingAppointment[];
+          tickets?: QueueTicket[];
+        }>("reception/overview", {
+          params: { branch_id: branch.value, local_date: today.value },
+        });
+    // An appointment-linked queue ticket is already represented as a booking.
+    // Walk-ins are always taken from the current clinic-local day, not the
+    // chosen day for scheduled appointments.
+    const todaysWalkIns = (liveResponse.data.tickets ?? []).filter((t) =>
+      t.kind === "walk_in" && !t.appointment_id,
+    );
     const bookings = (response.data.appointments ?? []).filter((a) =>
       (!doctor.value || a.doctor_id === doctor.value) &&
       (!status.value || a.status === status.value),
     );
-    const walkIns = (response.data.tickets ?? []).filter((t) =>
-      t.kind === "walk_in" &&
-      !t.appointment_id &&
+    const walkIns = todaysWalkIns.filter((t) =>
       (!doctor.value || t.doctor_id === doctor.value) &&
       (!status.value ||
         (status.value === "checked_in" && ["waiting", "called", "skipped"].includes(t.status)) ||
@@ -435,16 +451,14 @@ async function loadUnified(serial: number, revision: number) {
       });
       rows.value = projected;
       total.value = combined.length;
-      allDayCount.value = (response.data.appointments?.length ?? 0) +
-        (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && !t.appointment_id).length;
+      allDayCount.value = (response.data.appointments?.length ?? 0) + todaysWalkIns.length;
       counts.value = {
-        all: (response.data.appointments?.length ?? 0) +
-          (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && !t.appointment_id).length,
+        all: (response.data.appointments?.length ?? 0) + todaysWalkIns.length,
         scheduled: (response.data.appointments ?? []).filter((a) => a.status === "scheduled").length,
         in_progress: (response.data.appointments ?? []).filter((a) => a.status === "in_progress").length +
-          (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && t.status === "in_progress").length,
+          todaysWalkIns.filter((t) => t.status === "in_progress").length,
         completed: (response.data.appointments ?? []).filter((a) => a.status === "completed").length +
-          (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && t.status === "completed").length,
+          todaysWalkIns.filter((t) => t.status === "completed").length,
       };
     }
     return { rows: projected, total: combined.length };
@@ -884,7 +898,13 @@ function focusSearch() {
             <DateField v-model="listDate" label="Qabullar sanasi" /></label
           ><button class="rp-link" @click="listDate = today">Bugun</button
            ><button class="rp-link" @click="listDate = nextDay(today)">Ertaga</button
-          ><span>{{ uzDate(listDate) }} qabullari</span>
+          ><span>{{
+            tab === "all"
+              ? uzDate(listDate) + " qabullari + bugungi jonli navbat"
+              : tab === "walk_in"
+                ? "Bugungi jonli navbat"
+                : uzDate(listDate) + " qabullari"
+          }}</span>
         </div>
         <p v-if="catalogError" role="alert" class="rp-error">
           {{ catalogError }}
@@ -947,7 +967,7 @@ function focusSearch() {
                 <td>{{ q.status === 'waiting' ? 'Kutilmoqda' : q.status === 'called' ? 'Chaqirildi' : q.status === 'in_progress' ? 'Qabulda' : q.status === 'completed' ? 'Yakunlangan' : q.status }}</td>
               </tr>
               <tr v-if="!loading && !error && !queueRows.length">
-                <td colspan="5" class="rp-empty">Tanlangan sanada navbat topilmadi.</td>
+                <td colspan="5" class="rp-empty">Bugungi jonli navbatda bemor topilmadi.</td>
               </tr>
             </tbody>
           </table>
@@ -983,7 +1003,7 @@ function focusSearch() {
                   </div></td>
                   <td><strong>{{ entry.ticket.doctorName }}</strong><small>{{ entry.serviceName }}</small></td>
                   <td><span class="rp-badge checked_in">{{ entry.ticket.status === 'waiting' ? 'Navbatda' : entry.ticket.status === 'called' ? 'Chaqirildi' : entry.ticket.status === 'in_progress' ? 'Qabulda' : entry.ticket.status === 'completed' ? 'Yakunlangan' : entry.ticket.status }}</span></td>
-                  <td><strong>№{{ entry.ticket.number }}</strong><small>Jonli navbat</small></td>
+                  <td><strong>№{{ entry.ticket.number }}</strong><small>Bugun · Jonli navbat</small></td>
                   <td><button class="rp-button rp-soft" @click="tab = 'walk_in'"><ClipboardList :size="16" /> Navbat</button></td>
                 </template>
               </tr>
