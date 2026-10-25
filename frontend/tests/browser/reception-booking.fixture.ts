@@ -127,8 +127,12 @@ export async function bookingSession(
       record();
       const status = url.searchParams.get("status");
       const branch = url.searchParams.get("branch_id");
+      const date = url.searchParams.get("from")
+        ? localDay(url.searchParams.get("from")!, "Asia/Tashkent") : null;
       const rows = state.tickets.filter((t) =>
-        (!status || t.status === status) && (!branch || t.branch_id === branch),
+        (!status || t.status === status) &&
+        (!branch || t.branch_id === branch) &&
+        (!date || t.local_date === date),
       );
       const page = Number(url.searchParams.get("page") || 1);
       const size = Number(url.searchParams.get("per_page") || 8);
