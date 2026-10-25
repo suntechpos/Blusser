@@ -122,3 +122,41 @@ test("scheduled patient check-in uses appointment version, shows server ticket a
   await expect(form).toContainText("Navbat raqami: 2");
   expect(calls).toBe(1);
 });
+
+test("all patients combines scheduled bookings and walk-ins once, with date filtering after reload", async ({ page }) => {
+  const fixture = await bookingSession(page);
+  fixture.state.rows.push({
+    id: "70000000-0000-4000-8000-000000000020",
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    room_id: ids.room, service_id: ids.service,
+    starts_at: "2026-10-23T05:30:00Z", ends_at: "2026-10-23T06:00:00Z",
+    status: "checked_in", version: 2,
+  });
+  fixture.state.tickets.push({
+    id: "80000000-0000-4000-8000-000000000020",
+    visit_id: "90000000-0000-4000-8000-000000000020",
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    appointment_id: "70000000-0000-4000-8000-000000000020",
+    kind: "scheduled", status: "waiting", local_date: "2026-10-23",
+    number: 1, version: 1,
+  });
+  fixture.state.tickets.push({
+    id: "80000000-0000-4000-8000-000000000021",
+    visit_id: "90000000-0000-4000-8000-000000000021",
+    patient_id: "60000000-0000-4000-8000-000000000002",
+    doctor_id: ids.doctor, branch_id: ids.branch,
+    appointment_id: null, kind: "walk_in", status: "waiting",
+    local_date: "2026-10-23", number: 2, version: 1,
+  });
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-24");
+  await expect(page.locator(".rp-list tbody")).not.toContainText("№2");
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-23");
+  await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
+  await expect(page.locator(".rp-list tbody")).toContainText("Aliyeva Mohira");
+  await expect(page.locator(".rp-list tbody")).toContainText("Bemor 2");
+  await expect(page.locator(".rp-list tbody")).toContainText("№2");
+  await expect(page.locator(".rp-stats")).toContainText("Tanlangan sana bemorlari");
+  await page.reload();
+  await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
+  await expect(page.locator(".rp-list tbody")).toContainText("№2");
+});
