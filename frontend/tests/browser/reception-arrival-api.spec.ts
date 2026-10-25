@@ -53,7 +53,7 @@ test("existing patient joins real API-shaped walk-in queue once; ticket persists
   expect(fixture.requests.filter((r) => r.method === "POST" && r.path.endsWith("/queue-tickets"))).toHaveLength(1);
   expect(fixture.requests.find((r) => r.method === "POST" && r.path.endsWith("/queue-tickets"))?.headers["idempotency-key"]).toMatch(/^[0-9a-f-]{36}$/);
   expect(fixture.requests.filter((r) => r.method === "POST" && r.path.endsWith("/visits"))).toHaveLength(0);
-  await form.getByRole("button", { name: "Yopish" }).click();
+  await form.locator(".rp-dialog-footer").getByRole("button", { name: "Yopish", exact: true }).click();
   await expect(page.locator(".rp-tabs")).toContainText("Barcha bemorlar");
   await expect(page.locator(".rp-list tbody")).toContainText("Aliyeva Mohira");
   await expect(page.locator(".rp-list tbody")).toContainText("№7");
@@ -77,6 +77,7 @@ test("new patient-only registration calls only patients API; never creates atten
   await form.getByLabel("Tug‘ilgan sana *").fill("1995-05-15");
   await form.getByRole("button", { name: "Bemorni saqlash" }).click();
   await expect(form).toContainText("Bemor bazaga muvaffaqiyatli saqlandi");
+  await expect(form.getByRole("button", { name: "Ro‘yxatga olish", exact: true })).toHaveCount(0);
   const writes = fixture.requests.filter((r) => r.method === "POST");
   expect(writes.filter((r) => r.path.endsWith("/patients"))).toHaveLength(1);
   expect(writes.filter((r) => /\/(appointments|visits|queue-tickets)$/.test(r.path))).toHaveLength(0);
@@ -160,7 +161,7 @@ test("all patients combines scheduled bookings and walk-ins once, with date filt
   await expect(page.locator(".rp-list tbody")).toContainText("Aliyeva Mohira");
   await expect(page.locator(".rp-list tbody")).toContainText("Bemor 2");
   await expect(page.locator(".rp-list tbody")).toContainText("№2");
-  await expect(page.locator(".rp-stats")).toContainText("Tanlangan sana bemorlari");
+  await expect(page.locator(".rp-stats")).toContainText("Qabullar va navbat");
   await page.reload();
   await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
   await expect(page.locator(".rp-list tbody")).toContainText("№2");
