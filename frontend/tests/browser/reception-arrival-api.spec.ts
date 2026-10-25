@@ -149,7 +149,12 @@ test("all patients combines scheduled bookings and walk-ins once, with date filt
     local_date: "2026-10-23", number: 2, version: 1,
   });
   await page.getByLabel("Qabullar sanasi").fill("2026-10-24");
-  await expect(page.locator(".rp-list tbody")).not.toContainText("№2");
+  // Appointment date can change without hiding TODAY'S walk-in.
+  await expect(page.locator(".rp-list tbody")).toContainText("№2");
+  await expect(page.locator(".rp-list tbody")).not.toContainText("Aliyeva Mohira");
+  await page.getByRole("button", { name: /Jonli navbat/ }).first().click();
+  await expect(page.locator(".rp-table-scroll")).toContainText("№2");
+  await page.getByRole("button", { name: /Barcha bemorlar/ }).first().click();
   await page.getByLabel("Qabullar sanasi").fill("2026-10-23");
   await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
   await expect(page.locator(".rp-list tbody")).toContainText("Aliyeva Mohira");
@@ -160,3 +165,40 @@ test("all patients combines scheduled bookings and walk-ins once, with date filt
   await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
   await expect(page.locator(".rp-list tbody")).toContainText("№2");
 });
+
+test("tomorrow's scheduled appointment AND today's live queue remain visible together after refresh", async ({ page }) => {
+  const fixture = await bookingSession(page);
+  fixture.state.rows.push({
+    id: "70000000-0000-4000-8000-000000000030",
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    room_id: ids.room, service_id: ids.service,
+    starts_at: "2026-10-24T04:00:00Z", ends_at: "2026-10-24T04:30:00Z",
+    status: "scheduled", version: 1,
+  });
+  fixture.state.tickets.push({
+    id: "80000000-0000-4000-8000-000000000030",
+    visit_id: "90000000-0000-4000-8000-000000000030",
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    appointment_id: null, kind: "walk_in", status: "waiting",
+    local_date: "2026-10-23", number: 3, version: 1,
+  });
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-24");
+  await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
+  await expect(page.locator(".rp-list tbody")).toContainText("№3");
+  await expect(page.locator(".rp-list tbody")).toContainText("09:00");
+  await expect(page.locator(".rp-list tbody")).toContainText("Bugun · Jonli navbat");
+  await expect(page.locator(".rp-tabs")).toContainText("Barcha bemorlar");
+  await expect(page.locator(".rp-stats")).toContainText("Jonli navbat");
+  await expect(page.getByRole("button", { name: /Jonli navbat/ }).first()).toContainText("1");
+  // Today's live queue is NOT filtered by the scheduled-appointment date.
+  await page.getByRole("button", { name: /Jonli navbat/ }).first().click();
+  await expect(page.locator(".rp-table-scroll")).toContainText("№3");
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-24");
+  await page.getByRole("button", { name: /Barcha bemorlar/ }).first().click();
+  await page.reload();
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-24");
+  await expect(page.locator(".rp-list tbody tr")).toHaveCount(2);
+  await expect(page.locator(".rp-list tbody")).toContainText("№3");
+  await expect(page.locator(".rp-list tbody")).toContainText("09:00");
+});
+
