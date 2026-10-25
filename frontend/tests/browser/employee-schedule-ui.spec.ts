@@ -110,6 +110,7 @@ test("schedule day rows preserve times, prevent duplicates, validate and cancel 
   await section
     .getByLabel("Qabul xonasi", { exact: true })
     .selectOption("ui-option");
+  await section.getByRole("button", { name: "Qabul xizmatlarini tanlash" }).click();
   await section.getByLabel("Shifokor xizmati: UI option").check();
   await section.getByLabel("Chorshanba tugash", { exact: true }).fill("09:00");
   await section
@@ -196,48 +197,54 @@ test("empty room API shows honest empty state without demo IDs", async ({
   await expect(rooms.locator("option:not([disabled])")).toHaveCount(1);
 });
 
-test("doctor can create a real booking service and select it for the employee form", async ({
+test("doctor can search, select and remove multiple real API catalog services", async ({
   page,
 }) => {
-  await editorSession(page);
+  const session = await editorSession(page);
   for (const path of ["specialties", "rooms"]) {
     await page.route(`**/api/v1/clinic/${path}**`, (route) =>
       route.fulfill({ json: { data: [], meta: { total: 0 } } }),
     );
   }
-  const created: Array<{ code: string; name: string; active: boolean }> = [];
-  await page.route("**/api/v1/clinic/appointments/configuration-services**", async (route) => {
-    if (route.request().method() === "POST") {
-      const body = route.request().postDataJSON() as {
-        code: string; name: string; active: boolean;
-      };
-      created.push(body);
-      return route.fulfill({
-        status: 201,
-        json: { id: "service-real-choice", ...body },
-      });
-    }
-    return route.fulfill({ json: { data: [], meta: { total: 0 } } });
+  await page.route("**/api/v1/clinic/appointments/configuration-services**", (route) => {
+    if (route.request().method() !== "GET")
+      return route.fulfill({ status: 405 });
+    return route.fulfill({
+      json: {
+        data: [
+          { id: "service-1", name: "Birlamchi qabul", active: true },
+          { id: "service-2", name: "Takroriy qabul", active: true },
+        ],
+        meta: { total: 2 },
+      },
+    });
   });
+
   await page.getByRole("button", { name: "Xodimlar", exact: true }).click();
   await page.getByRole("button", { name: "Xodim qo‘shish", exact: true }).click();
   await page.getByLabel("Lavozim *", { exact: true }).selectOption("Shifokor");
   const section = page.getByRole("region", { name: "Ish jadvali", exact: true });
   await section.getByLabel("Ish jadvalini saqlash", { exact: true }).check();
   await section.getByLabel("Bemor qabul qiladi", { exact: true }).check();
-  const input = section.getByLabel("Yangi qabul xizmati nomi", { exact: true });
-  await expect(input).toBeVisible();
-  await input.fill("Birlamchi konsultatsiya");
-  await section.getByRole("button", { name: "Xizmat qo‘shish", exact: true }).click();
-  await expect(section.getByLabel("Shifokor xizmati: Birlamchi konsultatsiya"))
-    .toBeChecked();
-  expect(created).toHaveLength(1);
-  expect(created[0]?.name).toBe("Birlamchi konsultatsiya");
-  expect(created[0]?.active).toBe(true);
-  expect(created[0]?.code).toMatch(/^service-[a-f0-9]{20}$/);
-  await input.fill("Birlamchi konsultatsiya");
-  await section.getByRole("button", { name: "Xizmat qo‘shish", exact: true }).click();
-  expect(created).toHaveLength(1);
-  await expect(section.getByText("Mavjud xizmat tanlandi", { exact: false }))
+  await expect(section.getByLabel("Yangi qabul xizmati nomi")).toHaveCount(0);
+  await section.getByRole("button", { name: "Qabul xizmatlarini tanlash" }).click();
+  const search = section.getByRole("searchbox", { name: "Qabul xizmatini qidirish" });
+  await search.fill("Birlamchi");
+  await expect(section.getByLabel("Shifokor xizmati: Birlamchi qabul")).toBeVisible();
+  await expect(section.getByLabel("Shifokor xizmati: Takroriy qabul")).toHaveCount(0);
+  await section.getByLabel("Shifokor xizmati: Birlamchi qabul").check();
+  await search.fill("");
+  await section.getByLabel("Shifokor xizmati: Takroriy qabul").check();
+  await expect(section.getByRole("button", { name: "Qabul xizmatlarini tanlash" }))
+    .toContainText("2 ta xizmat tanlangan");
+  await expect(section.getByRole("button", { name: "Xizmatni olib tashlash: Birlamchi qabul" }))
     .toBeVisible();
+  await section.getByRole("button", { name: "Xizmatni olib tashlash: Birlamchi qabul" }).click();
+  await expect(section.getByLabel("Shifokor xizmati: Birlamchi qabul")).not.toBeChecked();
+  await expect(section.getByLabel("Shifokor xizmati: Takroriy qabul")).toBeChecked();
+  await expect(section.getByRole("button", { name: "Qabul xizmatlarini tanlash" }))
+    .toContainText("1 ta xizmat tanlangan");
+  expect(session.requests.filter((r) =>
+    r.path.includes("configuration-services") && r.method !== "GET",
+  )).toHaveLength(0);
 });
