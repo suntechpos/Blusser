@@ -937,9 +937,10 @@ defineExpose({
                   :aria-label="'Shifokor xizmati: ' + s.name"
                 />{{ s.name }}
               </label>
-              <div
-                v-if="can('services.create') && session.grants?.['services.view'] === 'entire_clinic'"
-                class="employee-booking-service-create"
+            </div>
+            <div
+              v-if="can('services.create') && session.grants?.['services.view'] === 'entire_clinic'"
+              class="employee-booking-service-create"
               >
                 <label>Yangi qabul xizmati
                   <input
@@ -962,7 +963,6 @@ defineExpose({
                 <p class="e-hint">
                   Xizmat katalogga darhol saqlanadi. Shifokorga biriktirish uchun xodimni saqlang.
                 </p>
-              </div>
             </div></template
           >
         </div>
