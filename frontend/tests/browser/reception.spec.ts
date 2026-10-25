@@ -56,6 +56,35 @@ test("doctor dropdown lists API doctors before department selection and auto-sel
   await expect(form.getByLabel("Qabul xizmati *", { exact: true })).toHaveValue(ids.service);
 });
 
+test("registered doctor with no catalog specialty appears and service can be selected", async ({
+  page,
+}) => {
+  await bookingSession(page);
+  await page.route("**/api/v1/clinic/appointments/booking-options**", async (route) => {
+    await route.fulfill({
+      json: {
+        data: [{
+          id: ids.doctor,
+          name: "New configurable doctor",
+          specialty_id: null,
+          specialty_name: null,
+          services: [{ id: ids.service, name: "Birlamchi konsultatsiya", duration_minutes: 30 }],
+        }],
+        timezone: "Asia/Tashkent",
+        meta: { page: 1, per_page: 100, total: 1 },
+      },
+    });
+  });
+  await open(page);
+  const form = dialog(page);
+  await expect(form.getByLabel("Bo‘lim", { exact: true })).toHaveValue("");
+  await expect(form.getByLabel("Shifokor *", { exact: true })).toContainText("New configurable doctor");
+  await form.getByLabel("Shifokor *", { exact: true }).selectOption(ids.doctor);
+  await expect(form.getByLabel("Bo‘lim", { exact: true })).toHaveValue("");
+  await form.getByLabel("Qabul xizmati *", { exact: true }).selectOption(ids.service);
+  await expect(form.getByLabel("Qabul xizmati *", { exact: true })).toHaveValue(ids.service);
+});
+
 test("real API-shaped existing patient booking uses October 28 slot, refreshes that date and never creates a patient", async ({
   page,
 }) => {
