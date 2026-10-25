@@ -111,7 +111,7 @@ test("employee management creates real doctor links and schedule then books a pe
     .getByLabel("Shifokor *", { exact: true })
     .selectOption({ label: "Booking configurable clinician" });
   await d
-    .getByLabel("Qabul turi *", { exact: true })
+    .getByLabel("Qabul xizmati *", { exact: true })
     .selectOption({ label: "Configured consultation · Jadval bo‘yicha" });
   await d.getByLabel("Qabul sanasi", { exact: true }).fill("2030-01-10");
   await expect(d).toContainText("Bu sana uchun ish jadvali sozlanmagan.");

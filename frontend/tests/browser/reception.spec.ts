@@ -25,7 +25,7 @@ async function prepare(page: Page, date = "2026-10-28", time = "10:30") {
     .getByLabel("Shifokor *", { exact: true })
     .selectOption(ids.doctor);
   await dialog(page)
-    .getByLabel("Qabul turi *", { exact: true })
+    .getByLabel("Qabul xizmati *", { exact: true })
     .selectOption(ids.service);
   await dialog(page).getByLabel("Qabul sanasi", { exact: true }).fill(date);
   await dialog(page).getByRole("button", { name: time, exact: true }).click();
@@ -167,7 +167,7 @@ test("patient search debounces and paginates server results; dependencies clear 
     dialog(page).getByLabel("Shifokor *", { exact: true }),
   ).toHaveValue("");
   await expect(
-    dialog(page).getByLabel("Qabul turi *", { exact: true }),
+    dialog(page).getByLabel("Qabul xizmati *", { exact: true }),
   ).toHaveValue("");
   await expect(dialog(page)).toContainText(
     "Bemor tanlangan filialga biriktirilmagan",
@@ -263,7 +263,7 @@ test("empty/error/loading states and mobile dialog keep working", async ({
     .getByLabel("Shifokor *", { exact: true })
     .selectOption(ids.doctor);
   await dialog(page)
-    .getByLabel("Qabul turi *", { exact: true })
+    .getByLabel("Qabul xizmati *", { exact: true })
     .selectOption(ids.service);
   await expect(dialog(page)).toContainText("Bu sanada bo‘sh vaqt yo‘q");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -393,7 +393,7 @@ test("schedule-derived service duration is displayed from authoritative slot tim
     "30 daqiqa",
   );
   await expect(
-    dialog(page).getByLabel("Qabul turi *", { exact: true }),
+    dialog(page).getByLabel("Qabul xizmati *", { exact: true }),
   ).toHaveValue(ids.service);
 });
 
@@ -420,7 +420,7 @@ test("new patient is default; failed appointment retries the saved patient witho
     .getByLabel("Shifokor *", { exact: true })
     .selectOption(ids.doctor);
   await dialog(page)
-    .getByLabel("Qabul turi *", { exact: true })
+    .getByLabel("Qabul xizmati *", { exact: true })
     .selectOption(ids.service);
   await dialog(page)
     .getByLabel("Qabul sanasi", { exact: true })

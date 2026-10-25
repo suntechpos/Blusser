@@ -49,6 +49,9 @@ const branch = ref(props.branchId),
   clinicZone = ref(""),
   serviceIds = ref<string[]>([]),
   room = ref("");
+const newServiceName = ref("");
+const serviceCreating = ref(false);
+const serviceCreateError = ref("");
 const days = ref<number[]>([]),
   separate = ref(true),
   start = ref("09:00"),
@@ -361,12 +364,65 @@ watch(
   },
   { deep: true },
 );
+async function createBookingService() {
+  const name = newServiceName.value.trim();
+  serviceCreateError.value = "";
+  if (!name) {
+    serviceCreateError.value = "Qabul xizmati nomini kiriting.";
+    return;
+  }
+  if (name.length > 255) {
+    serviceCreateError.value = "Xizmat nomi 255 belgidan oshmasin.";
+    return;
+  }
+  if (!can("services.create") || session.grants?.["services.view"] !== "entire_clinic") {
+    serviceCreateError.value = "Qabul xizmati yaratish uchun ruxsat yo‘q.";
+    return;
+  }
+  const existingService = services.value.find(
+    (s) => s.name?.trim().toLocaleLowerCase() === name.toLocaleLowerCase(),
+  );
+  if (existingService) {
+    if (!serviceIds.value.includes(existingService.id))
+      serviceIds.value = [...serviceIds.value, existingService.id];
+    newServiceName.value = "";
+    notice.value = "Mavjud xizmat tanlandi. Shifokorga biriktirish uchun xodimni saqlang.";
+    return;
+  }
+  if (serviceCreating.value) return;
+  serviceCreating.value = true;
+  try {
+    const code = "service-" + crypto.randomUUID().replace(/-/g, "").slice(0, 20);
+    const result = await clinicRequest<Option>("appointments/configuration-services", {
+      method: "POST",
+      body: { code, name, active: true },
+    });
+    const created = { ...result.data, name };
+    services.value = [...services.value, created].sort((a, b) =>
+      (a.name ?? "").localeCompare(b.name ?? ""),
+    );
+    serviceIds.value = [...new Set([...serviceIds.value, created.id])];
+    newServiceName.value = "";
+    notice.value = "Xizmat katalogga qo‘shildi. Shifokorga biriktirish uchun xodimni saqlang.";
+  } catch (e) {
+    serviceCreateError.value = errorText(e);
+  } finally {
+    serviceCreating.value = false;
+  }
+}
 function validate() {
   if (!enabled.value) return true;
   error.value = "";
   if (loading.value || workLoading.value)
     error.value = "Jadval ma’lumotlari yuklanishini kuting.";
   else if (!branch.value) error.value = "Filialni tanlang.";
+  else if (
+    isDoctor.value &&
+    receivesPatients.value &&
+    days.value.some((d) => patientDays.value[d]) &&
+    !serviceIds.value.length
+  )
+    error.value = "Bemor qabuli uchun kamida bitta qabul xizmatini tanlang yoki qo‘shing.";
   else if (
     isDoctor.value &&
     receivesPatients.value &&
@@ -875,15 +931,45 @@ defineExpose({
               </p>
             </div>
             <div class="employee-schedule-services">
-              <label>Shifokorning xizmatlari</label
-              ><label v-for="s in services" :key="s.id"
-                ><input
+              <label>Shifokorning qabul xizmatlari</label>
+              <p v-if="!services.length" class="e-hint">
+                Qabul xizmatlari hali qo‘shilmagan. Xizmatni quyida yarating yoki
+                katalog ruxsatini tekshiring.
+              </p>
+              <label v-for="s in services" :key="s.id">
+                <input
                   v-model="serviceIds"
                   type="checkbox"
                   :value="s.id"
                   :aria-label="'Shifokor xizmati: ' + s.name"
-                />{{ s.name }}</label
+                />{{ s.name }}
+              </label>
+            </div>
+            <div
+              v-if="can('services.create') && session.grants?.['services.view'] === 'entire_clinic'"
+              class="employee-booking-service-create"
               >
+                <label>Yangi qabul xizmati
+                  <input
+                    v-model="newServiceName"
+                    maxlength="255"
+                    aria-label="Yangi qabul xizmati nomi"
+                    placeholder="Masalan: Birlamchi konsultatsiya"
+                    :disabled="serviceCreating"
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="e-button"
+                  :disabled="serviceCreating || !newServiceName.trim()"
+                  @click="createBookingService"
+                >
+                  <PlusCircle :size="17" />{{ serviceCreating ? "Saqlanmoqda…" : "Xizmat qo‘shish" }}
+                </button>
+                <p v-if="serviceCreateError" class="e-error" role="alert">{{ serviceCreateError }}</p>
+                <p class="e-hint">
+                  Xizmat katalogga darhol saqlanadi. Shifokorga biriktirish uchun xodimni saqlang.
+                </p>
             </div></template
           >
         </div>

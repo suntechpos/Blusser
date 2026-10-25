@@ -525,9 +525,9 @@ const summary = computed(() => chosenDoctor.value?.name);
                 errors.doctorId
               }}</small></label
             ><label
-              >Qabul turi <span>*</span
-              ><select v-model="draft.serviceId" aria-label="Qabul turi *">
-                <option value="">Qabul turini tanlang</option>
+              >Qabul xizmati <span>*</span
+              ><select v-model="draft.serviceId" aria-label="Qabul xizmati *">
+                <option value="">Qabul xizmatini tanlang</option>
                 <option v-for="s in services" :key="s.id" :value="s.id">
                   {{ s.name }} ·
                   {{ s.duration ? s.duration + " daqiqa" : "Jadval bo‘yicha" }}
@@ -583,7 +583,7 @@ const summary = computed(() => chosenDoctor.value?.name);
               </button>
             </p>
             <p v-else-if="!draft.doctorId || !draft.serviceId" class="rp-empty">
-              Shifokor va qabul turini tanlang.
+              Shifokor va qabul xizmatini tanlang.
             </p>
             <p v-else-if="!slots.length" class="rp-empty">
               Bu sanada bo‘sh vaqt yo‘q. {{ emptySlotReason }}

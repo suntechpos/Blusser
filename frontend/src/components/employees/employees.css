@@ -1424,6 +1424,28 @@
   overflow-y: auto;
   min-width: 0;
 }
+.employee-booking-service-create {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dbe7fa;
+  border-radius: 10px;
+}
+.employee-booking-service-create > label {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.employee-booking-service-create input {
+  width: 100%;
+}
+.employee-booking-service-create > .e-error,
+.employee-booking-service-create > .e-hint {
+  flex-basis: 100%;
+  margin: 0;
+}
 .employee-schedule-services > label:not(:first-child) {
   display: flex;
   align-items: center;
