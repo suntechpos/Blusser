@@ -518,7 +518,7 @@ async function saved(appointment: BookingAppointment, date: string) {
 function bookSlot(slot: BookingSlot) {
   openBooking({
     doctorId: scheduleDoctor.value,
-    departmentId: sideDoctor.value?.specialty_id,
+    departmentId: sideDoctor.value?.specialty_id ?? undefined,
     serviceId: scheduleService.value,
     slot,
   });
