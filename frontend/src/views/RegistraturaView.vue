@@ -640,9 +640,7 @@ function focusSearch() {
           <p>{{ s.name }}</p>
           <strong>{{ s.value }}</strong
           ><small>{{
-            ["Tushum"].includes(s.name)
-              ? "Hozircha ulanmagan"
-              : "Qabullar API"
+            s.name === "Tushum" ? "Hozircha ulanmagan" : s.name === "Jonli navbat" ? "Navbatlar API" : "Qabullar API"
           }}</small>
         </div>
       </article>
