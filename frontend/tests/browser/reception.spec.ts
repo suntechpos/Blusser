@@ -116,6 +116,39 @@ test("registered doctor with no catalog specialty appears and service can be sel
   await expect(form.getByLabel("Qabul xizmati *", { exact: true })).toHaveValue(ids.service);
 });
 
+
+test("future appointment never hides today's real live queue; explicit reveal switches date", async ({ page }) => {
+  const fixture = await bookingSession(page);
+  fixture.state.tickets.push({
+    id: "80000000-0000-4000-8000-000000000052",
+    visit_id: "90000000-0000-4000-8000-000000000052",
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    appointment_id: null, kind: "walk_in", status: "waiting",
+    local_date: "2026-10-23", number: 2, version: 1,
+  });
+  // Reload initial API read with the queued patient fixture.
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-24");
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-23");
+  await expect(page.locator(".rp-list tbody")).toContainText("№2");
+  await expect(page.getByRole("button", { name: /Jonli navbat/ }).first()).toContainText("1");
+
+  await open(page);
+  await prepare(page, "2026-10-28", "10:30");
+  await submit(page);
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(page.locator(".rp-toast")).toContainText("28-oktabr");
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  await expect(page.locator(".rp-list tbody")).toContainText("№2");
+  await expect(page.locator(".rp-list tbody")).not.toContainText("10:30");
+  // Re-opening the site must keep today's queue rather than hiding it.
+  await page.reload();
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  await expect(page.locator(".rp-list tbody")).toContainText("№2");
+  // The booked future appointment still exists and is visible on its date.
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-28");
+  await expect(page.locator(".rp-list tbody")).toContainText("10:30");
+});
+
 test("real API-shaped existing patient booking uses October 28 slot, refreshes that date and never creates a patient", async ({
   page,
 }) => {
@@ -134,6 +167,9 @@ test("real API-shaped existing patient booking uses October 28 slot, refreshes t
   await expect(page.locator(".rp-toast")).toHaveText(
     /Bemor qabulga muvaffaqiyatli yozildi/,
   );
+  // Future bookings must not silently replace the desk's selected date.
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  await page.getByRole("button", { name: /Yozilgan qabulni ko‘rish/ }).click();
   await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-28");
   await expect(page.locator("tbody")).toContainText("Aliyeva Mohira");
   await expect(page.locator("tbody")).toContainText("10:30");
@@ -286,6 +322,8 @@ test("today excludes past slots, past date cannot post, future date beyond 31 da
       Date.parse(u.searchParams.get("from")!),
   ).toBe(86400000);
   await submit(page);
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  await page.getByRole("button", { name: /Yozilgan qabulni ko‘rish/ }).click();
   await expect(page.locator("tbody")).toContainText("Aliyeva Mohira");
 });
 
@@ -543,6 +581,8 @@ test("new patient is default; failed appointment retries the saved patient witho
     date_of_birth: "1994-03-12",
     branch_id: ids.branch,
   });
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  await page.getByRole("button", { name: /Yozilgan qabulni ko‘rish/ }).click();
   await expect(page.locator("tbody")).toContainText("Karimov Ilhom");
   await page.reload();
   await page.getByLabel("Qabullar sanasi").fill("2026-10-28");
