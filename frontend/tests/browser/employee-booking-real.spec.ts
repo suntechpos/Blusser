@@ -105,7 +105,7 @@ test("employee management creates real doctor links and schedule then books a pe
     .fill("Booking test patient");
   await d.getByRole("button", { name: /Booking test patient/ }).click();
   await d
-    .getByLabel("Bo‘lim *", { exact: true })
+    .getByLabel("Bo‘lim", { exact: true })
     .selectOption({ label: "Configured specialty" });
   await d
     .getByLabel("Shifokor *", { exact: true })
