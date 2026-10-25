@@ -57,7 +57,7 @@ function receptionDateKey(branchId: string): string | null {
     : null;
 }
 function validReceptionDate(value: string | null): value is string {
-  if (!value || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T12:00:00Z`);
   return !Number.isNaN(parsed.getTime()) &&
     parsed.toISOString().slice(0, 10) === value;
