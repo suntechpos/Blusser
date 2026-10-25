@@ -20,19 +20,7 @@ import BookingDialog from "../components/reception/BookingDialog.vue";
 import ArrivalDialog from "../components/reception/ArrivalDialog.vue";
 import ReceptionDialog from "../components/reception/ReceptionDialog.vue";
 import DateField from "../components/employees/DateField.vue";
-import {
-  createReceptionState,
-  doctors as demoDoctors,
-  initials,
-  uzDate,
-  nextPatient,
-  checkIn,
-  blankBooking,
-  availability,
-  type ReceptionPatient,
-  type ReceptionAppointment,
-  type PatientDraft,
-} from "../mocks/reception";
+import { initials, uzDate } from "../mocks/reception";
 import "../components/reception/reception.css";
 import { canReception } from "../services/receptionAccess";
 import { can, session } from "../services/session";
@@ -49,8 +37,6 @@ import {
   type BookingSlot,
   type BookingPreset,
 } from "../services/receptionBooking";
-// Preserve the separate legacy arrival demo; it never supplies the API table.
-const state = ref(createReceptionState());
 const branches = computed(() => session.branches.filter((b) => b.active));
 const branch = ref(session.branch || branches.value[0]?.id || "");
 const zone = computed(
@@ -85,7 +71,6 @@ interface Row extends BookingAppointment {
 const rows = ref<Row[]>([]),
   booking = ref(false),
   arrival = ref(false),
-  preset = ref<ReceptionAppointment>(),
   bookingPreset = ref<BookingPreset>({}),
   detail = ref<Row>(),
   menu = ref("");
@@ -116,9 +101,28 @@ const statusLabels: Record<string, string> = {
   cancelled: "Bekor qilingan",
   no_show: "Kelmagan",
 };
+interface QueueTicket {
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  branch_id: string;
+  number: number;
+  status: string;
+  kind: "scheduled" | "walk_in";
+  local_date: string;
+  version: number;
+}
+interface QueueRow extends QueueTicket {
+  patientName: string;
+  patientNumber: string;
+  doctorName: string;
+}
+const queueRows = ref<QueueRow[]>([]);
+const queueCount = ref<number | null>(null);
+let queueCountSequence = 0;
 const tabs = computed(() => [
   { id: "all", name: "Barcha bemorlar", count: counts.value.all ?? 0 },
-  { id: "walk_in", name: "Jonli navbat", count: "—" },
+  { id: "walk_in", name: "Jonli navbat", count: queueCount.value ?? "—" },
   {
     id: "scheduled",
     name: "Oldindan yozilgan",
@@ -140,7 +144,7 @@ const stats = computed(() => [
     icon: CalendarDays,
     tone: "green",
   },
-  { name: "Jonli navbat", value: "—", icon: Stethoscope, tone: "amber" },
+  { name: "Jonli navbat", value: String(queueCount.value ?? "—"), icon: Stethoscope, tone: "amber" },
   {
     name: "Qabulda",
     value: String(counts.value.in_progress ?? 0),
@@ -214,6 +218,56 @@ function updateListState(update: () => void) {
     changingList = previous;
   }
 }
+async function loadQueueCount() {
+  const serial = ++queueCountSequence;
+  queueCount.value = null;
+  if (!branch.value || !zone.value || !listDate.value || !can("queues.view")) return;
+  try {
+    const r = await clinicRequest<{ meta: { total: number } }>("queue-tickets", {
+      params: { branch_id: branch.value, status: "waiting",
+        ...dayRange(listDate.value, zone.value), page: 1, per_page: 1 },
+    });
+    if (alive && serial === queueCountSequence) queueCount.value = r.data.meta.total;
+  } catch {
+    if (alive && serial === queueCountSequence) queueCount.value = null;
+  }
+}
+watch([branch, listDate, () => session.epoch], () => void loadQueueCount(), { immediate: true });
+
+async function loadQueue(serial: number, revision: number) {
+  queueRows.value = [];
+  if (!can("queues.view") || !branch.value || !zone.value || !listDate.value) {
+    error.value = "Navbatlarni ko‘rish uchun ruxsat va filial kerak.";
+    loading.value = false;
+    return;
+  }
+  try {
+    const r = await clinicRequest<{ data: QueueTicket[]; meta: { total: number } }>(
+      "queue-tickets",
+      { params: { branch_id: branch.value,
+        ...(doctor.value ? { doctor_id: doctor.value } : {}),
+        ...dayRange(listDate.value, zone.value), page: page.value, per_page: 8 } },
+    );
+    const patients = await Promise.all(r.data.data.map(async (row) => {
+      if (!can("patients.view")) return null;
+      const p = await clinicRequest<Patient>("patients/" + row.patient_id);
+      return p.data;
+    }));
+    if (alive && serial === listSerial && revision === listRevision) {
+      queueRows.value = r.data.data.map((row, index) => ({
+        ...row,
+        patientName: patients[index]?.name ?? row.patient_id,
+        patientNumber: patients[index]?.patient_number ?? row.patient_id,
+        doctorName: doctors.value.find((d) => d.id === row.doctor_id)?.name ?? row.doctor_id,
+      }));
+      total.value = r.data.meta.total;
+    }
+  } catch (e) {
+    if (alive && serial === listSerial && revision === listRevision) error.value = errorText(e);
+  } finally {
+    if (alive && serial === listSerial && revision === listRevision) loading.value = false;
+  }
+}
 async function load() {
   const serial = ++listSerial;
   const revision = listRevision;
@@ -221,6 +275,10 @@ async function load() {
   error.value = "";
   rows.value = [];
   total.value = 0;
+  if (tab.value === "walk_in") {
+    await loadQueue(serial, revision);
+    return;
+  }
   if (
     !can("appointments.view") ||
     !branch.value ||
@@ -523,81 +581,17 @@ function bookSlot(slot: BookingSlot) {
     slot,
   });
 }
-function showAppointment(_a: ReceptionAppointment) {
-  toast.value = "Kelish jarayoni — faqat lokal namuna.";
-}
-function openArrival(a?: ReceptionAppointment) {
-  if (
-    a
-      ? !canReception("checkIn")
-      : !canReception("checkIn") && !canReception("walkIn")
-  )
-    return;
-  preset.value = a;
+function openArrival() {
+  if (!canReception("patient") && !canReception("checkIn") && !canReception("walkIn")) return;
   arrival.value = true;
   menu.value = "";
 }
-function createPatient(d: PatientDraft) {
-  if (!canReception("patient"))
-    throw Error("Bemor qo‘shish uchun ruxsat yo‘q.");
-  const p = nextPatient(state.value.patients, d);
-  state.value.patients.push(p);
-  return p;
+async function onArrivalSaved(result: { kind: "scheduled" | "walk_in" | "patient"; number?: number }) {
+  toast.value = result.kind === "patient"
+    ? "Bemor PostgreSQL bazasida saqlandi."
+    : "Bemor navbatga qo‘shildi. Navbat raqami: " + result.number;
+  await Promise.all([load(), loadQueueCount(), loadSide()]);
 }
-function arrive(
-  p: ReceptionPatient,
-  id: string | null,
-  doctorId: string,
-  branchId: string,
-) {
-  if (!canReception(id ? "checkIn" : "walkIn")) return;
-  if (id) {
-    const a = state.value.appointments.find(
-      (a) => a.id === id && a.patientId === p.id,
-    );
-    if (!a || !checkIn(a)) return;
-  } else {
-    if (
-      state.value.appointments.some(
-        (a) => a.patientId === p.id && a.date === today.value,
-      )
-    ) {
-      toast.value = "Bugungi mavjud qabulni tanlang. Bemor qayta qo‘shilmadi.";
-      return;
-    }
-    const d = demoDoctors.find(
-      (d) => d.id === doctorId && d.branches.includes(branchId),
-    );
-    if (
-      !d ||
-      !availability(
-        { ...blankBooking(), doctorId, branchId, departmentId: d.departmentId },
-        state.value.appointments,
-      ).scheduled
-    )
-      return;
-    state.value.appointments.push({
-      id: `A-${state.value.appointments.length + 1}`,
-      patientId: p.id,
-      doctorId,
-      branchId,
-      departmentId: d.departmentId,
-      serviceId: "initial",
-      date: today.value,
-      time: new Date().toTimeString().slice(0, 5),
-      status: "waiting",
-      kind: "walk_in",
-      note: "",
-    });
-  }
-  const appointment =
-    state.value.appointments.find((a) => a.id === id) ??
-    state.value.appointments.at(-1);
-  if (appointment) showAppointment(appointment);
-  arrival.value = false;
-  toast.value = "Keldi — navbatga qo‘shildi (faqat lokal namuna).";
-}
-
 function focusSearch() {
   document.getElementById("reception-query")?.focus();
 }
@@ -627,7 +621,7 @@ function focusSearch() {
         ><button
           class="rp-button rp-primary"
           data-permission="reception.view"
-          :disabled="!canReception('checkIn') && !canReception('walkIn')"
+          :disabled="!canReception('checkIn') && !canReception('walkIn') && !canReception('patient')"
           @click="openArrival()"
         >
           <UserRoundPlus :size="19" /> Bemorni ro‘yxatga olish
@@ -646,7 +640,7 @@ function focusSearch() {
           <p>{{ s.name }}</p>
           <strong>{{ s.value }}</strong
           ><small>{{
-            ["Tushum", "Jonli navbat"].includes(s.name)
+            ["Tushum"].includes(s.name)
               ? "Hozircha ulanmagan"
               : "Qabullar API"
           }}</small>
