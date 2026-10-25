@@ -124,11 +124,12 @@ type UnifiedEntry =
   | { source: "appointment"; appointment: Row }
   | { source: "walk_in"; ticket: QueueRow; serviceName: string };
 const unifiedRows = ref<UnifiedEntry[]>([]);
+const allDayCount = ref<number | null>(null);
 const queueRows = ref<QueueRow[]>([]);
 const queueCount = ref<number | null>(null);
 let queueCountSequence = 0;
 const tabs = computed(() => [
-  { id: "all", name: "Barcha bemorlar", count: counts.value.all ?? 0 },
+  { id: "all", name: "Barcha bemorlar", count: allDayCount.value ?? counts.value.all ?? 0 },
   { id: "walk_in", name: "Jonli navbat", count: queueCount.value ?? "—" },
   {
     id: "scheduled",
@@ -141,7 +142,7 @@ const tabs = computed(() => [
 const stats = computed(() => [
   {
     name: "Tanlangan sana bemorlari",
-    value: String(counts.value.all ?? 0),
+    value: String(allDayCount.value ?? counts.value.all ?? 0),
     icon: Users,
     tone: "blue",
   },
@@ -239,7 +240,10 @@ async function loadQueueCount() {
     if (alive && serial === queueCountSequence) queueCount.value = null;
   }
 }
-watch([branch, listDate, () => session.epoch], () => void loadQueueCount(), { immediate: true });
+watch([branch, listDate, () => session.epoch], () => {
+  allDayCount.value = null;
+  void loadQueueCount();
+}, { immediate: true });
 
 async function loadQueue(serial: number, revision: number) {
   queueRows.value = [];
@@ -349,10 +353,15 @@ async function loadUnified(serial: number, revision: number) {
     const visits = new Map<string, string>();
     if (can("visits.view")) {
       await Promise.all(live.map(async ({ ticket }) => {
-        const response = await clinicRequest<{ service_id: string }>(
-          "visits/" + ticket.visit_id,
-        );
-        visits.set(ticket.visit_id, response.data.service_id);
+        try {
+          const response = await clinicRequest<{ service_id: string }>(
+            "visits/" + ticket.visit_id,
+          );
+          visits.set(ticket.visit_id, response.data.service_id);
+        } catch {
+          // Queue visibility does not imply permission to view every visit.
+          // Do not hide the valid queue ticket when service detail is unavailable.
+        }
       }));
     }
     if (alive && serial === listSerial && revision === listRevision) {
@@ -377,6 +386,8 @@ async function loadUnified(serial: number, revision: number) {
       });
       rows.value = projected;
       total.value = combined.length;
+      allDayCount.value = (response.data.appointments?.length ?? 0) +
+        (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && !t.appointment_id).length;
       counts.value = {
         all: (response.data.appointments?.length ?? 0) +
           (response.data.tickets ?? []).filter((t) => t.kind === "walk_in" && !t.appointment_id).length,
