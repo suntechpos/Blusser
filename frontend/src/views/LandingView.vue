@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
+import blusserLogo from "../assets/blusser-logo-transparent.png";
 import {
-  ArrowRight, BadgeCheck, Building2, CalendarDays, Check, ChevronDown, Cloud,
+  ArrowRight, Building2, CalendarDays, Check, ChevronDown, Cloud,
   CreditCard, FlaskConical, Headphones, Mail, Menu, Monitor, Network, Phone,
   Play, Plus, Send, ShieldCheck, UserRound, UsersRound, X, Zap, Globe,
   ChartNoAxesColumnIncreasing as Chart,
@@ -10,12 +11,13 @@ import {
 const emit = defineEmits<{ login: [] }>();
 const demoHref = "mailto:info@blusser.uz?subject=Blusser%20demo%20so%E2%80%98rovi";
 const menu = ref(false);
+const landing = ref<HTMLElement>();
 const openFaq = ref<number[]>([0]);
 const toggleFaq = (i: number) =>
   (openFaq.value = openFaq.value.includes(i) ? openFaq.value.filter((x) => x !== i) : [...openFaq.value, i]);
 function go(id: string) {
   menu.value = false;
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById(id)?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 }
 onMounted(() => {
   document.title = "Blusser — Klinikangizni aqlli boshqaring";
@@ -23,6 +25,87 @@ onMounted(() => {
   if (!m) { m = document.createElement("meta"); m.setAttribute("name", "description"); document.head.appendChild(m); }
   m.setAttribute("content", "Blusser — xususiy klinikalar uchun yagona boshqaruv platformasi: registratura, bemorlar, shifokorlar, laboratoriya va kassa.");
 });
+
+// Content stays visible by default. Reveal only once it enters the viewport;
+// unsupported observers/animations and reduced motion need no hidden-state fallback.
+let disposeMotion = () => {};
+onMounted(() => {
+  const root = landing.value;
+  if (!root) return;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const compact = window.matchMedia("(max-width: 1000px)");
+  const animations = new Set<Animation>();
+  const rows = [...root.querySelectorAll<HTMLElement>(".q5, .q6")];
+  let observer: IntersectionObserver | undefined;
+  let frame = 0;
+  let stopped = false;
+
+  const updateRows = () => {
+    frame = 0;
+    if (stopped) return;
+    for (const [index, row] of rows.entries()) {
+      if (reduced.matches || compact.matches) {
+        row.style.removeProperty("transform");
+        row.style.removeProperty("--card-travel");
+        continue;
+      }
+      const viewport = row.parentElement!;
+      const bounds = viewport.getBoundingClientRect();
+      const travel = Math.min(36, viewport.clientWidth * 0.025);
+      const progress = Math.max(0, Math.min(1,
+        (window.innerHeight - bounds.top) / (window.innerHeight + bounds.height),
+      ));
+      row.style.setProperty("--card-travel", `${travel}px`);
+      const x = index === 0 ? -travel * progress : -travel * (1 - progress);
+      row.style.transform = `translate3d(${x}px, 0, 0)`;
+    }
+  };
+  const schedule = () => {
+    if (!frame && !stopped) frame = window.requestAnimationFrame(updateRows);
+  };
+  const configure = () => {
+    observer?.disconnect();
+    for (const animation of animations) animation.cancel();
+    animations.clear();
+    if (!reduced.matches && typeof window.IntersectionObserver === "function") {
+      observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          observer?.unobserve(entry.target);
+          const element = entry.target as HTMLElement;
+          if (typeof element.animate !== "function") continue;
+          const direction = element.dataset.reveal;
+          const from = direction === "left" ? "translate3d(-24px,0,0)"
+            : direction === "right" ? "translate3d(24px,0,0)" : "translate3d(0,20px,0)";
+          const animation = element.animate([
+            { opacity: 0, transform: from }, { opacity: 1, transform: "translate3d(0,0,0)" },
+          ], { duration: 600, delay: Number(element.dataset.revealDelay ?? 0),
+            easing: "cubic-bezier(.2,.65,.3,1)", fill: "backwards" });
+          animations.add(animation);
+          animation.onfinish = () => animations.delete(animation);
+        }
+      }, { threshold: 0.08 });
+      root.querySelectorAll("[data-reveal]").forEach((element) => observer!.observe(element));
+    }
+    schedule();
+  };
+  configure();
+  window.addEventListener("scroll", schedule, { passive: true });
+  window.addEventListener("resize", schedule, { passive: true });
+  reduced.addEventListener("change", configure);
+  compact.addEventListener("change", schedule);
+  disposeMotion = () => {
+    stopped = true;
+    observer?.disconnect();
+    window.cancelAnimationFrame(frame);
+    animations.forEach((animation) => animation.cancel());
+    window.removeEventListener("scroll", schedule);
+    window.removeEventListener("resize", schedule);
+    reduced.removeEventListener("change", configure);
+    compact.removeEventListener("change", schedule);
+  };
+});
+onUnmounted(() => disposeMotion());
 
 const nav = [["Imkoniyatlar", "features"], ["Afzalliklar", "why"], ["Tariflar", "pricing"], ["FAQ", "faq"], ["Kontakt", "contact"]];
 const quick = [
@@ -76,10 +159,10 @@ const foot = [
 </script>
 
 <template>
-  <div class="lp">
+  <div ref="landing" class="lp">
     <header class="hd">
       <div class="wrap hd-in">
-        <a class="logo" href="#top" aria-label="Blusser" @click.prevent="go('top')"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><rect x="2" y="2" width="14" height="9" rx="3" fill="#1d6bff"/><rect x="6" y="9" width="16" height="6" rx="3" fill="#19c3c9"/><rect x="2" y="13" width="14" height="9" rx="3" fill="#1d6bff"/></svg>Blusser</a>
+        <a class="logo" href="#top" aria-label="Blusser" @click.prevent="go('top')"><img class="brand-image" :src="blusserLogo" alt="Blusser — Medical Software" width="2146" height="733" fetchpriority="high" /></a>
         <nav class="nav" aria-label="Asosiy">
           <button v-for="n in nav" :key="n[1]" @click="go(n[1])">{{ n[0] }}<ChevronDown v-if="n[0] === 'Imkoniyatlar'" :size="12" /></button>
         </nav>
@@ -97,7 +180,7 @@ const foot = [
 
     <main id="top">
       <section class="hero wrap">
-        <div class="hero-t">
+        <div class="hero-t" data-reveal>
           <span class="tag">KLINIKALAR UCHUN YAGONA PLATFORMA</span>
           <h1>Klinikangizni<br /><span class="grad">aqlli boshqaring</span></h1>
           <p>Registratura, bemorlar, shifokorlar, xodimlar, filiallar va moliyaviy jarayonlarni yagona tizimda boshqaring. Blusser — zamonaviy klinikalar uchun ishonchli raqamli yechim.</p>
@@ -106,7 +189,7 @@ const foot = [
             <button class="btn out" disabled title="Video hozircha mavjud emas"><Play :size="16" /> Tizim haqida video</button>
           </div>
         </div>
-        <div class="dash" aria-label="Blusser dashboard ko‘rinishi"><span class="dash-orbit" aria-hidden="true" />
+        <div class="dash" data-reveal data-reveal-delay="100" aria-label="Blusser dashboard ko‘rinishi"><span class="dash-orbit" aria-hidden="true" />
           <div class="d-top"><b class="logo sm2">Blusser</b><span class="d-s">Bemor qidirish…</span><span class="d-u">Dr. Bekzod</span></div>
           <div class="d-body">
             <ul class="d-side"><li class="on">Asosiy sahifa</li><li>Bemorlar</li><li>Qabul jadvali</li><li>Shifokorlar</li><li>Laboratoriya</li><li>Kassa va moliya</li><li>Hisobotlar</li><li>Filiallar</li></ul>
@@ -122,18 +205,18 @@ const foot = [
         </div>
       </section>
 
-      <section class="wrap"><div class="q5"><div v-for="q in quick" :key="q[1] as string" class="qc"><span class="ic"><component :is="q[0]" :size="20" /></span><div><b>{{ q[1] }}</b><small>{{ q[2] }}</small></div></div></div></section>
-      <section id="features" class="wrap"><div class="q6"><div v-for="m in modules" :key="m[1] as string" class="qc"><span class="ic"><component :is="m[0]" :size="20" /></span><div><b>{{ m[1] }}</b><small>{{ m[2] }}</small></div></div></div></section>
+      <section class="wrap"><div class="feature-window"><div class="q5"><div v-for="(q, i) in quick" :key="q[1] as string" class="qc" data-reveal :data-reveal-delay="i * 60"><span class="ic"><component :is="q[0]" :size="20" /></span><div><b>{{ q[1] }}</b><small>{{ q[2] }}</small></div></div></div></div></section>
+      <section id="features" class="wrap"><div class="feature-window"><div class="q6"><div v-for="(m, i) in modules" :key="m[1] as string" class="qc" data-reveal :data-reveal-delay="i * 50"><span class="ic"><component :is="m[0]" :size="20" /></span><div><b>{{ m[1] }}</b><small>{{ m[2] }}</small></div></div></div></div></section>
 
       <section class="wrap cmp">
-        <div class="cm bad"><span class="pill r">Hozirgi holat</span><div class="ph paper" aria-hidden="true"><img src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&amp;fit=crop&amp;w=560&amp;q=78" loading="lazy" alt="" /></div><ul><li v-for="b in bad" :key="b"><X :size="14" class="mk r" />{{ b }}</li></ul></div>
+        <div class="cm bad" data-reveal="left"><span class="pill r">Hozirgi holat</span><div class="ph paper" aria-hidden="true"><img src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&amp;fit=crop&amp;w=560&amp;q=78" loading="lazy" alt="" /></div><ul><li v-for="b in bad" :key="b"><X :size="14" class="mk r" />{{ b }}</li></ul></div>
         <span class="mid"><ArrowRight :size="18" /></span>
-        <div class="cm good"><span class="pill g">Blusser bilan</span><div class="ph doc" aria-hidden="true"><img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&amp;fit=crop&amp;w=560&amp;q=78" loading="lazy" alt="" /></div><ul><li v-for="g in good" :key="g"><Check :size="14" class="mk g" />{{ g }}</li></ul></div>
+        <div class="cm good" data-reveal="right"><span class="pill g">Blusser bilan</span><div class="ph doc" aria-hidden="true"><img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&amp;fit=crop&amp;w=560&amp;q=78" loading="lazy" alt="" /></div><ul><li v-for="g in good" :key="g"><Check :size="14" class="mk g" />{{ g }}</li></ul></div>
       </section>
 
-      <section class="wrap sec"><h2>Blusser bilan nimalarni boshqarasiz?</h2><p class="sub">Klinikangizning barcha jarayonlari uchun yagona, qulay va samarali yechim.</p>
+      <section class="wrap sec"><h2 data-reveal>Blusser bilan nimalarni boshqarasiz?</h2><p class="sub">Klinikangizning barcha jarayonlari uchun yagona, qulay va samarali yechim.</p>
         <div class="g3">
-          <article v-for="c in cards" :key="c.title" class="card">
+          <article v-for="(c, i) in cards" :key="c.title" class="card" data-reveal :data-reveal-delay="(i % 3) * 80">
             <div class="card-h"><span class="ic big"><component :is="c.icon" :size="26" /></span><div><h3>{{ c.title }}</h3><p>{{ c.text }}</p></div></div>
             <div class="pv"><small>{{ c.head }}</small>
               <div v-if="c.title === 'Hisobotlar'" class="mini wide"><i v-for="b in bars" :key="b[0]" :style="{ height: b[1] + '%' }"><em>{{ b[0] }}</em></i></div>
@@ -143,25 +226,25 @@ const foot = [
         </div>
       </section>
 
-      <section id="why" class="wrap sec why"><h2>Nima uchun klinikalar Blusserni tanlaydi?</h2><p class="sub">Sizning muvaffaqiyatingiz — bizning ustuvor vazifamiz.</p>
+      <section id="why" class="wrap sec why" data-reveal><h2>Nima uchun klinikalar Blusserni tanlaydi?</h2><p class="sub">Sizning muvaffaqiyatingiz — bizning ustuvor vazifamiz.</p>
         <div class="w-row"><div class="w4"><div v-for="w in why" :key="w[1] as string" class="qc col"><span class="ic"><component :is="w[0]" :size="20" /></span><div><b>{{ w[1] }}</b><small>{{ w[2] }}</small></div></div></div><div class="ph doc2" aria-hidden="true"><img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&amp;fit=crop&amp;w=560&amp;q=78" loading="lazy" alt="" /><span class="doc2-shield"><ShieldCheck :size="28" /></span></div></div>
       </section>
 
-      <section id="pricing" class="wrap sec"><h2>Tariflar</h2><p class="sub">Klinikangiz ehtiyojiga mos tarifni tanlang.</p>
-        <div class="g3 plans"><article v-for="p in plans" :key="p.name" class="plan" :class="{ hot: p.hot }"><span v-if="p.hot" class="pop">Eng ommabop</span><h3>{{ p.name }}</h3><p class="sub s2">{{ p.sub }}</p>
+      <section id="pricing" class="wrap sec"><h2 data-reveal>Tariflar</h2><p class="sub">Klinikangiz ehtiyojiga mos tarifni tanlang.</p>
+        <div class="g3 plans"><article v-for="(p, i) in plans" :key="p.name" class="plan" data-reveal :data-reveal-delay="i * 80" :class="{ hot: p.hot }"><span v-if="p.hot" class="pop">Eng ommabop</span><h3>{{ p.name }}</h3><p class="sub s2">{{ p.sub }}</p>
           <ul><li v-for="i in p.items" :key="i"><Check :size="14" class="mk g" />{{ i }}</li></ul><b class="price">{{ p.price }}</b>
           <a class="btn sm" :class="p.hot ? 'pri' : 'out'" :href="demoHref">{{ p.cta }} <ArrowRight :size="14" /></a></article></div>
       </section>
 
-      <section id="faq" class="wrap sec faq"><h2 class="l">Ko‘p so‘raladigan savollar</h2><p class="sub l">Sizni qiziqtirgan savollarga javoblar.</p>
+      <section id="faq" class="wrap sec faq" data-reveal><h2 class="l">Ko‘p so‘raladigan savollar</h2><p class="sub l">Sizni qiziqtirgan savollarga javoblar.</p>
         <div class="fq"><div v-for="(f, i) in faqs" :key="f[0]" class="fi"><button :aria-expanded="openFaq.includes(i)" @click="toggleFaq(i)"><component :is="openFaq.includes(i) ? Zap : Plus" :size="14" class="mk b" />{{ f[0] }}<ChevronDown :size="16" class="chev" :class="{ up: openFaq.includes(i) }" /></button><p v-show="openFaq.includes(i)">{{ f[1] }}</p></div></div>
       </section>
 
-      <section class="wrap"><div class="cta"><div><h2>Klinikangizni raqamli boshqaruvga olib chiqing</h2><p>Demo so‘rang va Blusser klinikangizga qanday mos tushishini ko‘ring.</p></div><div class="row"><a class="btn wh" :href="demoHref">Demo so‘rash <ArrowRight :size="16" /></a><button class="btn ol" @click="go('contact')">Kontakt</button></div></div></section>
+      <section class="wrap"><div class="cta" data-reveal><div><h2>Klinikangizni raqamli boshqaruvga olib chiqing</h2><p>Demo so‘rang va Blusser klinikangizga qanday mos tushishini ko‘ring.</p></div><div class="row"><a class="btn wh" :href="demoHref">Demo so‘rash <ArrowRight :size="16" /></a><button class="btn ol" @click="go('contact')">Kontakt</button></div></div></section>
     </main>
 
-    <footer id="contact" class="ft"><div class="wrap">
-      <div class="ft-g"><div><b class="logo w">Blusser</b><p>Zamonaviy klinikalar uchun yagona raqamli boshqaruv platformasi.</p><div class="soc"><Send :size="16" /><span>IG</span><span>YT</span><span>in</span></div></div>
+    <footer id="contact" class="ft"><div class="wrap" data-reveal>
+      <div class="ft-g"><div><a class="logo footer-brand" href="#top" @click.prevent="go('top')"><img class="brand-image" :src="blusserLogo" alt="Blusser — Medical Software" width="2146" height="733" loading="lazy" /></a><p>Zamonaviy klinikalar uchun yagona raqamli boshqaruv platformasi.</p><div class="soc"><Send :size="16" /><span>IG</span><span>YT</span><span>in</span></div></div>
         <div v-for="c in foot" :key="c[0] as string"><h4>{{ c[0] }}</h4><button v-for="l in c[1] as string[][]" :key="l[0]" @click="go(l[1])">{{ l[0] }}</button></div>
         <div><h4>Aloqa</h4><a href="mailto:info@blusser.uz"><Mail :size="14" /> info@blusser.uz</a><a href="tel:+998900000000"><Phone :size="14" /> +998 90 000 00 00</a><a href="https://t.me/" rel="noopener"><Send :size="14" /> Telegram</a></div></div>
       <div class="ft-b"><span>© 2026 Blusser. Barcha huquqlar himoyalangan.</span><span>Sog‘lom jamiyat uchun raqamli yechimlar.</span></div></div></footer>
@@ -374,6 +457,24 @@ h1{font-size:clamp(38px,5.6vw,64px);line-height:1.04;margin:20px 0 18px;font-wei
 }
 @media(prefers-reduced-motion:reduce){
 .lp *, .lp *::before, .lp *::after{scroll-behavior:auto!important;transition:none!important}
+}
+
+/* Original wordmark and bounded, scroll-driven feature rows. */
+.lp .hd .logo{flex-shrink:0}
+.lp .brand-image{display:block;width:164px;height:auto;max-width:100%;object-fit:contain}
+.lp .ft .footer-brand{display:inline-flex;background:#fff;border-radius:10px;padding:8px 12px;margin-bottom:0}
+.lp .ft .brand-image{width:180px}
+.lp .feature-window{overflow:clip;padding:10px 0 12px}
+.lp .feature-window .q5,.lp .feature-window .q6{width:calc(100% + var(--card-travel,0px));margin:0;will-change:transform}
+.lp #features .feature-window{padding-top:4px}
+.lp [data-reveal]{scroll-margin-top:84px}
+.lp [data-reveal]:focus-within{opacity:1!important;transform:none!important}
+@media(max-width:1000px){
+.lp .feature-window .q5,.lp .feature-window .q6{width:100%;transform:none!important;will-change:auto}
+}
+@media(max-width:640px){.lp .brand-image{width:148px}}
+@media(prefers-reduced-motion:reduce){
+.lp .feature-window .q5,.lp .feature-window .q6{width:100%;transform:none!important;will-change:auto}
 }
 
 </style>
