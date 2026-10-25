@@ -19,7 +19,7 @@ async function prepare(page: Page, date = "2026-10-28", time = "10:30") {
     .getByRole("button", { name: /Aliyeva Mohira/ })
     .click();
   await dialog(page)
-    .getByLabel("Bo‘lim *", { exact: true })
+    .getByLabel("Bo‘lim", { exact: true })
     .selectOption(ids.specialty);
   await dialog(page)
     .getByLabel("Shifokor *", { exact: true })
@@ -45,11 +45,11 @@ test("doctor dropdown lists API doctors before department selection and auto-sel
   await bookingSession(page);
   await open(page);
   const form = dialog(page);
-  await expect(form.getByLabel("Bo‘lim *", { exact: true })).toHaveValue("");
+  await expect(form.getByLabel("Bo‘lim", { exact: true })).toHaveValue("");
   await expect(form.getByLabel("Shifokor *", { exact: true }))
     .toContainText("Aziz Karimov");
   await form.getByLabel("Shifokor *", { exact: true }).selectOption(ids.doctor);
-  await expect(form.getByLabel("Bo‘lim *", { exact: true })).toHaveValue(ids.specialty);
+  await expect(form.getByLabel("Bo‘lim", { exact: true })).toHaveValue(ids.specialty);
   await expect(form.getByLabel("Qabul xizmati *", { exact: true }))
     .toContainText("Birlamchi konsultatsiya");
   await form.getByLabel("Qabul xizmati *", { exact: true }).selectOption(ids.service);
@@ -274,7 +274,7 @@ test("empty/error/loading states and mobile dialog keep working", async ({
     .getByRole("button", { name: /Aliyeva Mohira/ })
     .click();
   await dialog(page)
-    .getByLabel("Bo‘lim *", { exact: true })
+    .getByLabel("Bo‘lim", { exact: true })
     .selectOption(ids.specialty);
   await dialog(page)
     .getByLabel("Shifokor *", { exact: true })
@@ -431,7 +431,7 @@ test("new patient is default; failed appointment retries the saved patient witho
     .getByLabel("Tug‘ilgan sana", { exact: true })
     .fill("1994-03-12");
   await dialog(page)
-    .getByLabel("Bo‘lim *", { exact: true })
+    .getByLabel("Bo‘lim", { exact: true })
     .selectOption(ids.specialty);
   await dialog(page)
     .getByLabel("Shifokor *", { exact: true })
