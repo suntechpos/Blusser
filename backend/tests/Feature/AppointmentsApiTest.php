@@ -458,6 +458,50 @@ final class AppointmentsApiTest extends FoundationTestCase
         $this->denied(fn () => $this->command($a), 'conflict');
     }
 
+    public function test_late_patient_can_check_in_within_grace_window_without_duplicate_visit(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $db = DB::connection('migration');
+        $db->table('branches')->where('id', $a['branch'])->update(['timezone' => 'Asia/Tashkent']);
+        $db->table('doctor_services')->where('doctor_id', $a['doctor']['id'])->update(['duration_minutes' => 1]);
+
+        // Start with a future, valid reservation; advance its two booked
+        // timestamps together to the current clinic day in this test-only DB.
+        $future = [...$this->data($a), 'ends_at' => '2030-01-07T09:01:00+05:00'];
+        $appt = $this->command($a, 'create', data: $future);
+        $dbNow = CarbonImmutable::parse($db->selectOne('SELECT clock_timestamp() AS instant')->instant);
+        $start = $dbNow->setTimezone('Asia/Tashkent')->subMinutes(4)->startOfMinute();
+        if ($start->format('H:i') === '23:59') {
+            $start = $start->subMinute();
+        }
+        $end = $start->addMinute();
+        $rule = [
+            ...$this->rule($a),
+            'weekday' => $start->isoWeekday(),
+            'local_start' => '00:00',
+            'local_end' => '23:59',
+            'slot_minutes' => 1,
+            'effective_from' => $start->toDateString(),
+            'effective_to' => $start->toDateString(),
+            'breaks' => [],
+        ];
+        $this->scheduleCommand($a, 'schedules', $rule);
+        $db->transaction(function () use ($db, $appt, $start, $end) {
+            $db->table('appointments')->where('id', $appt['id'])->update(['starts_at' => $start, 'ends_at' => $end]);
+            $db->table('resource_reservations')->where('appointment_id', $appt['id'])->update(['starts_at' => $start, 'ends_at' => $end]);
+        });
+
+        $this->assertTrue(app(Appointments::class)->show($this->actor($a['user']), $a['tenant'], 'appointments', $appt['id'])['late']);
+        $key = (string) Str::uuid();
+        $att = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1], $key);
+        $this->assertSame('checked_in', $att['appointment']['status']);
+        $this->assertSame('waiting', $att['ticket']['status']);
+        $replayed = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1], $key);
+        $this->assertSame($att['visit']['id'], $replayed['visit']['id']);
+        $this->denied(fn () => $this->command($a, 'check_in', $appt['id'], ['expected_version' => 2]), 'conflict');
+        $this->assertSame(1, $db->table('queue_tickets')->count());
+    }
+
     public function test_late_no_show_and_reschedule_before_checkin(): void
     {
         $a = $this->reference($this->fixture()['a']);
