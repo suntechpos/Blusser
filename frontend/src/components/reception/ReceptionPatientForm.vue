@@ -3,7 +3,7 @@ import DateField from "../employees/DateField.vue";
 import type { PatientDraft } from "../../mocks/reception";
 import { localDate } from "../../mocks/reception";
 const model = defineModel<PatientDraft>({ required: true });
-defineProps<{ errors: Record<string, string> }>();
+defineProps<{ errors: Record<string, string>; maxDate?: string }>();
 </script>
 <template>
   <div class="rp-form-grid">
@@ -48,7 +48,7 @@ defineProps<{ errors: Record<string, string> }>();
       ><DateField
         v-model="model.dob"
         label="Tug‘ilgan sana *"
-        :max="localDate()"
+        :max="maxDate || localDate()"
       /><small v-if="errors.dob" class="rp-error">{{
         errors.dob
       }}</small></label

@@ -46,7 +46,7 @@ test("booking an existing patient does not grant new-patient creation", async ({
   await expect(page.getByRole("dialog")).toBeVisible();
 });
 
-test("check-in also requires visit and queue creation; UI cannot rely on label matching", async ({
+test("without queue creation permission, patient registration stays available but walk-in is blocked", async ({
   page,
 }) => {
   const grants = { ...allServerGrants };
@@ -58,10 +58,13 @@ test("check-in also requires visit and queue creation; UI cannot rely on label m
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Bemorni ro‘yxatga olish", exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Bemorni ro‘yxatga olish", exact: true }).click();
+  const form = page.getByRole("dialog", { name: "Bemorni ro‘yxatga olish" });
+  await expect(form.getByRole("button", { name: "Jonli navbatga qo‘shish" })).toBeDisabled();
+  await form.getByRole("button", { name: "Faqat ro‘yxatga olish" }).click();
+  await expect(form.getByRole("button", { name: "+ Yangi bemor qo‘shish" })).toBeEnabled();
   await expect(
-    page
-      .locator(".rp-heading-actions")
-      .getByRole("button", { name: "Qabulga yozish", exact: true }),
+    page.locator(".rp-heading-actions").getByRole("button", { name: "Qabulga yozish", exact: true }),
   ).toBeEnabled();
 });
