@@ -292,7 +292,10 @@ async function loadQueueCount() {
 watch([branch, listDate, () => session.epoch], () => {
   allDayCount.value = null;
 }, { immediate: true });
-watch([branch, today, () => session.epoch], () => {
+// Re-read today's queue count when reception refreshes its selected booking
+// date too. The API date remains TODAY; this prevents a stale "0" when the
+// initial queue count loaded before a new ticket was registered.
+watch([branch, today, listDate, () => session.epoch], () => {
   void loadQueueCount();
 }, { immediate: true });
 
