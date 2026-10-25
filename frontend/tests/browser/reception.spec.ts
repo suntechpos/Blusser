@@ -67,6 +67,11 @@ test("reception remembers its selected date through refresh and keeps dates isol
   }, ids.other);
   expect(persistedDate).toBe("2026-10-23");
   await page.reload();
+  // The global branch selection is not persisted: a new session uses the
+  // default branch. Each branch's selected date IS persisted independently.
+  await expect(page.getByLabel("Qabullar filiali")).toHaveValue(ids.branch);
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-28");
+  await page.getByLabel("Qabullar filiali").selectOption(ids.other);
   await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
 });
 
