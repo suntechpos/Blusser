@@ -39,6 +39,23 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-23T03:01:00Z"));
 });
 
+test("doctor dropdown lists API doctors before department selection and auto-selects their department", async ({
+  page,
+}) => {
+  await bookingSession(page);
+  await open(page);
+  const form = dialog(page);
+  await expect(form.getByLabel("Bo‘lim *", { exact: true })).toHaveValue("");
+  await expect(form.getByLabel("Shifokor *", { exact: true }))
+    .toContainText("Aziz Karimov");
+  await form.getByLabel("Shifokor *", { exact: true }).selectOption(ids.doctor);
+  await expect(form.getByLabel("Bo‘lim *", { exact: true })).toHaveValue(ids.specialty);
+  await expect(form.getByLabel("Qabul xizmati *", { exact: true }))
+    .toContainText("Birlamchi konsultatsiya");
+  await form.getByLabel("Qabul xizmati *", { exact: true }).selectOption(ids.service);
+  await expect(form.getByLabel("Qabul xizmati *", { exact: true })).toHaveValue(ids.service);
+});
+
 test("real API-shaped existing patient booking uses October 28 slot, refreshes that date and never creates a patient", async ({
   page,
 }) => {
