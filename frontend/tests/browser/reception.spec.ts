@@ -67,6 +67,11 @@ test("reception remembers its selected date through refresh and keeps dates isol
   }, ids.other);
   expect(persistedDate).toBe("2026-10-23");
   await page.reload();
+  // Global branch selection resets on reload. Persisted dates are scoped to
+  // individual branches; verify both after switching explicitly.
+  await expect(page.getByLabel("Qabullar filiali")).toHaveValue(ids.branch);
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-28");
+  await page.getByLabel("Qabullar filiali").selectOption(ids.other);
   await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
 });
 
@@ -164,9 +169,10 @@ test("real API-shaped existing patient booking uses October 28 slot, refreshes t
   await dialog(page).screenshot({ path: "/tmp/reception-booking-modal.png" });
   await submit(page);
   await expect(dialog(page)).toHaveCount(0);
-  await expect(page.locator(".rp-toast")).toHaveText(
-    /Bemor qabulga muvaffaqiyatli yozildi/,
+  await expect(page.locator(".rp-toast")).toContainText(
+    "28-oktabr, 2026 sanasiga muvaffaqiyatli yozildi",
   );
+  await expect(page.getByRole("button", { name: /Yozilgan qabulni ko‘rish/ })).toBeVisible();
   // Future bookings must not silently replace the desk's selected date.
   await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
   await page.getByRole("button", { name: /Yozilgan qabulni ko‘rish/ }).click();
