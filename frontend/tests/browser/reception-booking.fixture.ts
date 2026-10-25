@@ -37,6 +37,7 @@ export async function bookingSession(
     listDelay: 0,
     duration: 30 as number | null,
     rows: [] as any[],
+    tickets: [] as any[],
   };
   await page.route("**/api/v1/clinic/**", async (route) => {
     const request = route.request(),
@@ -93,6 +94,33 @@ export async function bookingSession(
           timezone: "Asia/Tashkent",
         },
       });
+    }
+    if (path.endsWith("/reception/overview")) {
+      record();
+      const day = url.searchParams.get("local_date") || "2026-10-23";
+      const branch = url.searchParams.get("branch_id");
+      const appointments = state.rows.filter((a) =>
+        (!branch || a.branch_id === branch) &&
+        new Date(a.starts_at).toLocaleDateString("en-CA", { timeZone: "Asia/Tashkent" }) === day,
+      );
+      const tickets = state.tickets.filter((t) =>
+        (!branch || t.branch_id === branch) && t.local_date === day,
+      );
+      return route.fulfill({
+        json: {
+          local_date: day,
+          timezone: "Asia/Tashkent",
+          appointments, tickets, visits: [],
+          counts: { scheduled: appointments.filter((a) => a.status === "scheduled").length,
+            waiting: tickets.filter((t) => t.status === "waiting").length },
+        },
+      });
+    }
+    if (/\/visits\/[^/]+$/.test(path) && method === "GET") {
+      record();
+      return route.fulfill({ json: {
+        id: path.split("/").at(-1), service_id: ids.service,
+      } });
     }
     if (path.endsWith("/appointments/booking-options")) {
       record();
