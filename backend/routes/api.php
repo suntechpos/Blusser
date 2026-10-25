@@ -9,6 +9,7 @@ use App\Modules\Platform\Http\HealthController;
 use App\Modules\Queues\Http\QueueController;
 use App\Modules\Scheduling\Http\EmployeeWorkController;
 use App\Modules\Scheduling\Http\SchedulingController;
+use App\Modules\Services\Http\ServiceCatalogController;
 use App\Modules\Tenancy\Http\ClinicController;
 use App\Modules\Tenancy\Http\ContextController;
 use Illuminate\Support\Facades\Route;
@@ -44,8 +45,14 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                     }
                     Route::put($kind.'/{id}', [SchedulingController::class, 'update'])->whereUuid('id')->defaults('resourceKind', $kind);
                 }
-                Route::get('appointments/configuration-services', [SchedulingController::class, 'index'])->defaults('resourceKind', 'services');
-                Route::post('appointments/configuration-services', [SchedulingController::class, 'store'])->defaults('resourceKind', 'services');
+                Route::get('appointments/configuration-services/export', [ServiceCatalogController::class, 'export']);
+                foreach (['appointments/configuration-services' => 'services', 'service-categories' => 'categories'] as $path => $kind) {
+                    Route::get($path, [ServiceCatalogController::class, 'index'])->defaults('catalogKind', $kind);
+                    Route::post($path, [ServiceCatalogController::class, 'store'])->defaults('catalogKind', $kind);
+                    Route::put($path.'/{id}', [ServiceCatalogController::class, 'update'])->whereUuid('id')->defaults('catalogKind', $kind);
+                    Route::post($path.'/{id}/status', [ServiceCatalogController::class, 'status'])->whereUuid('id')->defaults('catalogKind', $kind);
+                }
+                Route::get('appointments/configuration-services/{id}', [ServiceCatalogController::class, 'show'])->whereUuid('id');
                 Route::get('doctors/{doctor}/availability', [SchedulingController::class, 'availability'])->whereUuid('doctor');
                 Route::get('queue-tickets', [QueueController::class, 'index']);
                 Route::post('queue-tickets', [QueueController::class, 'store']);

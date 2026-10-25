@@ -9,8 +9,14 @@ import {
   validateCategory,
   type Category,
   type CategoryDraft,
-} from "../../mocks/servicesCatalog";
-const props = defineProps<{ categories: Category[]; category?: Category }>();
+} from "../../services/serviceCatalog";
+const props = defineProps<{
+  categories: Category[];
+  category?: Category;
+  saving?: boolean;
+  serverError?: string;
+  statusAllowed?: boolean;
+}>();
 const emit = defineEmits<{ close: []; save: [draft: CategoryDraft] }>();
 const draft = ref<CategoryDraft>(
     props.category ? { ...props.category } : blankCategory(),
@@ -21,6 +27,7 @@ const dirty = computed(() => JSON.stringify(draft.value) !== initial);
 const preview = computed(() => ({
   ...draft.value,
   id: props.category?.id ?? "preview",
+  service_count: props.category?.service_count ?? 0,
   name: draft.value.name.trim() || "Kategoriya nomi",
 }));
 const colorNames = {
@@ -33,6 +40,7 @@ const colorNames = {
   slate: "Kulrang",
 };
 function save() {
+  if (props.saving) return;
   errors.value = validateCategory(
     draft.value,
     props.categories,
@@ -47,14 +55,18 @@ function save() {
     :title="category ? 'Kategoriyani tahrirlash' : 'Kategoriya qo‘shish'"
     subtitle="Xizmatlarni guruhlash uchun yangi kategoriya"
     :icon="FolderPlus"
-    :dirty="dirty"
+    :dirty="!saving && dirty"
     @close="emit('close')"
     ><form
       id="sv-category-form"
       class="sv-form"
       novalidate
+      :inert="saving || undefined"
+      :aria-busy="saving"
+      :data-permission="category ? 'categories.update' : 'categories.create'"
       @submit.prevent="save"
     >
+      <p v-if="serverError" class="sv-error" role="alert">{{ serverError }}</p>
       <label
         >Kategoriya nomi <em>*</em
         ><input
@@ -86,6 +98,9 @@ function save() {
             v-for="color in palette"
             :key="color"
             type="button"
+            :data-permission="
+              category ? 'categories.update' : 'categories.create'
+            "
             :class="[color, { selected: draft.color === color }]"
             :aria-label="`Rang: ${colorNames[color]}`"
             :aria-pressed="draft.color === color"
@@ -100,13 +115,16 @@ function save() {
           >Ro‘yxatdagi ko‘rinishi</small
         >
       </div>
-      <div class="sv-active-row">
+      <div v-if="!category || statusAllowed" class="sv-active-row">
         <div>
           <strong>Faol holat</strong
           ><small>Xizmat qo‘shishda tanlash mumkin</small>
         </div>
         <button
           type="button"
+          :data-permission="
+            category ? 'categories.status' : 'categories.create'
+          "
           class="sv-switch"
           role="switch"
           aria-label="Kategoriya faol holati"
@@ -117,16 +135,24 @@ function save() {
           <span /></button
         ><span>{{ draft.active ? "Faol" : "Faol emas" }}</span>
       </div>
-      <p class="sv-local-note">Lokal namuna · haqiqiy bazaga yozilmaydi</p>
     </form>
     <template #footer="{ close }"
       ><footer class="sv-modal-footer">
-        <button class="sv-button" type="button" @click="close">
+        <button
+          class="sv-button"
+          type="button"
+          :disabled="saving"
+          @click="close"
+        >
           Bekor qilish</button
         ><button
           class="sv-button sv-primary"
           type="submit"
           form="sv-category-form"
+          :disabled="saving"
+          :data-permission="
+            category ? 'categories.update' : 'categories.create'
+          "
         >
           <Check :size="19" />Saqlash
         </button>
