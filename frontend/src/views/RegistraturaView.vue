@@ -169,7 +169,7 @@ const tabs = computed(() => [
 ]);
 const stats = computed(() => [
   {
-    name: "Qabullar va bugungi navbat",
+    name: "Qabullar va navbat",
     value: String(allDayCount.value ?? counts.value.all ?? 0),
     icon: Users,
     tone: "blue",
@@ -895,7 +895,13 @@ function focusSearch() {
             <DateField v-model="listDate" label="Qabullar sanasi" /></label
           ><button class="rp-link" @click="listDate = today">Bugun</button
            ><button class="rp-link" @click="listDate = nextDay(today)">Ertaga</button
-          ><span>{{ uzDate(listDate) }} qabullari</span>
+          ><span>{{
+            tab === "all"
+              ? uzDate(listDate) + " qabullari + bugungi jonli navbat"
+              : tab === "walk_in"
+                ? "Bugungi jonli navbat"
+                : uzDate(listDate) + " qabullari"
+          }}</span>
         </div>
         <p v-if="catalogError" role="alert" class="rp-error">
           {{ catalogError }}
