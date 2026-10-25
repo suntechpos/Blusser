@@ -253,7 +253,7 @@ const foot = [
 </template>
 
 <style scoped>
-.lp{--b:#1d6bff;--t:#19c3c9;--ink:#0b1f4d;--mu:#5b6b8c;--ln:#e3ebf7;background:linear-gradient(#f2f8ff,#fff 600px);color:var(--ink);overflow-x:hidden}
+.lp{--b:#1d6bff;--t:#19c3c9;--ink:#0b1f4d;--mu:#5b6b8c;--ln:#e3ebf7;background:linear-gradient(#f2f8ff,#fff 600px);color:var(--ink);overflow-x:clip}
 .lp *{box-sizing:border-box}.wrap{max-width:1240px;margin:0 auto;padding:0 20px}
 button{cursor:pointer;background:none;border:0;color:inherit;font:inherit}
 .hd{position:sticky;top:0;z-index:20;background:#fffffff2;backdrop-filter:blur(8px);border-bottom:1px solid var(--ln)}
