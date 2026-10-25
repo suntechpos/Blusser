@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { localDay } from "../../services/receptionTime";
-import { CalendarClock, PlusCircle, Trash2, Save, Info } from "lucide-vue-next";
+import { CalendarClock, PlusCircle, Trash2, Save, Info, ChevronDown, X } from "lucide-vue-next";
 import { session, can } from "../../services/session";
 import { clinicRequest, errorText } from "../../services/api";
 import {
@@ -49,9 +49,22 @@ const branch = ref(props.branchId),
   clinicZone = ref(""),
   serviceIds = ref<string[]>([]),
   room = ref("");
-const newServiceName = ref("");
-const serviceCreating = ref(false);
-const serviceCreateError = ref("");
+const serviceQuery = ref("");
+const servicePickerOpen = ref(false);
+const selectedServices = computed(() =>
+  services.value.filter((s) => serviceIds.value.includes(s.id)),
+);
+const filteredServices = computed(() => {
+  const query = serviceQuery.value.trim().toLocaleLowerCase();
+  return services.value.filter((s) =>
+    !query || (s.name ?? "").toLocaleLowerCase().includes(query),
+  );
+});
+function toggleService(id: string) {
+  serviceIds.value = serviceIds.value.includes(id)
+    ? serviceIds.value.filter((selected) => selected !== id)
+    : [...serviceIds.value, id];
+}
 const days = ref<number[]>([]),
   separate = ref(true),
   start = ref("09:00"),
@@ -364,52 +377,6 @@ watch(
   },
   { deep: true },
 );
-async function createBookingService() {
-  const name = newServiceName.value.trim();
-  serviceCreateError.value = "";
-  if (!name) {
-    serviceCreateError.value = "Qabul xizmati nomini kiriting.";
-    return;
-  }
-  if (name.length > 255) {
-    serviceCreateError.value = "Xizmat nomi 255 belgidan oshmasin.";
-    return;
-  }
-  if (!can("services.create") || session.grants?.["services.view"] !== "entire_clinic") {
-    serviceCreateError.value = "Qabul xizmati yaratish uchun ruxsat yo‘q.";
-    return;
-  }
-  const existingService = services.value.find(
-    (s) => s.name?.trim().toLocaleLowerCase() === name.toLocaleLowerCase(),
-  );
-  if (existingService) {
-    if (!serviceIds.value.includes(existingService.id))
-      serviceIds.value = [...serviceIds.value, existingService.id];
-    newServiceName.value = "";
-    notice.value = "Mavjud xizmat tanlandi. Shifokorga biriktirish uchun xodimni saqlang.";
-    return;
-  }
-  if (serviceCreating.value) return;
-  serviceCreating.value = true;
-  try {
-    const code = "service-" + crypto.randomUUID().replace(/-/g, "").slice(0, 20);
-    const result = await clinicRequest<Option>("appointments/configuration-services", {
-      method: "POST",
-      body: { code, name, active: true },
-    });
-    const created = { ...result.data, name };
-    services.value = [...services.value, created].sort((a, b) =>
-      (a.name ?? "").localeCompare(b.name ?? ""),
-    );
-    serviceIds.value = [...new Set([...serviceIds.value, created.id])];
-    newServiceName.value = "";
-    notice.value = "Xizmat katalogga qo‘shildi. Shifokorga biriktirish uchun xodimni saqlang.";
-  } catch (e) {
-    serviceCreateError.value = errorText(e);
-  } finally {
-    serviceCreating.value = false;
-  }
-}
 function validate() {
   if (!enabled.value) return true;
   error.value = "";
@@ -422,7 +389,7 @@ function validate() {
     days.value.some((d) => patientDays.value[d]) &&
     !serviceIds.value.length
   )
-    error.value = "Bemor qabuli uchun kamida bitta qabul xizmatini tanlang yoki qo‘shing.";
+    error.value = "Bemor qabuli uchun kamida bitta qabul xizmatini tanlang.";
   else if (
     isDoctor.value &&
     receivesPatients.value &&
@@ -932,44 +899,68 @@ defineExpose({
             </div>
             <div class="employee-schedule-services">
               <label>Shifokorning qabul xizmatlari</label>
-              <p v-if="!services.length" class="e-hint">
-                Qabul xizmatlari hali qo‘shilmagan. Xizmatni quyida yarating yoki
-                katalog ruxsatini tekshiring.
-              </p>
-              <label v-for="s in services" :key="s.id">
-                <input
-                  v-model="serviceIds"
-                  type="checkbox"
-                  :value="s.id"
-                  :aria-label="'Shifokor xizmati: ' + s.name"
-                />{{ s.name }}
-              </label>
-            </div>
-            <div
-              v-if="can('services.create') && session.grants?.['services.view'] === 'entire_clinic'"
-              class="employee-booking-service-create"
-              >
-                <label>Yangi qabul xizmati
-                  <input
-                    v-model="newServiceName"
-                    maxlength="255"
-                    aria-label="Yangi qabul xizmati nomi"
-                    placeholder="Masalan: Birlamchi konsultatsiya"
-                    :disabled="serviceCreating"
-                  />
-                </label>
+              <div class="employee-service-picker">
                 <button
                   type="button"
-                  class="e-button"
-                  :disabled="serviceCreating || !newServiceName.trim()"
-                  @click="createBookingService"
+                  class="employee-service-trigger"
+                  aria-label="Qabul xizmatlarini tanlash"
+                  :aria-expanded="servicePickerOpen"
+                  :disabled="!services.length"
+                  @click="servicePickerOpen = !servicePickerOpen"
                 >
-                  <PlusCircle :size="17" />{{ serviceCreating ? "Saqlanmoqda…" : "Xizmat qo‘shish" }}
+                  <span>{{ serviceIds.length ? serviceIds.length + " ta xizmat tanlangan" : "Xizmatlarni tanlang" }}</span>
+                  <ChevronDown :size="18" />
                 </button>
-                <p v-if="serviceCreateError" class="e-error" role="alert">{{ serviceCreateError }}</p>
-                <p class="e-hint">
-                  Xizmat katalogga darhol saqlanadi. Shifokorga biriktirish uchun xodimni saqlang.
+                <div
+                  v-if="servicePickerOpen && services.length"
+                  class="employee-service-dropdown"
+                  @keydown.esc.stop.prevent="servicePickerOpen = false"
+                >
+                  <input
+                    v-model="serviceQuery"
+                    type="search"
+                    aria-label="Qabul xizmatini qidirish"
+                    placeholder="Xizmat nomini qidiring..."
+                  />
+                  <div class="employee-service-options">
+                    <label v-for="s in filteredServices" :key="s.id">
+                      <input
+                        type="checkbox"
+                        :checked="serviceIds.includes(s.id)"
+                        :aria-label="'Shifokor xizmati: ' + s.name"
+                        @change="toggleService(s.id)"
+                      />
+                      <span>{{ s.name }}</span>
+                    </label>
+                    <p v-if="!filteredServices.length" class="e-hint">
+                      Qidiruv bo‘yicha xizmat topilmadi.
+                    </p>
+                  </div>
+                </div>
+                <div v-if="selectedServices.length" class="employee-service-selected">
+                  <span v-for="s in selectedServices" :key="s.id" class="employee-service-chip">
+                    {{ s.name }}
+                    <button
+                      type="button"
+                      :aria-label="'Xizmatni olib tashlash: ' + s.name"
+                      @click="toggleService(s.id)"
+                    ><X :size="15" /></button>
+                  </span>
+                </div>
+                <p
+                  v-if="session.grants?.['services.view'] !== 'entire_clinic'"
+                  class="e-hint"
+                >
+                  Xizmatlar katalogini ko‘rishga ruxsat yo‘q.
                 </p>
+                <p v-else-if="!services.length" class="e-hint">
+                  Hozircha faol qabul xizmatlari mavjud emas. Avval Xizmatlar
+                  bo‘limida xizmat yarating.
+                </p>
+                <p v-else class="e-hint">
+                  Bitta yoki bir nechta xizmat tanlang. Biriktirish jadvalni saqlaganda amalga oshadi.
+                </p>
+              </div>
             </div></template
           >
         </div>
