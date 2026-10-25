@@ -604,7 +604,7 @@ function focusSearch() {
           Registratura
           <small
             class="rp-demo-badge"
-            title="Qabullar serverdan olinadi. Kelish va jonli navbat alohida lokal namuna."
+            title="Qabullar va bemor kelishi server API orqali boshqariladi."
             >Qabullar API</small
           >
         </h1>
@@ -656,10 +656,10 @@ function focusSearch() {
             :class="{ active: tab === t.id }"
             :aria-pressed="tab === t.id"
             data-permission="reception.view"
-            :disabled="t.id === 'walk_in'"
+            :disabled="t.id === 'walk_in' && !can('queues.view')"
             :title="
-              t.id === 'walk_in'
-                ? 'Jonli navbat bu bosqichda ulanmagan'
+              t.id === 'walk_in' && !can('queues.view')
+                ? 'Navbatlarni ko‘rish uchun ruxsat kerak'
                 : undefined
             "
             @click="
@@ -694,6 +694,7 @@ function focusSearch() {
             ><Search :size="18" /><input
               id="reception-query"
               v-model="query"
+              :disabled="tab === 'walk_in'"
               aria-label="Ro‘yxatdan bemor qidirish"
               placeholder="Bemor qidirish..."
           /></label>
@@ -706,7 +707,7 @@ function focusSearch() {
             <option v-for="d in doctors" :key="d.id" :value="d.id">
               {{ d.name }}
             </option></select
-          ><select v-model="status" aria-label="Holat" @change="tab = 'all'">
+          ><select v-model="status" aria-label="Holat" :disabled="tab === 'walk_in'" @change="tab = 'all'">
             <option value="">Holat</option>
             <option v-for="(label, id) in statusLabels" :key="id" :value="id">
               {{ label }}
@@ -725,7 +726,24 @@ function focusSearch() {
             <Filter :size="19" />
           </button>
         </div>
-        <div class="rp-table-scroll">
+        <div v-if="tab === 'walk_in'" class="rp-table-scroll">
+          <table>
+            <thead><tr><th>#</th><th>Bemor</th><th>Shifokor</th><th>Navbat</th><th>Holat</th></tr></thead>
+            <tbody>
+              <tr v-for="q in queueRows" :key="q.id">
+                <td>{{ q.number }}</td>
+                <td><strong>{{ q.patientName }}</strong><small>{{ q.patientNumber }}</small></td>
+                <td>{{ q.doctorName }}</td>
+                <td>{{ q.kind === 'scheduled' ? 'Oldindan yozilgan' : 'Jonli navbat' }} · №{{ q.number }}</td>
+                <td>{{ q.status === 'waiting' ? 'Kutilmoqda' : q.status === 'called' ? 'Chaqirildi' : q.status === 'in_progress' ? 'Qabulda' : q.status === 'completed' ? 'Yakunlangan' : q.status }}</td>
+              </tr>
+              <tr v-if="!loading && !error && !queueRows.length">
+                <td colspan="5" class="rp-empty">Tanlangan sanada navbat topilmadi.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="rp-table-scroll">
           <table>
             <thead>
               <tr>
@@ -978,12 +996,8 @@ function focusSearch() {
       @saved="saved"
     /><ArrivalDialog
       v-if="arrival"
-      :patients="state.patients"
-      :appointments="state.appointments"
-      :preset="preset"
-      :create-patient="createPatient"
       @close="arrival = false"
-      @arrive="arrive"
+      @saved="onArrivalSaved"
     /><ReceptionDialog
       v-if="detail"
       title="Qabul ma’lumotlari"
