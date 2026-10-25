@@ -249,7 +249,7 @@ watch(branch, (id, previousId) => {
   if (!id || id === previousId || changingList) return;
   listDate.value = rememberedReceptionDate(id) ?? today.value;
 }, { flush: "sync" });
-watch([branch, listDate], ([id, date]) => {
+function persistReceptionDate(id: string, date: string): void {
   const key = receptionDateKey(id);
   if (!key || !validReceptionDate(date) || typeof window === "undefined") return;
   try {
@@ -257,7 +257,13 @@ watch([branch, listDate], ([id, date]) => {
   } catch {
     // Private browsing and disabled storage should not break the UI.
   }
-}, { flush: "post" });
+}
+// Persist immediately when the date changes (including the "Bugun" action),
+// before navigation or reload can observe a stale sessionStorage value.
+// Atomic booking updates persist only after branch + date are both finalized.
+watch(listDate, (date) => {
+  if (!changingList) persistReceptionDate(branch.value, date);
+}, { flush: "sync" });
 function updateListState(update: () => void) {
   const previous = changingList;
   changingList = true;
@@ -704,6 +710,7 @@ async function saved(appointment: BookingAppointment, date: string) {
     status.value = "";
     page.value = 1;
   });
+  persistReceptionDate(branch.value, listDate.value);
   rows.value = [];
   total.value = 0;
   error.value = "";

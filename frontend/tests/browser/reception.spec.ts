@@ -58,6 +58,14 @@ test("reception remembers its selected date through refresh and keeps dates isol
 
   await page.getByRole("button", { name: "Bugun", exact: true }).click();
   await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  const persistedDate = await page.evaluate((branchId) => {
+    const key = Object.keys(sessionStorage).find((item) =>
+      item.startsWith("blusser.reception.selectedDate.v1:") &&
+      item.endsWith(":" + branchId),
+    );
+    return key ? sessionStorage.getItem(key) : null;
+  }, ids.other);
+  expect(persistedDate).toBe("2026-10-23");
   await page.reload();
   await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
 });
