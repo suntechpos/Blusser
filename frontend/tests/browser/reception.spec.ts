@@ -39,6 +39,29 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-23T03:01:00Z"));
 });
 
+test("reception remembers its selected date through refresh and keeps dates isolated by branch", async ({ page }) => {
+  await bookingSession(page);
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-28");
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-28");
+
+  await page.reload();
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-28");
+
+  await page.getByLabel("Qabullar filiali").selectOption(ids.other);
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  await page.getByLabel("Qabullar sanasi").fill("2026-10-27");
+  await page.getByLabel("Qabullar filiali").selectOption(ids.branch);
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-28");
+  await page.getByLabel("Qabullar filiali").selectOption(ids.other);
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-27");
+
+  await page.getByRole("button", { name: "Bugun", exact: true }).click();
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+  await page.reload();
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-23");
+});
+
 test("doctor dropdown lists API doctors before department selection and auto-selects their department", async ({
   page,
 }) => {
@@ -130,7 +153,9 @@ test("real API-shaped existing patient booking uses October 28 slot, refreshes t
     fullPage: true,
   });
   await page.reload();
-  await page.getByLabel("Qabullar sanasi").fill("2026-10-28");
+  // Returning to Registratura must keep the appointment date, rather than
+  // silently resetting to today's (different) live-queue date.
+  await expect(page.getByLabel("Qabullar sanasi")).toHaveValue("2026-10-28");
   await expect(page.locator("tbody")).toContainText("Aliyeva Mohira");
   await page.getByLabel("Qabullar sanasi").fill("2026-10-23");
   await expect(page.locator("tbody")).not.toContainText("Aliyeva Mohira");

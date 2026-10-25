@@ -46,7 +46,33 @@ const zone = computed(
 const today = computed(() =>
   zone.value ? localDay(Date.now(), zone.value) : "",
 );
-const listDate = ref(today.value),
+// Keep the last selected reception date for this browser tab, user, clinic
+// and branch. A booking scheduled for tomorrow must not appear to disappear
+// simply because the page reloads and defaults back to today's live queue.
+function receptionDateKey(branchId: string): string | null {
+  const userId = session.user?.id;
+  const tenantId = session.user?.active_tenant_id;
+  return userId && tenantId && branchId
+    ? `blusser.reception.selectedDate.v1:${userId}:${tenantId}:${branchId}`
+    : null;
+}
+function validReceptionDate(value: string | null): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value;
+}
+function rememberedReceptionDate(branchId: string): string | null {
+  const key = receptionDateKey(branchId);
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const date = window.sessionStorage.getItem(key);
+    return validReceptionDate(date) ? date : null;
+  } catch {
+    return null; // Restricted storage must not prevent registration.
+  }
+}
+const listDate = ref(rememberedReceptionDate(branch.value) ?? today.value),
   tab = ref("all"),
   query = ref(""),
   doctor = ref(""),
@@ -217,6 +243,21 @@ function filters() {
 // A view change invalidates a pending response before a debounced read starts.
 let listRevision = 0;
 let changingList = false;
+// Changing the branch restores that branch's own date. An atomic booking-reveal
+// updates its date and branch together and must not be overwritten here.
+watch(branch, (id, previousId) => {
+  if (!id || id === previousId || changingList) return;
+  listDate.value = rememberedReceptionDate(id) ?? today.value;
+}, { flush: "sync" });
+watch([branch, listDate], ([id, date]) => {
+  const key = receptionDateKey(id);
+  if (!key || !validReceptionDate(date) || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, date);
+  } catch {
+    // Private browsing and disabled storage should not break the UI.
+  }
+}, { flush: "post" });
 function updateListState(update: () => void) {
   const previous = changingList;
   changingList = true;
