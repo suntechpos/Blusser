@@ -66,7 +66,7 @@ SQL;
             WHERE active_q.tenant_id=tid AND active_v.doctor_id=did
               AND active_q.status IN ('called','in_progress')
         ),
-        SQL;
+SQL;
         DB::unprepared(str_replace($marker, $active."\n        ".$marker, $feed));
     }
 
