@@ -30,7 +30,26 @@ final class DoctorWorkspaceController
                     [$filters['date'] ?? null, $filters['doctor_id'] ?? null, $filters['branch_id'] ?? null],
                 )->value;
 
-                return json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+                $feed = json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+
+                // The security-definer feed already restricts tickets to this doctor
+                // and branch. Fetch service IDs with normal visit RLS, without exposing
+                // other patients, to resolve real schedule availability for queue start.
+                if (($feed['doctor']['id'] ?? null) && ($feed['branch']['id'] ?? null) && ! empty($feed['tickets'])) {
+                    $visitIds = array_values(array_filter(array_column($feed['tickets'], 'visit_id')));
+                    $services = DB::table('visits')
+                        ->whereRaw('tenant_id = public.context_tenant()')
+                        ->where('doctor_id', $feed['doctor']['id'])
+                        ->where('branch_id', $feed['branch']['id'])
+                        ->whereIn('id', $visitIds)
+                        ->pluck('service_id', 'id');
+                    foreach ($feed['tickets'] as &$ticket) {
+                        $ticket['service_id'] = $services->get($ticket['visit_id'] ?? '') ?: null;
+                    }
+                    unset($ticket);
+                }
+
+                return $feed;
             }, consistentSnapshot: true),
         );
     }

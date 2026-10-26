@@ -7,14 +7,19 @@ const patient = {
   name: "Aliyev Alijon", dob: "2003-02-05",
   gender: "male", phone: "+998912342343", service: "Tish qo‘ydirish",
   number: 1, kind: "walk_in" as const, status: "waiting",
-  appointment_id: null, created_at: "2026-10-26T06:00:00Z",
+  appointment_id: null, service_id: "service-dental", created_at: "2026-10-26T06:00:00Z",
 };
 async function setup(
   page: Page,
   manager = false,
   grants: Record<string, string> = allServerGrants,
-  rows: Array<typeof patient & { version?: number; called_at?: string | null }> = [patient],
+  rows: Array<Omit<typeof patient, "appointment_id"> & {
+    appointment_id: string | null;
+    version?: number;
+    called_at?: string | null;
+  }> = [patient],
   calls: string[] = [],
+  starts: Array<{ id: string; body: Record<string, unknown> }> = [],
 ) {
   const requests: string[] = [];
   const queue = rows.map((row) => ({ ...row, version: row.version ?? 1, called_at: row.called_at ?? null }));
@@ -32,6 +37,34 @@ async function setup(
     if (path === "/api/v1/clinic/context") return route.fulfill({ json: {
       grants, branches: [], timezone: "Asia/Tashkent",
     }});
+    const startPath = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/start$/);
+    if (startPath) {
+      const ticket = queue.find((row) => row.id === startPath[1]);
+      const body = route.request().postDataJSON();
+      if (route.request().method() !== "POST" || !ticket || ticket.status !== "called" ||
+        body?.expected_version !== ticket.version ||
+        !body?.room_id || !body?.starts_at || !body?.ends_at) {
+        return route.fulfill({ status: 409, json: { message: "Conflict" } });
+      }
+      starts.push({ id: ticket.id, body });
+      ticket.status = "in_progress";
+      ticket.version++;
+      return route.fulfill({ json: { ticket: { id: ticket.id, version: ticket.version, status: ticket.status } } });
+    }
+    if (path === "/api/v1/clinic/appointments/appointment-real" && route.request().method() === "GET") {
+      return route.fulfill({ json: {
+        id: "appointment-real", doctor_id: "doctor-nizomjon",
+        branch_id: "branch-1", patient_id: "patient-alijon", service_id: "service-dental",
+        room_id: "room-reserved", starts_at: "2026-10-26T07:30:00Z",
+        ends_at: "2026-10-26T08:00:00Z", status: "checked_in",
+      } });
+    }
+    if (path === "/api/v1/clinic/doctors/doctor-nizomjon/availability") {
+      return route.fulfill({ json: { data: [{
+        doctor_id: "doctor-nizomjon", branch_id: "branch-1", room_id: "room-available",
+        starts_at: "2026-10-26T07:30:00Z", ends_at: "2026-10-26T08:00:00Z",
+      }], meta: { total: 1 } } });
+    }
     const callPath = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/call$/);
     if (callPath) {
       const ticket = queue.find((item) => item.id === callPath[1]);
@@ -182,6 +215,55 @@ test("queue-call button explains missing visits.view even when queues.call is pr
   await expect(page.locator(".dw-call-next")).toBeVisible();
   await expect(page.locator(".dw-call-next")).toBeDisabled();
   await expect(page.locator(".dw-queue")).toContainText("Tashriflarni ko‘rish ruxsati berilmagan");
+});
+
+test("Task #01: called walk-in patient starts through real availability slot", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const starts: Array<{ id: string; body: Record<string, unknown> }> = [];
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "called", version: 2, called_at: "2026-10-26T06:55:00Z" },
+  ], [], starts);
+  await expect(page.getByRole("button", { name: "Qabulni boshlash" })).toBeEnabled();
+  await page.getByRole("button", { name: "Qabulni boshlash" }).click();
+  await expect(page.locator(".dw-live-details")).toContainText("Qabulda");
+  expect(starts).toHaveLength(1);
+  expect(starts[0]?.body).toMatchObject({
+    expected_version: 2, room_id: "room-available",
+    starts_at: "2026-10-26T07:30:00Z", ends_at: "2026-10-26T08:00:00Z",
+  });
+  await expect(page.getByRole("button", { name: "Qabulni boshlash" })).toHaveCount(0);
+});
+
+test("Task #01: scheduled patient uses exactly its existing appointment reservation", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const starts: Array<{ id: string; body: Record<string, unknown> }> = [];
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "called", appointment_id: "appointment-real", version: 2 },
+  ], [], starts);
+  await page.getByRole("button", { name: "Qabulni boshlash" }).click();
+  await expect(page.locator(".dw-live-details")).toContainText("Qabulda");
+  expect(starts).toHaveLength(1);
+  expect(starts[0]?.body).toMatchObject({
+    room_id: "room-reserved", expected_version: 2,
+    starts_at: "2026-10-26T07:30:00Z", ends_at: "2026-10-26T08:00:00Z",
+  });
+});
+
+test("Task #01: missing queue.start grant or another in-progress consultation blocks start", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const grants = { ...allServerGrants };
+  delete grants["queues.start"];
+  await setup(page, false, grants, [
+    { ...patient, status: "called", version: 2 },
+  ]);
+  await expect(page.getByRole("button", { name: "Qabulni boshlash" })).toBeDisabled();
+  await expect(page.locator(".dw-live-details")).toContainText("ruxsati berilmagan");
+});
+
+test("Task #01: never starts a patient who is waiting or merely scheduled", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page);
+  await expect(page.getByRole("button", { name: "Qabulni boshlash" })).toHaveCount(0);
 });
 
 test("clinic date switching fetches new rows and does not resurrect demo queue", async ({ page }) => {

@@ -27,6 +27,7 @@ export interface WorkspacePatientRow {
   appointment_id: string | null;
   starts_at?: string;
   visit_id?: string;
+  service_id?: string | null;
   number?: number;
   kind?: "scheduled" | "walk_in";
   created_at?: string;
