@@ -168,6 +168,7 @@ BEGIN
         'scheduled',scheduled_rows,'tickets',ticket_rows);
 END
 $workspace$;
+ALTER FUNCTION governance.doctor_workspace_feed(date,uuid,uuid) OWNER TO blusser_security;
 REVOKE ALL ON FUNCTION governance.doctor_workspace_feed(date,uuid,uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION governance.doctor_workspace_feed(date,uuid,uuid) TO blusser_app;
 SQL
