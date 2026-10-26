@@ -59,6 +59,7 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                 Route::get('queue-tickets', [QueueController::class, 'index']);
                 Route::post('queue-tickets', [QueueController::class, 'store']);
                 Route::get('queue-tickets/{ticket}', [QueueController::class, 'show'])->whereUuid('ticket');
+                Route::get('queue-tickets/{ticket}/own-start-slot', [QueueController::class, 'ownStartSlot'])->whereUuid('ticket');
                 foreach (['call', 'recall', 'start', 'complete', 'skip', 'cancel', 'requeue'] as $operation) {
                     Route::post('queue-tickets/{ticket}/'.$operation, [QueueController::class, 'mutate'])->whereUuid('ticket')->defaults('operation', $operation);
                 }
