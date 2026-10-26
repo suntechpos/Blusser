@@ -32,9 +32,15 @@ final class Queues
     public function ownStartSlot(User $actor, string $tenant, string $ticket): array
     {
         return $this->read($actor, $tenant, function () use ($ticket) {
-            $value = DB::selectOne(
-                'SELECT governance.own_doctor_start_slot(?::uuid) AS value', [$ticket],
-            )->value;
+            try {
+                $value = DB::selectOne(
+                    'SELECT governance.own_doctor_start_slot(?::uuid) AS value', [$ticket],
+                )->value;
+            } catch (QueryException $exception) {
+                if (($exception->errorInfo[0] ?? null) === '42501') abort(403);
+                if (($exception->errorInfo[0] ?? null) === 'P0002') abort(404);
+                throw $exception;
+            }
 
             abort_if($value === null, 409, 'Bugungi jadvalda bu bemor uchun bo‘sh vaqt topilmadi.');
 
