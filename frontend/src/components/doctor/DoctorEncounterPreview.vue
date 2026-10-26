@@ -71,7 +71,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
       </button>
     </div>
 
-    <article v-if="tab === 'Bugungi qabul'" class="dw-card dw-current" role="tabpanel">
+    <article v-show="tab === 'Bugungi qabul'" class="dw-card dw-current" role="tabpanel">
       <div class="dw-section-title">
         <h2>Qabul yozuvi</h2>
         <span class="dw-start">
@@ -126,7 +126,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
       </p>
     </article>
 
-    <template v-else-if="tab === 'Tashriflar tarixi'">
+    <template v-if="tab === 'Tashriflar tarixi'">
       <p class="dw-preview-notice dw-preview-tab-notice" role="status">
         Tashriflar tarixi API hali ulanmagan. Quyida faqat eski veryostka ko‘rsatilgan.
       </p>
@@ -134,7 +134,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         :visits="[]" />
     </template>
 
-    <template v-else>
+    <template v-else-if="tab === 'Tekshiruv natijalari' || tab === 'Hujjatlar'">
       <p class="dw-preview-notice dw-preview-tab-notice" role="status">
         {{ tab }} API hali ulanmagan. Real natija yoki hujjat mavjud deb ko‘rsatilmaydi.
       </p>
