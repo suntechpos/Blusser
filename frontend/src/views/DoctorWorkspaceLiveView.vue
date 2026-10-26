@@ -220,7 +220,7 @@ function genderLabel(gender: string | null) {
           <input type="date" aria-label="Qabul sanasi" :value="date" @change="changeDate" />
         </label>
         <button type="button" class="dw-live-today" @click="resetDate">Bugun</button>
-        <button type="button" class="dw-live-reload" aria-label="Navbatni yangilash" title="Yangilash" @click="load">
+        <button type="button" class="dw-live-reload" aria-label="Navbatni yangilash" title="Yangilash" @click="load()">
           <RefreshCw :size="18" />
         </button>
       </div>
