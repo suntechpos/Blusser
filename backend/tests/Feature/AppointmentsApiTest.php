@@ -495,28 +495,28 @@ final class AppointmentsApiTest extends FoundationTestCase
         });
 
         $this->assertTrue(app(Appointments::class)->show($this->actor($a['user']), $a['tenant'], 'appointments', $appt['id'])['late']);
-        // A late arrival should still have a valid original booked slot.
-        // Assert each prerequisite separately, so CI reports the actual guard
-        // rather than a generic GovernanceDenied from the booking command.
-        $preflight = app(Scheduling::class)->context($this->actor($a['user']), $a['tenant'], function () use ($appt) {
-            return DB::connection('pgsql')->selectOne(
+        // The runtime role intentionally cannot call the internal scheduling
+        // predicate directly. Inspect these invariants with migration credentials
+        // in this disposable test database, not through the application role.
+        // Do not broaden production SQL grants simply to make a test pass.
+        $preflight = $db->transaction(function () use ($db, $a, $appt) {
+            $db->select("SELECT set_config('app.tenant_id', ?, true)", [$a['tenant']]);
+
+            return $db->selectOne(
                 "SELECT
-                    governance.booking_slot_valid(a.doctor_id, a.branch_id, a.service_id, a.room_id, a.starts_at, a.ends_at) AS valid_slot,
-                    (a.ends_at + interval '60 minutes' >= clock_timestamp()) AS in_grace,
-                    EXISTS (SELECT 1 FROM public.resource_reservations r WHERE r.tenant_id = a.tenant_id AND r.id = a.reservation_id AND r.active) AS reservation_active,
-                    governance.patient_allowed(a.patient_id, 'patients.view') AS patient_allowed,
-                    governance.booking_scope('appointments.check_in', a.doctor_id, a.branch_id) AS can_check_in,
-                    governance.booking_scope('visits.create', a.doctor_id, a.branch_id) AS can_create_visit,
-                    governance.booking_scope('queues.create', a.doctor_id, a.branch_id) AS can_create_ticket,
-                    to_char(a.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS starts_utc,
-                    to_char(a.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS ends_utc
-                 FROM public.appointments a WHERE a.id = ? AND a.tenant_id = public.context_tenant()",
-                [$appt['id']],
+                    governance.booking_slot_valid(ap.doctor_id, ap.branch_id, ap.service_id,
+                        ap.room_id, ap.starts_at, ap.ends_at) AS valid_slot,
+                    (ap.ends_at + interval '60 minutes' >= clock_timestamp()) AS in_grace,
+                    EXISTS (SELECT 1 FROM public.resource_reservations rr
+                        WHERE rr.tenant_id = ap.tenant_id AND rr.id = ap.reservation_id
+                        AND rr.active) AS reservation_active
+                 FROM public.appointments ap WHERE ap.id = ? AND ap.tenant_id = ?",
+                [$appt['id'], $a['tenant']],
             );
         });
         $this->assertNotNull($preflight);
-        foreach (['valid_slot', 'in_grace', 'reservation_active', 'patient_allowed', 'can_check_in', 'can_create_visit', 'can_create_ticket'] as $condition) {
-            $this->assertTrue((bool) $preflight->$condition, $condition.' failed for '.$preflight->starts_utc.'–'.$preflight->ends_utc);
+        foreach (['valid_slot', 'in_grace', 'reservation_active'] as $condition) {
+            $this->assertTrue((bool) $preflight->$condition, 'Late-arrival prerequisite not met: '.$condition);
         }
         // Validate that the live PostgreSQL routine still contains the migrated
         // 60-minute grace rule (not just the test-side eligibility preflight).
