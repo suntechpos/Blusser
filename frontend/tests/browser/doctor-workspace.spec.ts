@@ -142,6 +142,16 @@ test("queue call requires server queues.call grant and only works for today's cl
   await expect(page.locator(".dw-call-next")).toBeDisabled();
 });
 
+test("queue-call button explains missing visits.view even when queues.call is present", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const grants = { ...allServerGrants };
+  delete grants["visits.view"];
+  await setup(page, false, grants);
+  await expect(page.locator(".dw-call-next")).toBeVisible();
+  await expect(page.locator(".dw-call-next")).toBeDisabled();
+  await expect(page.locator(".dw-queue")).toContainText("Tashriflarni ko‘rish ruxsati berilmagan");
+});
+
 test("clinic date switching fetches new rows and does not resurrect demo queue", async ({ page }) => {
   const requests = await setup(page);
   await expect(page.locator(".dw-queue-person")).toHaveCount(1);

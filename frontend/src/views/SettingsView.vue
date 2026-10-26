@@ -127,7 +127,61 @@ function message(s: string) {
   clearTimeout(timer);
   timer = setTimeout(() => (notice.value = ""), 3500);
 }
-function validateDraft(){if(!draft.value.name.trim())throw Error('Rol nomini kiriting.');if(store.state.value.roles.some(r=>r.id!==draft.value.id&&r.name.trim().replace(/\s+/g,' ').toLowerCase()===draft.value.name.trim().replace(/\s+/g,' ').toLowerCase()))throw Error('Rol nomi takrorlangan.');if(!draft.value.permissions.length)throw Error('Kamida bitta foydali ruxsat tanlang.');}
+// The backend rejects a child permission whose scope exceeds its page's
+// view scope (or a secondary parent view). Explain the exact mismatch here
+// rather than making the server return an opaque 422 "invalid_input".
+const scopeNames: Record<string, string> = {
+  own: "O‘ziga tegishli",
+  assigned_branches: "Biriktirilgan filiallar",
+  entire_clinic: "Butun klinika",
+};
+const scopeConflicts = computed(() => {
+  const selectedGrants = new Map(
+    draft.value.grants
+      .filter((grant) => draft.value.permissions.includes(grant.code))
+      .map((grant) => [grant.code, grant.scope]),
+  );
+  const labels = new Map(
+    permissionSections.value.flatMap((section) =>
+      section.permissions.map((p) => [p.code, p.label] as const),
+    ),
+  );
+  const conflicts: string[] = [];
+  for (const [code, scope] of selectedGrants) {
+    const view = code.split(".")[0] + ".view";
+    const extraParent: Record<string, string> = {
+      categories: "services.view",
+      reception_actions: "reception.view",
+      employee_schedule: "employees.view",
+      departments: "rooms.view",
+    };
+    const parents = [
+      ...(code !== view && labels.has(view) ? [view] : []),
+      ...(extraParent[code.split(".")[0]] ? [extraParent[code.split(".")[0]]!] : []),
+    ];
+    for (const parent of parents) {
+      const granted = selectedGrants.get(parent);
+      if (granted === "entire_clinic" || granted === scope) continue;
+      const current = granted ? scopeNames[granted] ?? granted : "yoqilmagan";
+      conflicts.push(
+        `«${labels.get(code) ?? code}» — ${scopeNames[scope] ?? scope}; ` +
+        `«${labels.get(parent) ?? parent}» — ${current}. ` +
+        "Ichki amal doirasi ko‘rish doirasidan keng bo‘lmasin.",
+      );
+    }
+  }
+  return [...new Set(conflicts)];
+});
+function validateDraft() {
+  if (!draft.value.name.trim()) throw Error("Rol nomini kiriting.");
+  if (store.state.value.roles.some((r) =>
+    r.id !== draft.value.id &&
+    r.name.trim().replace(/\s+/g, " ").toLowerCase() ===
+      draft.value.name.trim().replace(/\s+/g, " ").toLowerCase(),
+  )) throw Error("Rol nomi takrorlangan.");
+  if (!draft.value.permissions.length) throw Error("Kamida bitta foydali ruxsat tanlang.");
+  if (scopeConflicts.value.length) throw Error("Ruxsat doiralari mos emas. Quyidagi xatolarni to‘g‘rilang.");
+}
 function requestSave() {
   try {
     validateDraft();
@@ -382,6 +436,10 @@ onBeforeUnmount(() => {
                 </p>
               </div>
             </section>
+          </div>
+          <div v-if="scopeConflicts.length" class="sr-error" role="alert">
+            <strong>{{ scopeConflicts.length }} ta ruxsat doirasi mos emas:</strong>
+            <p v-for="(issue, index) in scopeConflicts" :key="index">{{ issue }}</p>
           </div>
           <p class="sr-demo">
             <Info :size="17" />Rollar server orqali boshqariladi. Klinik demo sahifalarining backend amallari alohida ulanadi.
