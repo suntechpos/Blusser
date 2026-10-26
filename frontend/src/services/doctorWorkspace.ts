@@ -22,6 +22,8 @@ export interface WorkspacePatientRow {
   phone: string | null;
   service: string;
   status: string;
+  version?: number;
+  called_at?: string | null;
   appointment_id: string | null;
   starts_at?: string;
   visit_id?: string;
@@ -37,6 +39,7 @@ export interface DoctorWorkspaceFeed {
   date: string | null;
   scheduled: WorkspacePatientRow[];
   tickets: WorkspacePatientRow[];
+  has_called_today?: boolean;
 }
 
 /** All access control is enforced by the server using the signed-in identity. */
