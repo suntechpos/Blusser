@@ -48,7 +48,7 @@ return new class extends Migration
             throw new RuntimeException('Scheduling definition changed; review work migration.');
         }
 
-return str_replace($old, $new, $sql);
+        return str_replace($old, $new, $sql);
     }
 
     public function down(): void
