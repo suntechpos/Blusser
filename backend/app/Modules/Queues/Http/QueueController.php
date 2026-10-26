@@ -27,6 +27,15 @@ final class QueueController
         return response()->json($this->queues->show($request->user(), $this->tenant($request), $request->route('ticket')));
     }
 
+    public function ownStartSlot(Request $request)
+    {
+        $this->validate($request->query(), []);
+
+        return response()->json(
+            $this->queues->ownStartSlot($request->user(), $this->tenant($request), $request->route('ticket')),
+        );
+    }
+
     public function store(Request $request)
     {
         return $this->write($request, 'create', 201);
