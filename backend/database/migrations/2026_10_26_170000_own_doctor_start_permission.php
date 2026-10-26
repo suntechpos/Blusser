@@ -102,7 +102,7 @@ BEGIN
  END IF;
  -- Walk-ins: current configured windows, exception replacements and service
  -- duration; appointment reservations and breaks are validated, not guessed.
- SELECT option_slot.room_id,option_slot.lo,option_slot.hi
+ SELECT w.room_id,option_slot.lo,option_slot.hi
  INTO selected_room,selected_lo,selected_hi
  FROM (
    SELECT sr.room_id,sr.local_start,sr.local_end,
