@@ -264,15 +264,18 @@ function genderLabel(gender: string | null) {
             </p>
           </template>
         </div>
-        <button v-if="can('queues.call')" type="button" class="dw-call-next"
-          data-permission="queues.call" :disabled="!callAllowed" @click="callNext">
+        <button v-if="feed?.doctor" type="button" class="dw-call-next"
+          data-permission="workspace.view" :disabled="!callAllowed" @click="callNext">
           <Megaphone :size="18" />
           {{ calling ? "Chaqirilmoqda..." : callLabel }}
         </button>
-        <p v-if="can('queues.call') && date !== clinicToday" class="dw-call-hint">
+        <p v-if="feed?.doctor && !can('queues.call')" class="dw-call-hint">
+          Shifokorga bemor chaqirish ruxsati berilmagan.
+        </p>
+        <p v-else-if="feed?.doctor && date !== clinicToday" class="dw-call-hint">
           Bemorlarni faqat bugungi navbatdan chaqirish mumkin.
         </p>
-        <p v-else-if="can('queues.call') && !nextTicket && !loading" class="dw-call-hint">
+        <p v-else-if="feed?.doctor && !nextTicket && !loading" class="dw-call-hint">
           Navbatda chaqiriladigan bemor yo‘q.
         </p>
         <p class="dw-live-footer">Ro‘yxat registratura ma’lumotlari asosida ko‘rsatilmoqda.</p>
