@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { CalendarDays, ChevronRight, Megaphone, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { CalendarDays, ChevronRight, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
 import { can, session } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
+import { resolveDoctorStartSlot } from "../services/doctorVisitStart";
 import "../components/employees/employees.css";
 import "../components/doctor/doctor.css";
 
@@ -16,6 +17,7 @@ const query = ref("");
 const selectedKey = ref("");
 const loading = ref(true);
 const calling = ref(false);
+const starting = ref(false);
 const error = ref("");
 let sequence = 0;
 
@@ -151,6 +153,70 @@ async function callNext() {
     }
   } finally {
     calling.value = false;
+  }
+}
+// "Qabulni boshlash" is a separate, explicit action on the selected
+// *called* ticket. Clicking patient rows never starts a consultation.
+const startPermissionMessage = computed(() => {
+  if (selected.value?.source !== "ticket" || selected.value.status !== "called") return "";
+  if (!can("queues.start")) return "Qabulni boshlash (Navbatlar) ruxsati berilmagan.";
+  if (!can("visits.view") || !can("patients.view")) {
+    return "Tashriflar va Bemorlarni ko‘rish ruxsatlari kerak.";
+  }
+  if (session.grants?.["services.view"] !== "entire_clinic") {
+    return "Xizmatlarni ko‘rish ruxsati «Butun klinika» bo‘lishi kerak.";
+  }
+  if (!can("doctors.view") || !can("rooms.view") || !can("schedules.view")) {
+    return "Shifokor profillari, xonalar va qabul jadvallarini ko‘rish ruxsatlari kerak.";
+  }
+  if (selected.value.appointment_id &&
+    (!can("appointments.view") || !can("appointments.update"))) {
+    return "Bron bilan kelgan bemor uchun qabullarni ko‘rish va tahrirlash ruxsatlari kerak.";
+  }
+  return "";
+});
+const anotherConsultation = computed(() => feed.value?.tickets.some((ticket) =>
+  ticket.status === "in_progress" && ticket.id !== selected.value?.id,
+) ?? false);
+const startAllowed = computed(() =>
+  selected.value?.source === "ticket" && selected.value.status === "called" &&
+  !startPermissionMessage.value && !anotherConsultation.value &&
+  date.value === clinicToday.value && !loading.value && !starting.value,
+);
+async function startConsultation() {
+  const ticket = selected.value;
+  const doctor = feed.value?.doctor;
+  const branch = feed.value?.branch;
+  if (!startAllowed.value || !ticket || !doctor || !branch) return;
+  const chosenKey = ticket.key;
+  starting.value = true;
+  error.value = "";
+  try {
+    if (!Number.isInteger(ticket.version) || (ticket.version ?? 0) < 1) {
+      throw new Error("Navbat versiyasi topilmadi. Sahifani yangilang.");
+    }
+    const slot = await resolveDoctorStartSlot(
+      ticket, doctor.id, branch.id, date.value, branch.timezone,
+    );
+    // If the doctor/date/patient was switched while availability loaded, do
+    // not send a mutation for the previously selected patient.
+    if (selected.value?.key !== chosenKey ||
+      feed.value?.doctor?.id !== doctor.id || feed.value?.branch?.id !== branch.id ||
+      date.value !== clinicToday.value) return;
+    await clinicRequest("queue-tickets/" + encodeURIComponent(ticket.id) + "/start", {
+      method: "POST",
+      body: { expected_version: ticket.version, ...slot },
+    });
+    await load(chosenKey);
+  } catch (cause) {
+    const message = errorText(cause);
+    try {
+      await load(chosenKey);
+    } finally {
+      error.value = message;
+    }
+  } finally {
+    starting.value = false;
   }
 }
 const completed = (row: DisplayRow) => row.status === "completed";
@@ -327,6 +393,22 @@ function genderLabel(gender: string | null) {
               <div><dt>Vaqt / Navbat</dt><dd>{{ visitTime(selected) }}</dd></div>
               <div><dt>Holati</dt><dd>{{ statusText(selected) }}</dd></div>
             </dl>
+            <div v-if="selected.source === 'ticket' && selected.status === 'called'" class="dw-start-block">
+              <button type="button" class="dw-start-button" data-permission="workspace.view"
+                :disabled="!startAllowed" @click="startConsultation">
+                <Play :size="18" />
+                {{ starting ? "Qabul boshlanmoqda..." : "Qabulni boshlash" }}
+              </button>
+              <p v-if="startPermissionMessage" class="dw-start-hint" role="status">
+                {{ startPermissionMessage }}
+              </p>
+              <p v-else-if="anotherConsultation" class="dw-start-hint" role="status">
+                Oldingi qabul yakunlanmaguncha boshqa bemorni qabulga olib bo‘lmaydi.
+              </p>
+              <p v-else-if="date !== clinicToday" class="dw-start-hint" role="status">
+                Faqat bugungi chaqirilgan bemorning qabulini boshlash mumkin.
+              </p>
+            </div>
             <p class="dw-live-warning">
               Qabulning tibbiy yozuvlari hali haqiqiy API bilan ulanmagan. Bu sahifa hozircha
               faqat bemorlar va navbatning serverdagi holatini ko‘rsatadi; demo shikoyat,
@@ -362,6 +444,10 @@ function genderLabel(gender: string | null) {
 .dw-live-visit dl > div { display: grid; grid-template-columns: 160px 1fr; gap: 16px; border-bottom: 1px solid #e8eff8; padding-bottom: 12px; }
 .dw-live-visit dt { color: #647b99; }
 .dw-live-visit dd { margin: 0; font-weight: 600; }
+.dw-start-block { margin-top: 18px; }
+.dw-start-button { min-height: 44px; padding: 10px 18px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 9px; background: #146dff; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.dw-start-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.dw-start-hint { margin: 8px 0 0; color: #647b99; font-size: 13px; }
 .dw-live-warning { background: #f2f7ff; padding: 14px; border-radius: 10px; color: #476488; margin-top: 18px; line-height: 1.5; }
 .dw-live-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; color: #7790b1; min-height: 250px; }
 .dw-call-next { margin: auto 6px 0; width: calc(100% - 12px); min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #146dff; color: white; border: 1px solid #146dff; border-radius: 9px; font: inherit; font-weight: 700; cursor: pointer; }
