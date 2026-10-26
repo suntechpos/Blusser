@@ -1,5 +1,6 @@
 import { clinicRequest } from "./api";
 import type { WorkspacePatientRow } from "./doctorWorkspace";
+import { session } from "./session";
 
 export interface DoctorStartSlot {
   room_id: string;
@@ -46,6 +47,19 @@ export async function resolveDoctorStartSlot(
 ): Promise<DoctorStartSlot> {
   if (ticket.status !== "called" || !ticket.visit_id) {
     throw new Error("Faqat chaqirilgan bemor qabulini boshlash mumkin.");
+  }
+  // Own doctor gets only the appointment/slot already authorized for this
+  // called ticket. This does not reveal clinic-wide services or schedules.
+  if (session.grants?.["queues.start"] === "own") {
+    const slot = (await clinicRequest<DoctorStartSlot>(
+      "queue-tickets/" + encodeURIComponent(ticket.id) + "/own-start-slot",
+    )).data;
+    if (!slot.room_id || !slot.starts_at || !slot.ends_at ||
+        Date.parse(slot.ends_at) <= Date.now() ||
+        localDay(slot.starts_at, zone) !== date) {
+      throw new Error("Bugungi qabul uchun bo‘sh xona va vaqt topilmadi.");
+    }
+    return slot;
   }
   if (ticket.appointment_id) {
     const appointment = (await clinicRequest<AppointmentProjection>(
