@@ -159,6 +159,38 @@ final class QueuesApiTest extends FoundationTestCase
         $this->browser($jar, 'GET', $url)->assertUnauthorized();
     }
 
+    public function test_call_is_fifo_and_blocked_until_previous_patient_completes(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $first = $this->queue($a);
+        $secondPatient = app(Patients::class)->command($this->actor($a['user']), $a['tenant'],
+            'create', null, ['name' => 'Second queue patient', 'date_of_birth' => '1992-03-04',
+                'branch_id' => $a['branch']], (string) Str::uuid())['patient'];
+        $second = $this->queue([...$a, 'patient' => $secondPatient]);
+        $firstId = $first['ticket']['id'];
+        $secondId = $second['ticket']['id'];
+
+        // Even a direct API call with a valid ticket ID cannot skip FIFO.
+        $this->denied(fn () => $this->queue($a, 'call', $secondId,
+            ['expected_version' => 1]), 'conflict');
+        $this->assertSame('waiting', DB::connection('migration')->table('queue_tickets')
+            ->where('id', $secondId)->value('status'));
+
+        $called = $this->queue($a, 'call', $firstId, ['expected_version' => 1]);
+        $this->assertSame('called', $called['ticket']['status']);
+        $this->denied(fn () => $this->queue($a, 'call', $secondId,
+            ['expected_version' => 1]), 'conflict');
+
+        $this->queue($a, 'start', $firstId, $this->startData($a, 2));
+        $this->denied(fn () => $this->queue($a, 'call', $secondId,
+            ['expected_version' => 1]), 'conflict');
+
+        $this->queue($a, 'complete', $firstId, ['expected_version' => 3]);
+        $after = $this->queue($a, 'call', $secondId, ['expected_version' => 1]);
+        $this->assertSame('called', $after['ticket']['status']);
+        $this->assertSame(2, $after['ticket']['number']);
+    }
+
     public function test_linked_appointment_reuses_reservation_and_completion_releases_it(): void
     {
         $a = $this->reference($this->fixture()['a']);
