@@ -26,9 +26,19 @@ let sequence = 0;
 
 async function load(preferredKey = "") {
   const request = ++sequence;
-  // Never show the previous doctor's patients while a different identity/doctor loads.
-  feed.value = null;
-  selectedKey.value = "";
+  // A routine refresh of the SAME doctor/branch/date must not unmount the
+  // consultation tab: this resets the selected tab and causes a white flash.
+  // Switching any scope, or changing identity (see the session watcher below),
+  // still removes the old patient's data immediately to avoid stale disclosure.
+  const previous = feed.value;
+  const sameScope = !!previous &&
+    previous.doctor?.id === doctorId.value &&
+    previous.branch?.id === branchId.value &&
+    previous.date === date.value;
+  if (!sameScope) {
+    feed.value = null;
+    selectedKey.value = "";
+  }
   error.value = "";
   loading.value = true;
   try {
@@ -38,8 +48,16 @@ async function load(preferredKey = "") {
       ...(branchId.value ? { branch_id: branchId.value } : {}),
     });
     if (request !== sequence) return;
+    const stillSameScope = sameScope &&
+      result.doctor?.id === previous?.doctor?.id &&
+      result.branch?.id === previous?.branch?.id &&
+      result.date === previous?.date;
+    // Preserve the patient's current selection even when they click another
+    // row while a background refresh is pending. Action handlers can still
+    // explicitly select the ticket they just called/started.
+    const retainedSelection = stillSameScope ? selectedKey.value : "";
     feed.value = result;
-    selectedKey.value = preferredKey;
+    selectedKey.value = preferredKey || retainedSelection;
     doctorId.value = result.doctor?.id || "";
     branchId.value = result.branch?.id || "";
     date.value = result.date || "";

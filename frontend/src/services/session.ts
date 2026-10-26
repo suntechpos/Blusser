@@ -116,12 +116,14 @@ async function loadContext() {
   session.grants = access.grants;
   session.branches = access.branches;
 }
-function accessSignature(access: ClinicAccess) {
+function authorizationSignature(access: ClinicAccess) {
   return JSON.stringify([
+    // Permission/scope changes must still invalidate every loaded clinic view.
     Object.entries(access.grants).sort(([a], [b]) => a.localeCompare(b)),
+    // Available branch IDs and active flags are authorization-relevant.
     [...access.branches]
       .sort((a, b) => a.id.localeCompare(b.id))
-      .map((b) => [b.id, b.name, b.active, b.timezone]),
+      .map((b) => [b.id, b.active]),
   ]);
 }
 /** Recheck authorization on focus without destroying an unchanged patient draft. */
@@ -162,11 +164,14 @@ export async function revalidateSession() {
     if (!token.current()) return;
     session.user = user;
     session.clinics = clinics.data.data;
-    if (
-      !session.grants ||
-      accessSignature(access) !==
-        accessSignature({ grants: session.grants, branches: session.branches })
-    ) {
+    const authorizationChanged = !session.grants ||
+      authorizationSignature(access) !== authorizationSignature({
+        grants: session.grants,
+        branches: session.branches,
+      });
+    if (authorizationChanged) {
+      // Keep the security-driven reset: a revoked or changed permission must
+      // discard patient views, not quietly keep previously loaded data.
       const branch = session.branch;
       clearClinic();
       session.grants = access.grants;
@@ -174,6 +179,11 @@ export async function revalidateSession() {
       session.branch = access.branches.some((b) => b.id === branch)
         ? branch
         : "";
+    } else {
+      // The background 15-second check also refreshes display metadata.
+      // A branch name or timezone update is not a permission change and must
+      // not increment session.epoch / recreate the entire clinical workspace.
+      session.branches = access.branches;
     }
     session.error = "";
   } catch (e) {
