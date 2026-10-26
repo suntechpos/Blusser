@@ -65,7 +65,7 @@ BEGIN
  IF NOT FOUND THEN RETURN jsonb_build_object('data',NULL); END IF;
  RETURN jsonb_build_object('data',jsonb_build_object(
    'id',d.id,
-   'number','DX-'||lpad(d.record_number::text,6,'0'),
+   'number','DX-'||CASE WHEN d.record_number<1000000 THEN lpad(d.record_number::text,6,'0') ELSE d.record_number::text END,
    'visit_id',d.visit_id,
    'patient_id',d.patient_id,
    'diagnosis_text',d.diagnosis_text,
@@ -94,7 +94,7 @@ BEGIN
    OR (SELECT count(*) FROM jsonb_object_keys(body))<>3
    OR NOT (body ?& ARRAY['diagnosis_text','diagnosis_type','icd_code'])
    OR content IS NULL OR length(content) NOT BETWEEN 1 AND 4000
-   OR kind NOT IN ('preliminary','final')
+   OR kind IS NULL OR kind NOT IN ('preliminary','final')
    OR (code IS NOT NULL AND code !~ '^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$') THEN
    RAISE EXCEPTION 'Invalid diagnosis' USING ERRCODE='22023';
  END IF;
@@ -107,6 +107,7 @@ BEGIN
    OR public.permission_scope('workspace.view') IS NULL
    OR public.permission_scope('workspace.consult') IS NULL
    OR NOT governance.queue_scope('queues.view',v.doctor_id,v.branch_id)
+   OR NOT governance.doctor_branch_live(v.doctor_id,v.branch_id)
    OR NOT EXISTS(
      SELECT 1 FROM public.queue_tickets q
      WHERE (q.tenant_id,q.visit_id)=(tid,vid) AND q.status='in_progress')
