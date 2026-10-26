@@ -106,7 +106,16 @@ const clinicToday = computed(() => {
   const part = (type: string) => parts.find((p) => p.type === type)?.value || "";
   return part("year") + "-" + part("month") + "-" + part("day");
 });
-const callAllowed = computed(() => can("queues.call") && !!nextTicket.value
+const callPermissionMessage = computed(() => {
+  if (!can("queues.view")) return "Navbatlarni ko‘rish ruxsati berilmagan.";
+  if (!can("queues.call")) return "Shifokorga bemor chaqirish ruxsati berilmagan.";
+  if (!can("visits.view")) return "Tashriflarni ko‘rish ruxsati berilmagan.";
+  if (nextTicket.value?.appointment_id && !can("appointments.view")) {
+    return "Qabullarni ko‘rish ruxsati berilmagan.";
+  }
+  return "";
+});
+const callAllowed = computed(() => !callPermissionMessage.value && !!nextTicket.value
   && date.value === clinicToday.value && !loading.value && !calling.value);
 const callLabel = computed(() => feed.value?.has_called_today ? "Keyingi bemor" : "Bemorni chaqirish");
 
@@ -269,8 +278,8 @@ function genderLabel(gender: string | null) {
           <Megaphone :size="18" />
           {{ calling ? "Chaqirilmoqda..." : callLabel }}
         </button>
-        <p v-if="feed?.doctor && !can('queues.call')" class="dw-call-hint">
-          Shifokorga bemor chaqirish ruxsati berilmagan.
+        <p v-if="feed?.doctor && callPermissionMessage" class="dw-call-hint">
+          {{ callPermissionMessage }}
         </p>
         <p v-else-if="feed?.doctor && date !== clinicToday" class="dw-call-hint">
           Bemorlarni faqat bugungi navbatdan chaqirish mumkin.
