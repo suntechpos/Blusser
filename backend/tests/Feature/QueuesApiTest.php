@@ -728,6 +728,30 @@ WORKER;
         $this->assertSame(0, $db->table('operation_events')->where('action', 'requeue')->count());
     }
 
+    public function test_own_doctor_start_does_not_require_clinic_wide_catalogue_or_scheduling_list_rights(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $ticket = $this->queue($a)['ticket']['id'];
+        $this->queue($a, 'call', $ticket, ['expected_version' => 1]);
+
+        $this->grant($a, 'queues.start', 'own');
+        $this->grant($a, 'queues.view', 'own');
+        foreach (['services.view', 'rooms.view', 'doctors.view',
+            'schedules.view', 'patients.view', 'appointments.update'] as $code) {
+            $this->grant($a, $code, null);
+        }
+
+        $started = $this->queue($a, 'start', $ticket, $this->startData($a, 2));
+        $this->assertSame('in_progress', $started['ticket']['status']);
+        $this->assertSame('in_progress', $started['visit']['status']);
+        $this->assertSame(1, DB::connection('migration')->table('resource_reservations')->count());
+
+        // Replays preserve authorization: revoking the operation itself is never bypassed.
+        $this->grant($a, 'queues.start', null);
+        $this->denied(fn () => $this->queue($a, 'start', $ticket,
+            $this->startData($a, 2)), 'forbidden');
+    }
+
     public function test_start_replay_rechecks_reference_permissions_and_call_rechecks_doctor_eligibility(): void
     {
         $a = $this->reference($this->fixture()['a']);
