@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Clock3, Eye, LockKeyhole, Plus, Search } from "lucide-vue-next";
+import { Clock3, LockKeyhole, Plus, Search } from "lucide-vue-next";
 import HistoryPanel from "./HistoryPanel.vue";
 import RecordsPanel from "./RecordsPanel.vue";
 import type { Encounter } from "../../mocks/doctorWorkspace";
@@ -104,7 +104,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
             <input id="dw-live-diagnosis" aria-label="Tashxis nomi yoki kodi"
               placeholder="Tashxis nomi yoki kodi..." />
           </label>
-          <select aria-label="Tashxis turi" defaultValue="Dastlabki">
+          <select aria-label="Tashxis turi">
             <option>Dastlabki</option>
             <option>Yakuniy</option>
           </select>
