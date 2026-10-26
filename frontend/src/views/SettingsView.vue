@@ -176,8 +176,8 @@ function validateDraft() {
   if (!draft.value.name.trim()) throw Error("Rol nomini kiriting.");
   if (store.state.value.roles.some((r) =>
     r.id !== draft.value.id &&
-    r.name.trim().replace(/\\s+/g, " ").toLowerCase() ===
-      draft.value.name.trim().replace(/\\s+/g, " ").toLowerCase(),
+    r.name.trim().replace(/\s+/g, " ").toLowerCase() ===
+      draft.value.name.trim().replace(/\s+/g, " ").toLowerCase(),
   )) throw Error("Rol nomi takrorlangan.");
   if (!draft.value.permissions.length) throw Error("Kamida bitta foydali ruxsat tanlang.");
   if (scopeConflicts.value.length) throw Error("Ruxsat doiralari mos emas. Quyidagi xatolarni to‘g‘rilang.");
