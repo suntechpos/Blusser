@@ -23,13 +23,16 @@ final class VisitClinicalNoteController
     {
         $data = $this->validateStrict($request->all(), [
             'expected_version' => 'required|integer|min:0',
-            'complaints' => 'required|string|max:10000',
-            'anamnesis' => 'required|string|max:10000',
-            'examination' => 'required|string|max:10000',
+            'complaints' => 'present|nullable|string|max:10000',
+            'anamnesis' => 'present|nullable|string|max:10000',
+            'examination' => 'present|nullable|string|max:10000',
         ]);
-        // Empty strings are valid: clinicians can draft individual fields, and
-        // deliberately clear fields. Laravel's default null-normalizer turns
-        // empty request strings to null, so accept null values as empty text.
+        // Laravel's ConvertEmptyStringsToNull middleware normalizes empty
+        // textarea contents to null. Restore empty strings before SQL validation.
+        foreach (['complaints', 'anamnesis', 'examination'] as $field) {
+            $data[$field] = $data[$field] ?? '';
+        }
+
         return response()->json($this->notes->save(
             $request->user(), $this->tenant($request), $request->route('visit'), $data,
         ))->header('Cache-Control', 'private, no-store');
