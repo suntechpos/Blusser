@@ -11414,6 +11414,24 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Value of first-party XSRF-TOKEN cookie issued by Sanctum CSRF handshake."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Trusted first-party origin. Required for clinical writes."
           }
         ],
         "requestBody": {
@@ -11537,6 +11555,308 @@
                                 "null"
                               ],
                               "example": "K02.1"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/visits/{visit}/clinical-notes": {
+      "get": {
+        "operationId": "get_visit_clinical_notes",
+        "summary": "Read the complaints anamnesis and examination for a visible clinic visit",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "workspace.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized per-visit clinical notes; `data` is null if not created.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive medical records; no caching",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "visit_id",
+                            "patient_id",
+                            "complaints",
+                            "anamnesis",
+                            "examination",
+                            "version",
+                            "updated_at"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "visit_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "patient_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "complaints": {
+                              "type": "string",
+                              "maxLength": 10000
+                            },
+                            "anamnesis": {
+                              "type": "string",
+                              "maxLength": 10000
+                            },
+                            "examination": {
+                              "type": "string",
+                              "maxLength": 10000
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          }
+        }
+      },
+      "put": {
+        "operationId": "put_visit_clinical_notes",
+        "summary": "Save complaints anamnesis and examination for own ongoing consultation",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "workspace.consult",
+          "workspace.view",
+          "visits.view",
+          "queues.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Value of first-party XSRF-TOKEN cookie issued by Sanctum CSRF handshake."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Trusted first-party origin. Required for clinical writes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expected_version",
+                  "complaints",
+                  "anamnesis",
+                  "examination"
+                ],
+                "properties": {
+                  "expected_version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "0 for a first save; current version for update"
+                  },
+                  "complaints": {
+                    "type": "string",
+                    "maxLength": 10000
+                  },
+                  "anamnesis": {
+                    "type": "string",
+                    "maxLength": 10000
+                  },
+                  "examination": {
+                    "type": "string",
+                    "maxLength": 10000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved versioned note with audit log. Cleared fields are empty strings.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive medical records; no caching",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "visit_id",
+                            "patient_id",
+                            "complaints",
+                            "anamnesis",
+                            "examination",
+                            "version",
+                            "updated_at"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "visit_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "patient_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "complaints": {
+                              "type": "string",
+                              "maxLength": 10000
+                            },
+                            "anamnesis": {
+                              "type": "string",
+                              "maxLength": 10000
+                            },
+                            "examination": {
+                              "type": "string",
+                              "maxLength": 10000
                             },
                             "version": {
                               "type": "integer",

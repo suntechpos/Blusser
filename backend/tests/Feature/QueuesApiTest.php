@@ -132,6 +132,74 @@ final class QueuesApiTest extends FoundationTestCase
         return ['expected_version' => $version, 'room_id' => $data['room_id'], 'starts_at' => $data['starts_at'], 'ends_at' => $data['ends_at']];
     }
 
+    public function test_real_clinical_notes_are_versioned_persistent_and_restricted_to_active_doctor_visit(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $ticket = $this->queue($a);
+        $visit = $ticket['visit']['id'];
+        $id = $ticket['ticket']['id'];
+        $this->queue($a, 'call', $id, ['expected_version' => 1]);
+        $this->queue($a, 'start', $id, $this->startData($a, 2));
+
+        $jar = $this->clinicSession($a);
+        $url = '/api/v1/clinic/visits/'.$visit.'/clinical-notes';
+        $this->browser($jar, 'GET', $url)->assertOk()->assertJsonPath('data', null);
+
+        $body = [
+            'expected_version' => 0,
+            'complaints' => 'Tish og‘rig‘i',
+            'anamnesis' => '',
+            'examination' => '',
+        ];
+        $this->browser($jar, 'PUT', $url, $body, false)->assertStatus(419);
+        $this->browser($jar, 'PUT', $url, $body)->assertOk()
+            ->assertJsonPath('data.version', 1)
+            ->assertJsonPath('data.complaints', $body['complaints'])
+            ->assertJsonPath('data.anamnesis', '')
+            ->assertJsonPath('data.examination', '');
+        $saved = $this->browser($jar, 'GET', $url)->assertOk()->json('data');
+        $this->assertSame($visit, $saved['visit_id']);
+        $this->assertSame($a['patient']['id'], $saved['patient_id']);
+
+        // Optimistic concurrency must prevent a second browser from silently
+        // overwriting previously saved medical observations.
+        $this->browser($jar, 'PUT', $url, $body)->assertConflict();
+        $revised = [
+            'expected_version' => 1,
+            'complaints' => 'O‘ng jag‘ og‘riydi',
+            'anamnesis' => '3 kundan beri',
+            'examination' => 'Klinik ko‘rik natijalari',
+        ];
+        $this->browser($jar, 'PUT', $url, $revised)->assertOk()
+            ->assertJsonPath('data.version', 2)
+            ->assertJsonPath('data.anamnesis', '3 kundan beri');
+        $this->browser($jar, 'GET', $url)->assertOk()
+            ->assertJsonPath('data.complaints', 'O‘ng jag‘ og‘riydi')
+            ->assertJsonPath('data.examination', 'Klinik ko‘rik natijalari');
+
+        foreach ([
+            [...$revised, 'extra' => 'disallowed'],
+            [...$revised, 'expected_version' => 2, 'complaints' => str_repeat('x', 10001)],
+            [...$revised, 'expected_version' => 2, 'examination' => ['array']],
+        ] as $invalid) {
+            $this->browser($jar, 'PUT', $url, $invalid)->assertUnprocessable();
+        }
+        $this->assertSame(2, DB::connection('migration')->table('audit_logs')
+            ->where('action', 'clinical_note.save')->count());
+
+        $this->grant($a, 'workspace.consult', null);
+        $this->browser($jar, 'PUT', $url, [...$revised, 'expected_version' => 2])->assertForbidden();
+        $this->grant($a, 'workspace.consult', 'own');
+
+        // A visit is no longer writable after its queue/visit lifecycle ends.
+        DB::connection('migration')->table('queue_tickets')->where('id', $id)->update(['status' => 'completed']);
+        DB::connection('migration')->table('visits')->where('id', $visit)->update(['status' => 'completed']);
+        $this->browser($jar, 'PUT', $url, [...$revised, 'expected_version' => 2])->assertForbidden();
+        $this->browser($jar, 'GET', $url)->assertOk()->assertJsonPath('data.version', 2);
+        $this->assertSame(2, DB::connection('migration')->table('audit_logs')
+            ->where('action', 'clinical_note.save')->count());
+    }
+
     public function test_real_visit_diagnosis_is_versioned_audited_and_scoped_to_own_doctor(): void
     {
         $a = $this->reference($this->fixture()['a']);

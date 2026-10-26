@@ -4,6 +4,7 @@ import { Clock3, LockKeyhole, Plus } from "lucide-vue-next";
 import HistoryPanel from "./HistoryPanel.vue";
 import RecordsPanel from "./RecordsPanel.vue";
 import DiagnosisEditor from "./DiagnosisEditor.vue";
+import ClinicalNotesEditor from "./ClinicalNotesEditor.vue";
 import type { Encounter } from "../../mocks/doctorWorkspace";
 import type { WorkspacePatientRow, WorkspaceDoctor, WorkspaceBranch } from "../../services/doctorWorkspace";
 
@@ -79,25 +80,11 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         </span>
       </div>
       <p class="dw-preview-notice" role="status">
-        Tashxis bo‘limi haqiqiy API orqali saqlanadi. Shikoyatlar, anamnez,
-        ko‘rik natijalari va tavsiyalar keyingi tasklarda ulanadi.
+        Shikoyatlar, anamnez, ko‘rik natijalari va tashxis serverga alohida saqlanadi.
+        Tavsiyalar, retsept va yo‘llanmalar keyingi bosqichda ulanadi.
       </p>
-      <fieldset disabled aria-label="Tibbiy yozuvlar API ulanmagan" class="dw-readonly-fields">
-        <div class="dw-grid-2">
-          <label class="dw-field">
-            Shikoyatlar
-            <textarea aria-label="Shikoyatlar" placeholder="Shikoyatlarni kiriting..." rows="3" />
-          </label>
-          <label class="dw-field">
-            Anamnez
-            <textarea aria-label="Anamnez" placeholder="Kasallik tarixini kiriting..." rows="3" />
-          </label>
-        </div>
-        <label class="dw-field">
-          Ko‘rik natijalari
-          <textarea aria-label="Ko‘rik natijalari" placeholder="Ko‘rik natijalarini kiriting..." rows="2" />
-        </label>
-      </fieldset>
+      <ClinicalNotesEditor v-if="patient.visit_id" :key="patient.visit_id"
+        :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
       <DiagnosisEditor v-if="patient.visit_id" :key="patient.visit_id"
         :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
       <fieldset disabled aria-label="Keyingi taskda ulanadigan tavsiyalar" class="dw-readonly-fields">
@@ -122,7 +109,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         </button>
       </div>
       <p class="dw-footnote"><LockKeyhole :size="17" />
-        Tashxis alohida saqlanadi. Qolgan klinik maydonlar keyingi tasklarda ulanadi.
+        Ko‘rik yozuvlari va tashxis alohida saqlanadi. Tavsiyalar hamda qolgan amallar keyingi tasklarda ulanadi.
       </p>
     </article>
 
