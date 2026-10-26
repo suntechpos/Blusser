@@ -1943,9 +1943,6 @@
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
           "428": {
             "description": "Current version required for role mutations/profile mode updates.",
             "headers": {
@@ -1956,6 +1953,9 @@
                 "description": "no-store, private"
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         },
         "requestBody": {
@@ -2162,9 +2162,6 @@
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
           "428": {
             "description": "Current version required for role mutations/profile mode updates.",
             "headers": {
@@ -2175,6 +2172,9 @@
                 "description": "no-store, private"
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         },
         "requestBody": {
@@ -2293,9 +2293,6 @@
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
           "428": {
             "description": "Current version required for role mutations/profile mode updates.",
             "headers": {
@@ -2306,6 +2303,9 @@
                 "description": "no-store, private"
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -2527,9 +2527,6 @@
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
           "428": {
             "description": "Current version required for role mutations/profile mode updates.",
             "headers": {
@@ -2540,6 +2537,9 @@
                 "description": "no-store, private"
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         },
         "requestBody": {
@@ -2723,6 +2723,29 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Atomic editor operation completed.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "no-store, private"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessWriteResult"
+                }
+              }
+            }
+          },
           "204": {
             "description": "Update employee assignments",
             "headers": {
@@ -2766,9 +2789,6 @@
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
           "428": {
             "description": "Current version required for role mutations/profile mode updates.",
             "headers": {
@@ -2780,28 +2800,8 @@
               }
             }
           },
-          "200": {
-            "description": "Atomic editor operation completed.",
-            "headers": {
-              "ETag": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Cache-Control": {
-                "schema": {
-                  "type": "string"
-                },
-                "description": "no-store, private"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccessWriteResult"
-                }
-              }
-            }
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         },
         "requestBody": {
@@ -2927,9 +2927,6 @@
           "422": {
             "$ref": "#/components/responses/ValidationError"
           },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
           "428": {
             "description": "Current version required for role mutations/profile mode updates.",
             "headers": {
@@ -2940,6 +2937,9 @@
                 "description": "no-store, private"
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -10063,9 +10063,6 @@
           "422": {
             "$ref": "#/components/responses/Failure422"
           },
-          "429": {
-            "$ref": "#/components/responses/Failure429"
-          },
           "428": {
             "description": "If-Match with the current record version is required.",
             "headers": {
@@ -10084,6 +10081,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
           }
         },
         "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
@@ -10189,9 +10189,6 @@
           "422": {
             "$ref": "#/components/responses/Failure422"
           },
-          "429": {
-            "$ref": "#/components/responses/Failure429"
-          },
           "428": {
             "description": "If-Match with the current record version is required.",
             "headers": {
@@ -10210,6 +10207,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
           }
         },
         "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
@@ -10700,9 +10700,6 @@
           "422": {
             "$ref": "#/components/responses/Failure422"
           },
-          "429": {
-            "$ref": "#/components/responses/Failure429"
-          },
           "428": {
             "description": "If-Match with the current record version is required.",
             "headers": {
@@ -10721,6 +10718,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
           }
         },
         "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
@@ -10827,9 +10827,6 @@
           "422": {
             "$ref": "#/components/responses/Failure422"
           },
-          "429": {
-            "$ref": "#/components/responses/Failure429"
-          },
           "428": {
             "description": "If-Match with the current record version is required.",
             "headers": {
@@ -10848,6 +10845,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
           }
         },
         "description": "Existing first-party Sanctum session and selected tenant required. Existing permissions require entire_clinic scope. FORCE RLS, real tenant-local IDs, current authority and mutation audit apply. No destructive deletion or duplicate booking catalog. Mutations use Idempotency-Key; changed replay payload returns 409. PUT/status requires current version via If-Match. Changing active through PUT additionally requires the corresponding status permission. Service duration changes referenced by appointments/visits return409 to preserve history.",
@@ -10859,6 +10859,307 @@
                 "$ref": "#/components/schemas/CatalogStatusInput"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/employee-work-schedules/{employee}": {
+      "get": {
+        "operationId": "get_employee_work_schedules",
+        "summary": "Read an employee's weekly work schedule",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "employees.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "employee",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized employee work schedule with version and day records.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        }
+      },
+      "put": {
+        "operationId": "put_employee_work_schedules",
+        "summary": "Update employee weekly work schedule",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "employees.update",
+          "employees.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "employee",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "branch_id",
+                  "days",
+                  "confirmed_removals"
+                ],
+                "properties": {
+                  "branch_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "days": {
+                    "type": "array",
+                    "maxItems": 7,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "weekday": {
+                          "type": "integer"
+                        },
+                        "start_time": {
+                          "type": "string"
+                        },
+                        "end_time": {
+                          "type": "string"
+                        },
+                        "receives_patients": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  },
+                  "confirmed_removals": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated schedule with version and day records.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/doctor-workspace": {
+      "get": {
+        "operationId": "get_doctor_workspace",
+        "summary": "Read real doctor-specific queue and appointment data",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "workspace.view"
+        ],
+        "description": "Session-derived signed-in doctor and its associated patients; manager can explicitly select a doctor. Enforced by PostgreSQL; read-only.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "doctor_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized doctor, branch, date, scheduled appointments and queue tickets.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Failure429"
           }
         }
       }
