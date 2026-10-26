@@ -132,6 +132,73 @@ final class QueuesApiTest extends FoundationTestCase
         return ['expected_version' => $version, 'room_id' => $data['room_id'], 'starts_at' => $data['starts_at'], 'ends_at' => $data['ends_at']];
     }
 
+    public function test_real_visit_diagnosis_is_versioned_audited_and_scoped_to_own_doctor(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $ticket = $this->queue($a);
+        $visit = $ticket['visit']['id'];
+        $id = $ticket['ticket']['id'];
+        $this->queue($a, 'call', $id, ['expected_version' => 1]);
+        $this->queue($a, 'start', $id, $this->startData($a, 2));
+
+        $jar = $this->clinicSession($a);
+        $path = '/api/v1/clinic/visits/'.$visit.'/diagnosis';
+
+        $this->browser($jar, 'GET', $path)->assertOk()->assertJsonPath('data', null);
+        $new = ['expected_version' => 0, 'diagnosis_text' => 'Dentin kariyesi, klinik belgilar bilan',
+            'diagnosis_type' => 'preliminary', 'icd_code' => 'K02.1'];
+        $this->browser($jar, 'PUT', $path, $new, false)->assertStatus(419);
+        $this->browser($jar, 'PUT', $path, $new)->assertOk()
+            ->assertJsonPath('data.version', 1)
+            ->assertJsonPath('data.diagnosis_type', 'preliminary')
+            ->assertJsonPath('data.icd_code', 'K02.1')
+            ->assertJsonPath('data.diagnosis_text', $new['diagnosis_text']);
+        $saved = $this->browser($jar, 'GET', $path)->assertOk()->json('data');
+        $this->assertStringStartsWith('DX-', $saved['number']);
+        $this->assertSame($visit, $saved['visit_id']);
+        $this->assertSame($a['patient']['id'], $saved['patient_id']);
+        $this->assertSame(1, $saved['version']);
+        $this->assertSame(1, DB::connection('migration')->table('audit_logs')
+            ->where('action', 'diagnosis.save')->count());
+
+        // A stale tab may not silently overwrite the clinician's newer entry.
+        $this->browser($jar, 'PUT', $path, $new)->assertStatus(409);
+        $updated = [...$new, 'expected_version' => 1,
+            'diagnosis_text' => 'Yakuni: dentin kariyesi', 'diagnosis_type' => 'final',
+            'icd_code' => null];
+        $this->browser($jar, 'PUT', $path, $updated)->assertOk()
+            ->assertJsonPath('data.version', 2)
+            ->assertJsonPath('data.diagnosis_type', 'final')
+            ->assertJsonPath('data.icd_code', null);
+        $this->browser($jar, 'GET', $path)->assertJsonPath('data.diagnosis_text', $updated['diagnosis_text']);
+        $this->assertSame(2, DB::connection('migration')->table('audit_logs')
+            ->where('action', 'diagnosis.save')->count());
+
+        foreach ([
+            [...$updated, 'expected_version' => 2, 'icd_code' => 'not-a-code'],
+            [...$updated, 'expected_version' => 2, 'patient_id' => $a['patient']['id']],
+            [...$updated, 'expected_version' => 2, 'diagnosis_text' => '  '],
+        ] as $invalid) {
+            $this->browser($jar, 'PUT', $path, $invalid)->assertStatus(422);
+        }
+
+        // Real authorization must enforce doctor identity; broad catalogue
+        // or generic admin scopes alone never authorize writing an encounter.
+        $this->grant($a, 'workspace.consult', null);
+        $this->browser($jar, 'PUT', $path, [...$updated, 'expected_version' => 2])->assertForbidden();
+        $this->grant($a, 'workspace.consult', 'own');
+
+        // Completed visits are read-only even for the same doctor.
+        DB::connection('migration')->table('queue_tickets')->where('id', $id)
+            ->update(['status' => 'completed']);
+        DB::connection('migration')->table('visits')->where('id', $visit)
+            ->update(['status' => 'completed']);
+        $this->browser($jar, 'PUT', $path, [...$updated, 'expected_version' => 2])->assertForbidden();
+        $this->browser($jar, 'GET', $path)->assertOk()->assertJsonPath('data.version', 2);
+        $this->assertSame(2, DB::connection('migration')->table('audit_logs')
+            ->where('action', 'diagnosis.save')->count());
+    }
+
     public function test_real_cookie_http_all_eleven_operations_and_synchronized_lifecycle(): void
     {
         $a = $this->reference($this->fixture()['a']);

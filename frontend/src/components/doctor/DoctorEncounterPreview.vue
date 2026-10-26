@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Clock3, LockKeyhole, Plus, Search } from "lucide-vue-next";
+import { Clock3, LockKeyhole, Plus } from "lucide-vue-next";
 import HistoryPanel from "./HistoryPanel.vue";
 import RecordsPanel from "./RecordsPanel.vue";
+import DiagnosisEditor from "./DiagnosisEditor.vue";
 import type { Encounter } from "../../mocks/doctorWorkspace";
 import type { WorkspacePatientRow, WorkspaceDoctor, WorkspaceBranch } from "../../services/doctorWorkspace";
 
@@ -70,7 +71,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
       </button>
     </div>
 
-    <article v-if="tab === 'Bugungi qabul'" class="dw-card dw-current" role="tabpanel">
+    <article v-show="tab === 'Bugungi qabul'" class="dw-card dw-current" role="tabpanel">
       <div class="dw-section-title">
         <h2>Qabul yozuvi</h2>
         <span class="dw-start">
@@ -78,9 +79,8 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         </span>
       </div>
       <p class="dw-preview-notice" role="status">
-        Qabul boshlandi. Quyidagi klinik forma oldingi veryostkadan qaytarildi,
-        lekin tibbiy yozuvlar API bilan ulanmaguncha faqat ko‘rish uchun.
-        Ma’lumotlar saqlanmaydi.
+        Tashxis bo‘limi haqiqiy API orqali saqlanadi. Shikoyatlar, anamnez,
+        ko‘rik natijalari va tavsiyalar keyingi tasklarda ulanadi.
       </p>
       <fieldset disabled aria-label="Tibbiy yozuvlar API ulanmagan" class="dw-readonly-fields">
         <div class="dw-grid-2">
@@ -97,18 +97,10 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
           Ko‘rik natijalari
           <textarea aria-label="Ko‘rik natijalari" placeholder="Ko‘rik natijalarini kiriting..." rows="2" />
         </label>
-        <div class="dw-diagnosis">
-          <label for="dw-live-diagnosis">Tashxis</label>
-          <label class="dw-search">
-            <Search :size="19" />
-            <input id="dw-live-diagnosis" aria-label="Tashxis nomi yoki kodi"
-              placeholder="Tashxis nomi yoki kodi..." />
-          </label>
-          <select aria-label="Tashxis turi">
-            <option>Dastlabki</option>
-            <option>Yakuniy</option>
-          </select>
-        </div>
+      </fieldset>
+      <DiagnosisEditor v-if="patient.visit_id" :key="patient.visit_id"
+        :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
+      <fieldset disabled aria-label="Keyingi taskda ulanadigan tavsiyalar" class="dw-readonly-fields">
         <label class="dw-field">
           Tavsiyalar
           <textarea aria-label="Tavsiyalar" placeholder="Tavsiyalarni kiriting..." rows="2" />
@@ -130,11 +122,11 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         </button>
       </div>
       <p class="dw-footnote"><LockKeyhole :size="17" />
-        Tibbiy yozuvlar serverga ulanmagani uchun tahrirlash va saqlash o‘chirilgan.
+        Tashxis alohida saqlanadi. Qolgan klinik maydonlar keyingi tasklarda ulanadi.
       </p>
     </article>
 
-    <template v-else-if="tab === 'Tashriflar tarixi'">
+    <template v-if="tab === 'Tashriflar tarixi'">
       <p class="dw-preview-notice dw-preview-tab-notice" role="status">
         Tashriflar tarixi API hali ulanmagan. Quyida faqat eski veryostka ko‘rsatilgan.
       </p>
@@ -142,7 +134,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         :visits="[]" />
     </template>
 
-    <template v-else>
+    <template v-else-if="tab === 'Tekshiruv natijalari' || tab === 'Hujjatlar'">
       <p class="dw-preview-notice dw-preview-tab-notice" role="status">
         {{ tab }} API hali ulanmagan. Real natija yoki hujjat mavjud deb ko‘rsatilmaydi.
       </p>

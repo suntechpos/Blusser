@@ -26,6 +26,11 @@ async function setup(
 ) {
   const requests: string[] = [];
   const queue = rows.map((row) => ({ ...row, version: row.version ?? 1, called_at: row.called_at ?? null }));
+  const diagnoses = new Map<string, {
+    id: string; number: string; visit_id: string; patient_id: string;
+    diagnosis_text: string; diagnosis_type: string; icd_system: string | null;
+    icd_code: string | null; version: number; updated_at: string;
+  }>();
   await page.route("**/api/v1/**", (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -40,6 +45,41 @@ async function setup(
     if (path === "/api/v1/clinic/context") return route.fulfill({ json: {
       grants, branches: branchList, timezone: "Asia/Tashkent",
     }});
+    const diagnosis = path.match(/^\/api\/v1\/clinic\/visits\/([^/]+)\/diagnosis$/);
+    if (diagnosis) {
+      const visitId = diagnosis[1]!;
+      const ticket = queue.find((row) => row.visit_id === visitId);
+      if (!ticket || !grants["visits.view"] || !grants["workspace.view"]) {
+        return route.fulfill({ status: 404, json: { message: "Unavailable" } });
+      }
+      if (route.request().method() === "GET") {
+        return route.fulfill({ json: { data: diagnoses.get(visitId) || null } });
+      }
+      if (route.request().method() === "PUT") {
+        const payload = route.request().postDataJSON();
+        const existing = diagnoses.get(visitId);
+        if (ticket.status !== "in_progress" || !grants["workspace.consult"]) {
+          return route.fulfill({ status: 403, json: { message: "Denied" } });
+        }
+        if (payload.expected_version !== (existing?.version || 0)) {
+          return route.fulfill({ status: 409, json: { message: "Conflict" } });
+        }
+        const next = {
+          id: existing?.id || "diagnosis-created",
+          number: existing?.number || "DX-000001",
+          visit_id: visitId, patient_id: ticket.patient_id,
+          diagnosis_text: payload.diagnosis_text,
+          diagnosis_type: payload.diagnosis_type,
+          icd_system: payload.icd_code ? "ICD-10" : null,
+          icd_code: payload.icd_code,
+          version: (existing?.version || 0) + 1,
+          updated_at: "2026-10-26T07:00:00Z",
+        };
+        diagnoses.set(visitId, next);
+        return route.fulfill({ json: { data: next } });
+      }
+      return route.fulfill({ status: 405, json: { message: "Method not allowed" } });
+    }
     const ownSlot = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/own-start-slot$/);
     if (ownSlot) {
       if (failOwnSlot) {
@@ -312,6 +352,55 @@ test("Task #02: 15-second session recheck updates clinic display metadata withou
   await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toBeVisible();
 });
 
+test("Task #06: real diagnosis can be written, saved and reopened without demo data", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "in_progress", version: 3,
+      started_at: "2026-10-26T06:42:00Z" },
+  ]);
+  const clinical = page.getByRole("region", { name: "Boshlangan qabul interfeysi" });
+  await expect(clinical.getByText("Yangi tashxis")).toBeVisible();
+  await clinical.getByRole("textbox", { name: "Shifokor tashxisi" })
+    .fill("Tishning dentin kariyesi");
+  await clinical.getByRole("combobox", { name: "Tashxis turi" }).selectOption("final");
+  await clinical.getByRole("textbox", { name: "MKB-10 kodi" }).fill("k02.1");
+  await clinical.getByRole("button", { name: "Tashxisni saqlash" }).click();
+  await expect(clinical).toContainText("Tashxis serverga saqlandi.");
+  await expect(clinical).toContainText("DX-000001");
+  await expect(clinical.getByRole("button", { name: "Tashxisni yangilash" })).toBeEnabled();
+  await page.getByRole("tab", { name: "Tashriflar tarixi" }).click();
+  await page.getByRole("tab", { name: "Bugungi qabul" }).click();
+  await expect(clinical.getByRole("textbox", { name: "Shifokor tashxisi" })).toHaveValue("Tishning dentin kariyesi");
+  await expect(clinical.getByRole("textbox", { name: "MKB-10 kodi" })).toHaveValue("K02.1");
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Shifokor tashxisi" })).toHaveValue("Tishning dentin kariyesi");
+  await expect(page.getByRole("combobox", { name: "Tashxis turi" })).toHaveValue("final");
+});
+
+test("Task #06: unsaved diagnosis stays in memory while switching old tabs, but is never claimed as saved", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "in_progress", version: 3, started_at: "2026-10-26T06:42:00Z" },
+  ]);
+  await page.getByRole("textbox", { name: "Shifokor tashxisi" }).fill("Tekshiruvdan oldin dastlabki qayd");
+  await page.getByRole("tab", { name: "Tashriflar tarixi" }).click();
+  await page.getByRole("tab", { name: "Bugungi qabul" }).click();
+  await expect(page.getByRole("textbox", { name: "Shifokor tashxisi" }))
+    .toHaveValue("Tekshiruvdan oldin dastlabki qayd");
+  await expect(page.getByText("Yangi tashxis")).toBeVisible();
+  await expect(page.getByText("Tashxis serverga saqlandi.")).toHaveCount(0);
+});
+
+test("Task #06: diagnosis cannot be edited when consult grant is missing", async ({ page }) => {
+  const grants = { ...allServerGrants };
+  delete grants["workspace.consult"];
+  await setup(page, false, grants, [
+    { ...patient, status: "in_progress", version: 3, started_at: "2026-10-26T06:42:00Z" },
+  ]);
+  await expect(page.getByRole("textbox", { name: "Shifokor tashxisi" })).toBeDisabled();
+  await expect(page.getByText("Ko‘rik ma’lumotlarini saqlash", { exact: false })).toBeVisible();
+});
+
 test("Task #02: real in-progress visit reveals the restored clinical layout read-only", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
   await setup(page, false, allServerGrants, [
@@ -327,7 +416,9 @@ test("Task #02: real in-progress visit reveals the restored clinical layout read
   for (const name of ["Shikoyatlar", "Anamnez", "Ko‘rik natijalari", "Tavsiyalar"]) {
     await expect(clinical.getByRole("textbox", { name })).toBeDisabled();
   }
-  await expect(clinical.getByRole("combobox", { name: "Tashxis turi" })).toBeDisabled();
+  await expect(clinical.getByRole("combobox", { name: "Tashxis turi" })).toBeEnabled();
+  await expect(clinical.getByRole("textbox", { name: "Shifokor tashxisi" })).toBeEnabled();
+  await expect(clinical.getByRole("button", { name: "Tashxisni saqlash" })).toBeDisabled();
   for (const name of ["Yo‘llanma", "Retsept", "Qoralamani saqlash", "Qabulni yakunlash"]) {
     await expect(clinical.getByRole("button", { name })).toBeDisabled();
   }

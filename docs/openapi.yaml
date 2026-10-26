@@ -11249,6 +11249,335 @@
           }
         }
       }
+    },
+    "/api/v1/clinic/visits/{visit}/diagnosis": {
+      "get": {
+        "operationId": "get_visit_diagnosis",
+        "summary": "View the diagnosis for an authorized clinic visit",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "workspace.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized visit diagnosis; `data` is null if none has been saved.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive clinical data; no caching",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "number",
+                            "visit_id",
+                            "patient_id",
+                            "diagnosis_text",
+                            "diagnosis_type",
+                            "version",
+                            "updated_at"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "number": {
+                              "type": "string",
+                              "example": "DX-000125"
+                            },
+                            "visit_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "patient_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "diagnosis_text": {
+                              "type": "string",
+                              "maxLength": 4000
+                            },
+                            "diagnosis_type": {
+                              "type": "string",
+                              "enum": [
+                                "preliminary",
+                                "final"
+                              ]
+                            },
+                            "icd_system": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "ICD-10",
+                                null
+                              ]
+                            },
+                            "icd_code": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "example": "K02.1"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          }
+        }
+      },
+      "put": {
+        "operationId": "put_visit_diagnosis",
+        "summary": "Write diagnosis to an active consultation (doctor's own visit only)",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "workspace.consult",
+          "workspace.view",
+          "visits.view",
+          "queues.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expected_version",
+                  "diagnosis_text",
+                  "diagnosis_type",
+                  "icd_code"
+                ],
+                "properties": {
+                  "expected_version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "0 to create; saved version to update"
+                  },
+                  "diagnosis_text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "diagnosis_type": {
+                    "type": "string",
+                    "enum": [
+                      "preliminary",
+                      "final"
+                    ]
+                  },
+                  "icd_code": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][0-9]{2}(\\.[0-9A-Za-z]{1,4})?$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved diagnosis and incremented optimistic version.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Sensitive clinical data; no caching",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "number",
+                            "visit_id",
+                            "patient_id",
+                            "diagnosis_text",
+                            "diagnosis_type",
+                            "version",
+                            "updated_at"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "number": {
+                              "type": "string",
+                              "example": "DX-000125"
+                            },
+                            "visit_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "patient_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "diagnosis_text": {
+                              "type": "string",
+                              "maxLength": 4000
+                            },
+                            "diagnosis_type": {
+                              "type": "string",
+                              "enum": [
+                                "preliminary",
+                                "final"
+                              ]
+                            },
+                            "icd_system": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "ICD-10",
+                                null
+                              ]
+                            },
+                            "icd_code": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "example": "K02.1"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "updated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          }
+        }
+      }
     }
   },
   "components": {
