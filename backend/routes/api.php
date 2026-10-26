@@ -9,6 +9,7 @@ use App\Modules\Platform\Http\HealthController;
 use App\Modules\Queues\Http\DoctorWorkspaceController;
 use App\Modules\Queues\Http\QueueController;
 use App\Modules\Queues\Http\VisitDiagnosisController;
+use App\Modules\Queues\Http\VisitClinicalNoteController;
 use App\Modules\Scheduling\Http\EmployeeWorkController;
 use App\Modules\Scheduling\Http\SchedulingController;
 use App\Modules\Services\Http\ServiceCatalogController;
@@ -57,6 +58,8 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                 Route::get('appointments/configuration-services/{id}', [ServiceCatalogController::class, 'show'])->whereUuid('id');
                 Route::get('doctors/{doctor}/availability', [SchedulingController::class, 'availability'])->whereUuid('doctor');
                 Route::get('doctor-workspace', DoctorWorkspaceController::class);
+                Route::get('visits/{visit}/clinical-notes', [VisitClinicalNoteController::class, 'show'])->whereUuid('visit');
+                Route::put('visits/{visit}/clinical-notes', [VisitClinicalNoteController::class, 'save'])->whereUuid('visit');
                 Route::get('visits/{visit}/diagnosis', [VisitDiagnosisController::class, 'show'])->whereUuid('visit');
                 Route::put('visits/{visit}/diagnosis', [VisitDiagnosisController::class, 'save'])->whereUuid('visit');
                 Route::get('queue-tickets', [QueueController::class, 'index']);
