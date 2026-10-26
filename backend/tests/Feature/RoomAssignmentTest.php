@@ -65,7 +65,9 @@ final class RoomAssignmentTest extends FoundationTestCase
         $this->assertTrue((bool) DB::connection('migration')->table('users')->where('id', $d['user'])->value('must_change_password'));
         $this->rejected(fn () => $this->command([...$a, 'user' => $d['user']], 'schedules', $this->rule($a, $d, ['weekday' => 2])), 'forbidden');
         $slots = app(Availability::class)->get($this->actor($a['user']), $a['tenant'], $d['id'], ['branch_id' => $a['branch'], 'service_id' => $a['service'], 'from' => '2030-01-07T00:00:00+05:00', 'to' => '2030-01-08T00:00:00+05:00']);
-        $this->assertSame([], $slots['data']);
+        // Reception may book a configured doctor before their first password rotation;
+        // the doctor still cannot authenticate until changing the password.
+        $this->assertNotEmpty($slots['data']);
     }
 
     public function test_shared_room_conflicts_replays_and_private_owner_changes_are_atomic(): void
