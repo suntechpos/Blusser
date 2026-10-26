@@ -9,7 +9,7 @@ const patient = {
   number: 1, kind: "walk_in" as const, status: "waiting",
   appointment_id: null, created_at: "2026-10-26T06:00:00Z",
 };
-async function setup(page: Page, manager = false) {
+async function setup(page: Page, manager = false, grants: Record<string, string> = allServerGrants) {
   const requests: string[] = [];
   await page.route("**/api/v1/**", (route) => {
     const url = new URL(route.request().url());
@@ -23,7 +23,7 @@ async function setup(page: Page, manager = false) {
     }});
     if (path === "/api/v1/clinic/branches") return route.fulfill({ json: { data: [] } });
     if (path === "/api/v1/clinic/context") return route.fulfill({ json: {
-      grants: allServerGrants, branches: [], timezone: "Asia/Tashkent",
+      grants, branches: [], timezone: "Asia/Tashkent",
     }});
     if (path === "/api/v1/clinic/doctor-workspace") {
       requests.push(url.search);
@@ -71,6 +71,23 @@ test("signed-in doctor shows own real queue and not demo patient data", async ({
   await expect(page.locator(".dw-queue-person")).toHaveCount(0);
   await page.getByLabel("Navbatdagi bemorni qidirish").fill("Aliyev");
   await expect(page.locator(".dw-queue-person")).toHaveCount(1);
+});
+
+test("doctor with workspace.view only can see and select waiting patients, without consult grant", async ({ page }) => {
+  await setup(page, false, { "workspace.view": "own" });
+  const waiting = page.locator(".dw-queue-tabs").getByRole("button", { name: /Kutilmoqda/ });
+  const completed = page.locator(".dw-queue-tabs").getByRole("button", { name: /Yakunlangan/ });
+  const patientRow = page.getByRole("button", { name: "Aliyev Alijon · P-000009" });
+  await expect(waiting).toBeVisible();
+  await expect(completed).toBeVisible();
+  await expect(patientRow).toBeVisible();
+  await expect(patientRow).toContainText("Aliyev Alijon");
+  await completed.click();
+  await expect(patientRow).toHaveCount(0);
+  await waiting.click();
+  await expect(patientRow).toBeVisible();
+  await patientRow.click();
+  await expect(page.locator(".dw-live-details")).toContainText("Aliyev Alijon");
 });
 
 test("clinic date switching fetches new rows and does not resurrect demo queue", async ({ page }) => {
