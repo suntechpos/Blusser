@@ -185,10 +185,10 @@ function genderLabel(gender: string | null) {
       <aside class="dw-card dw-queue">
         <h2>Bugungi navbat</h2>
         <div class="dw-queue-tabs">
-          <button type="button" :class="{ selected: queueTab === 'waiting' }" @click="setTab('waiting')">
+          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'waiting' }" @click="setTab('waiting')">
             Kutilmoqda <b>{{ waitingCount }}</b>
           </button>
-          <button type="button" :class="{ selected: queueTab === 'completed' }" @click="setTab('completed')">
+          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'completed' }" @click="setTab('completed')">
             Yakunlangan <b>{{ completedCount }}</b>
           </button>
         </div>
@@ -200,7 +200,7 @@ function genderLabel(gender: string | null) {
           <p v-if="loading" class="dw-empty" role="status">Navbat yuklanmoqda...</p>
           <template v-else>
             <button v-for="row in filteredRows" :key="row.key" type="button"
-              class="dw-queue-person" :class="{ selected: selected?.key === row.key }"
+              class="dw-queue-person" data-permission="workspace.view" :class="{ selected: selected?.key === row.key }"
               :aria-label="row.name + ' · ' + row.patient_number" @click="selectedKey = row.key">
               <span class="dw-avatar purple">{{ initials(row.name) }}</span>
               <span class="dw-queue-person-info">
