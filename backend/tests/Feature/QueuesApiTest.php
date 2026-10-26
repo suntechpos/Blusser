@@ -191,6 +191,40 @@ final class QueuesApiTest extends FoundationTestCase
         $this->assertSame(2, $after['ticket']['number']);
     }
 
+    public function test_preexisting_multiple_called_tickets_cannot_start_two_consultations(): void
+    {
+        $a = $this->reference($this->fixture()['a']);
+        $first = $this->queue($a);
+        $secondPatient = app(Patients::class)->command($this->actor($a['user']), $a['tenant'],
+            'create', null, ['name' => 'Legacy called patient', 'date_of_birth' => '1992-03-04',
+                'branch_id' => $a['branch']], (string) Str::uuid())['patient'];
+        $second = $this->queue([...$a, 'patient' => $secondPatient]);
+        $firstId = $first['ticket']['id'];
+        $secondId = $second['ticket']['id'];
+
+        $this->queue($a, 'call', $firstId, ['expected_version' => 1]);
+        // Reproduce historical data from before the one-active-patient guard.
+        // Keep the synchronized visit/ticket integrity trigger valid.
+        $db = DB::connection('migration');
+        $db->transaction(function () use ($db, $secondId, $second): void {
+            $db->table('queue_tickets')->where('id', $secondId)->update([
+                'status' => 'called', 'version' => 2, 'called_at' => now(),
+            ]);
+            $db->table('visits')->where('id', $second['visit']['id'])->update([
+                'status' => 'called', 'version' => 2,
+            ]);
+        });
+
+        $this->queue($a, 'start', $firstId, $this->startData($a, 2, '09:00'));
+        $this->denied(fn () => $this->queue($a, 'start', $secondId,
+            $this->startData($a, 2, '09:30')), 'conflict');
+        $this->assertSame('called', $db->table('queue_tickets')->where('id', $secondId)->value('status'));
+
+        $this->queue($a, 'complete', $firstId, ['expected_version' => 3]);
+        $started = $this->queue($a, 'start', $secondId, $this->startData($a, 2, '09:30'));
+        $this->assertSame('in_progress', $started['ticket']['status']);
+    }
+
     public function test_linked_appointment_reuses_reservation_and_completion_releases_it(): void
     {
         $a = $this->reference($this->fixture()['a']);
