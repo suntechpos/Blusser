@@ -377,6 +377,20 @@ test("Task #06: real diagnosis can be written, saved and reopened without demo d
   await expect(page.getByRole("combobox", { name: "Tashxis turi" })).toHaveValue("final");
 });
 
+test("Task #06: unsaved diagnosis stays in memory while switching old tabs, but is never claimed as saved", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "in_progress", version: 3, started_at: "2026-10-26T06:42:00Z" },
+  ]);
+  await page.getByRole("textbox", { name: "Shifokor tashxisi" }).fill("Tekshiruvdan oldin dastlabki qayd");
+  await page.getByRole("tab", { name: "Tashriflar tarixi" }).click();
+  await page.getByRole("tab", { name: "Bugungi qabul" }).click();
+  await expect(page.getByRole("textbox", { name: "Shifokor tashxisi" }))
+    .toHaveValue("Tekshiruvdan oldin dastlabki qayd");
+  await expect(page.getByText("Yangi tashxis")).toBeVisible();
+  await expect(page.getByText("Tashxis serverga saqlandi.")).toHaveCount(0);
+});
+
 test("Task #06: diagnosis cannot be edited when consult grant is missing", async ({ page }) => {
   const grants = { ...allServerGrants };
   delete grants["workspace.consult"];
