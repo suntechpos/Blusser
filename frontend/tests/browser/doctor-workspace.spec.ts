@@ -22,6 +22,7 @@ async function setup(
   calls: string[] = [],
   starts: Array<{ id: string; body: Record<string, unknown> }> = [],
   failOwnSlot = false,
+  branchList: Array<{ id: string; name: string; active: boolean; timezone: string }> = [],
 ) {
   const requests: string[] = [];
   const queue = rows.map((row) => ({ ...row, version: row.version ?? 1, called_at: row.called_at ?? null }));
@@ -35,9 +36,9 @@ async function setup(
     if (path === "/api/v1/auth/clinics") return route.fulfill({ json: {
       data: [{ id: "tenant-a", name: "Shifo Med Klinikasi", role: manager ? "CEO" : "Shifokor" }],
     }});
-    if (path === "/api/v1/clinic/branches") return route.fulfill({ json: { data: [] } });
+    if (path === "/api/v1/clinic/branches") return route.fulfill({ json: { data: branchList } });
     if (path === "/api/v1/clinic/context") return route.fulfill({ json: {
-      grants, branches: [], timezone: "Asia/Tashkent",
+      grants, branches: branchList, timezone: "Asia/Tashkent",
     }});
     const ownSlot = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/own-start-slot$/);
     if (ownSlot) {
@@ -232,6 +233,62 @@ test("queue-call button explains missing visits.view even when queues.call is pr
   await expect(page.locator(".dw-call-next")).toBeVisible();
   await expect(page.locator(".dw-call-next")).toBeDisabled();
   await expect(page.locator(".dw-queue")).toContainText("Tashriflarni ko‘rish ruxsati berilmagan");
+});
+
+test("Task #02: refreshing the same doctor keeps the selected patient and clinical tab visible", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "in_progress", version: 3,
+      started_at: "2026-10-26T06:42:00Z" },
+  ]);
+  const history = page.getByRole("tab", { name: "Tashriflar tarixi" });
+  await history.click();
+  await expect(history).toHaveAttribute("aria-selected", "true");
+  const clinical = page.getByRole("region", { name: "Boshlangan qabul interfeysi" });
+  let begin!: () => void;
+  let release!: () => void;
+  const requestStarted = new Promise<void>((resolve) => { begin = resolve; });
+  const mayComplete = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/v1/clinic/doctor-workspace*", async (route) => {
+    begin();
+    await mayComplete;
+    await route.fallback();
+  });
+
+  await page.getByRole("button", { name: "Navbatni yangilash" }).click();
+  await requestStarted;
+  // Old code set feed=null before GET, hiding the preview and resetting the tab.
+  await expect(clinical).toBeVisible();
+  await expect(history).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".dw-queue-person.selected")).toContainText("Aliyev Alijon");
+  release();
+  await expect(history).toHaveAttribute("aria-selected", "true");
+  await expect(clinical).toContainText("Tashrif topilmadi");
+});
+
+test("Task #02: 15-second session recheck updates clinic display metadata without remounting consultation", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-26T07:00:00Z") });
+  const branches = [{
+    id: "branch-1", name: "Asosiy filial", active: true, timezone: "Asia/Tashkent",
+  }];
+  const grants = { ...allServerGrants };
+  let branchResponses = 0;
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname === "/api/v1/clinic/branches") branchResponses++;
+  });
+  await setup(page, false, grants, [
+    { ...patient, status: "in_progress", version: 3,
+      started_at: "2026-10-26T06:42:00Z" },
+  ], [], [], false, branches);
+  const history = page.getByRole("tab", { name: "Tashriflar tarixi" });
+  await history.click();
+  await expect(history).toHaveAttribute("aria-selected", "true");
+  // Same branch/same grants; only the display name changed on the server.
+  branches[0]!.name = "Asosiy filial (yangilangan)";
+  await page.clock.runFor(16_000);
+  await expect.poll(() => branchResponses).toBeGreaterThanOrEqual(2);
+  await expect(history).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toBeVisible();
 });
 
 test("Task #02: real in-progress visit reveals the restored clinical layout read-only", async ({ page }) => {
