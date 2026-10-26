@@ -88,7 +88,15 @@ function resetDate() {
   void load();
 }
 watch(
-  () => [session.epoch, session.user?.id, session.user?.active_tenant_id],
+  // Vue compares each source's primitive value independently. Returning a
+  // *new array* from one getter falsely triggers this watcher whenever the
+  // 15-second revalidation replaces session.user with the same identity.
+  // An actual epoch/user/tenant change must still discard the old feed.
+  [
+    () => session.epoch,
+    () => session.user?.id,
+    () => session.user?.active_tenant_id,
+  ],
   () => {
     ++sequence;
     doctorId.value = "";
