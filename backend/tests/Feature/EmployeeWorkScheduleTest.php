@@ -174,7 +174,8 @@ WORKER;
                     $waiting = (int) DB::selectOne("SELECT count(*) AS n FROM pg_stat_activity WHERE application_name IN (?,?) AND wait_event_type='Lock'", $labels)->n;
                     if ($waiting === 2) {
                         break;
-                    }usleep(50000);
+                    }
+                    usleep(50000);
                 } while (microtime(true) < $deadline);
                 $this->assertSame(2, $waiting);
                 $db->commit();
@@ -187,12 +188,14 @@ WORKER;
                 sort($codes);
                 $this->assertSame($same ? [200, 200] : [200, 409], $codes);
                 if ($same) {
-                    $this->assertSame($results[0]['result'],$results[1]['result']);
-                }$this->assertCount(2,$this->read($a)['data']);
+                    $this->assertSame($results[0]['result'], $results[1]['result']);
+                }
+                $this->assertCount(2, $this->read($a)['data']);
             } finally {
                 if ($db->transactionLevel() > 0) {
                     $db->rollBack();
-                }foreach ($processes as $p) {
+                }
+                foreach ($processes as $p) {
                     if ($p->isRunning()) {
                         $p->stop();
                     }
