@@ -66,6 +66,7 @@ async function setup(
           ...(other ? { id: "ticket-biloldin", name: "Boshqa shifokor bemori" } : {}),
         })) : [],
         has_called_today: queue.some((item) => !!item.called_at),
+        has_active_patient: queue.some((item) => item.status === "called" || item.status === "in_progress"),
         scheduled: [],
       }});
     }
@@ -124,11 +125,42 @@ test("call button always calls oldest waiting ticket, never selected patient, an
   await page.getByRole("button", { name: /Jumanov Alijon/ }).click();
   await expect(page.locator(".dw-live-details")).toContainText("Jumanov Alijon");
   await button.click();
-  await expect(page.getByRole("button", { name: "Keyingi bemor" })).toBeEnabled();
-  expect(calls).toEqual(["ticket-first"]);
-  await page.getByRole("button", { name: "Keyingi bemor" }).click();
-  expect(calls).toEqual(["ticket-first", "ticket-second"]);
   await expect(page.getByRole("button", { name: "Keyingi bemor" })).toBeDisabled();
+  await expect(page.locator(".dw-queue")).toContainText("Qabul yakunlanmaguncha");
+  expect(calls).toEqual(["ticket-first"]);
+  // Double-clicking the next button cannot call the second patient.
+  await expect(page.locator(".dw-queue-person")).toHaveCount(2);
+  expect(calls).toEqual(["ticket-first"]);
+});
+
+test("next patient can be called after the previous ticket is completed", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const calls: string[] = [];
+  await setup(page, false, allServerGrants, [
+    { ...patient, id: "ticket-first", version: 4, status: "completed",
+      called_at: "2026-10-26T06:00:00Z" },
+    { ...patient, id: "ticket-second", version: 1, number: 2,
+      name: "Jumanov Alijon", created_at: "2026-10-26T06:05:00Z" },
+  ], calls);
+  const button = page.getByRole("button", { name: "Keyingi bemor" });
+  await expect(button).toBeEnabled();
+  await button.click();
+  expect(calls).toEqual(["ticket-second"]);
+  await expect(button).toBeDisabled();
+});
+
+test("doctor with an in-progress patient cannot call a second waiting patient", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const calls: string[] = [];
+  await setup(page, false, allServerGrants, [
+    { ...patient, id: "ticket-first", status: "in_progress", version: 3,
+      called_at: "2026-10-26T06:00:00Z" },
+    { ...patient, id: "ticket-second", version: 1, number: 2,
+      name: "Jumanov Alijon", created_at: "2026-10-26T06:05:00Z" },
+  ], calls);
+  await expect(page.getByRole("button", { name: "Keyingi bemor" })).toBeDisabled();
+  await expect(page.locator(".dw-queue")).toContainText("Qabul yakunlanmaguncha");
+  expect(calls).toEqual([]);
 });
 
 test("queue call requires server queues.call grant and only works for today's clinic date", async ({ page }) => {

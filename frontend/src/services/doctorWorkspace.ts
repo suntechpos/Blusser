@@ -40,6 +40,7 @@ export interface DoctorWorkspaceFeed {
   scheduled: WorkspacePatientRow[];
   tickets: WorkspacePatientRow[];
   has_called_today?: boolean;
+  has_active_patient?: boolean;
 }
 
 /** All access control is enforced by the server using the signed-in identity. */
