@@ -96,6 +96,7 @@ final class DoctorWorkspaceFeedTest extends FoundationTestCase
         $this->assertSame(1, $mine['tickets'][0]['version']);
         $this->assertNull($mine['tickets'][0]['called_at']);
         $this->assertFalse($mine['has_called_today']);
+        $this->assertFalse($mine['has_active_patient']);
         $this->assertSame([], $mine['doctors']);
 
         app(Queues::class)->command($this->actor($a['user']), $a['tenant'], 'call',
@@ -103,6 +104,7 @@ final class DoctorWorkspaceFeedTest extends FoundationTestCase
             (string) Str::uuid());
         $afterCall = $this->feed($a);
         $this->assertTrue($afterCall['has_called_today']);
+        $this->assertTrue($afterCall['has_active_patient']);
         $this->assertSame('called', $afterCall['tickets'][0]['status']);
         $this->assertSame(2, $afterCall['tickets'][0]['version']);
         $this->assertNotNull($afterCall['tickets'][0]['called_at']);
@@ -121,5 +123,6 @@ final class DoctorWorkspaceFeedTest extends FoundationTestCase
         $this->assertCount(2, $manager['doctors']);
         $this->assertCount(1, $manager['tickets']);
         $this->assertSame('Other doctors patient', $manager['tickets'][0]['name']);
+        $this->assertFalse($manager['has_active_patient']);
     }
 }
