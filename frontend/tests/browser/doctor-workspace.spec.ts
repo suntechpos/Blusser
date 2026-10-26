@@ -266,6 +266,27 @@ test("Task #02: refreshing the same doctor keeps the selected patient and clinic
   await expect(clinical).toContainText("Tashrif topilmadi");
 });
 
+test("Task #02: unchanged identity at 15-second revalidation never reloads patient or resets selected tab", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-26T07:00:00Z") });
+  const requests = await setup(page, false, allServerGrants, [
+    { ...patient, status: "in_progress", version: 3,
+      started_at: "2026-10-26T06:42:00Z" },
+  ]);
+  const clinical = page.getByRole("region", { name: "Boshlangan qabul interfeysi" });
+  const history = clinical.getByRole("tab", { name: "Tashriflar tarixi" });
+  await history.click();
+  await expect(history).toHaveAttribute("aria-selected", "true");
+  const initialFeedRequests = requests.length;
+  // App.vue revalidates /auth/me every 15 seconds and assigns a FRESH object
+  // with the SAME user.id and tenant. The old array-valued watch getter in
+  // DoctorWorkspaceLiveView treated that as a change and reset the tab.
+  await page.clock.runFor(16_000);
+  await expect(history).toHaveAttribute("aria-selected", "true");
+  await expect(clinical).toBeVisible();
+  await expect(page.locator(".dw-queue-person.selected")).toContainText("Aliyev Alijon");
+  expect(requests.length).toBe(initialFeedRequests);
+});
+
 test("Task #02: 15-second session recheck updates clinic display metadata without remounting consultation", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-26T07:00:00Z") });
   const branches = [{
