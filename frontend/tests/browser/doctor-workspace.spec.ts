@@ -37,6 +37,18 @@ async function setup(
     if (path === "/api/v1/clinic/context") return route.fulfill({ json: {
       grants, branches: [], timezone: "Asia/Tashkent",
     }});
+    const ownSlot = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/own-start-slot$/);
+    if (ownSlot) {
+      const ticket = queue.find((row) => row.id === ownSlot[1]);
+      if (!ticket || ticket.status !== "called" || grants["queues.start"] !== "own") {
+        return route.fulfill({ status: 404, json: { message: "Unavailable" } });
+      }
+      return route.fulfill({ json: {
+        room_id: "room-own-doctor",
+        starts_at: "2026-10-26T07:30:00Z",
+        ends_at: "2026-10-26T08:00:00Z",
+      } });
+    }
     const startPath = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/start$/);
     if (startPath) {
       const ticket = queue.find((row) => row.id === startPath[1]);
@@ -232,6 +244,29 @@ test("Task #01: called walk-in patient starts through real availability slot", a
     starts_at: "2026-10-26T07:30:00Z", ends_at: "2026-10-26T08:00:00Z",
   });
   await expect(page.getByRole("button", { name: "Qabulni boshlash" })).toHaveCount(0);
+});
+
+test("Task #01: own-scoped doctor starts without clinic-wide service/room/schedule views", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const starts: Array<{ id: string; body: Record<string, unknown> }> = [];
+  const grants = { ...allServerGrants, "queues.start": "own" };
+  for (const permission of [
+    "services.view", "rooms.view", "doctors.view",
+    "schedules.view", "patients.view", "appointments.update",
+  ]) delete grants[permission];
+  await setup(page, false, grants, [
+    { ...patient, status: "called", version: 2 },
+  ], [], starts);
+  const start = page.getByRole("button", { name: "Qabulni boshlash" });
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect(page.locator(".dw-live-details")).toContainText("Qabulda");
+  expect(starts).toHaveLength(1);
+  expect(starts[0]?.body).toMatchObject({
+    expected_version: 2, room_id: "room-own-doctor",
+    starts_at: "2026-10-26T07:30:00Z",
+    ends_at: "2026-10-26T08:00:00Z",
+  });
 });
 
 test("Task #01: scheduled patient uses exactly its existing appointment reservation", async ({ page }) => {
