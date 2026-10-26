@@ -7,7 +7,7 @@ import QabullarView from "./QabullarView.vue";
 import BemorlarView from "./BemorlarView.vue";
 import XodimlarView from "./XodimlarView.vue";
 import DepartmentsRoomsView from "./DepartmentsRoomsView.vue";
-import DoctorWorkspaceView from "./DoctorWorkspaceView.vue";
+import DoctorWorkspaceLiveView from "./DoctorWorkspaceLiveView.vue";
 import RegistraturaView from "./RegistraturaView.vue";
 import ServicesView from "./ServicesView.vue";
 import DiagnosticsView from "./DiagnosticsView.vue";
@@ -769,7 +769,7 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`);
             v-access-surface="'rooms'"
             v-else-if="activeItem === 'Bo‘limlar va Xonalar'"
           />
-          <DoctorWorkspaceView
+          <DoctorWorkspaceLiveView
             v-access-surface="'workspace'"
             v-else-if="activeItem === 'Shifokor kabineti'"
           />
