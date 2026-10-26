@@ -43,8 +43,19 @@ final class DoctorWorkspaceController
                         ->where('branch_id', $feed['branch']['id'])
                         ->whereIn('id', $visitIds)
                         ->pluck('service_id', 'id');
+                    // Real consultation start timestamp comes from the ticket,
+                    // not from a browser clock or the retired demonstration data.
+                    // Ticket RLS is enforced in addition to the secured feed.
+                    $ticketIds = array_column($feed['tickets'], 'id');
+                    $started = DB::table('queue_tickets')
+                        ->whereRaw('tenant_id = public.context_tenant()')
+                        ->where('branch_id', $feed['branch']['id'])
+                        ->whereIn('id', $ticketIds)
+                        ->selectRaw('id, to_char(started_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS"Z"\') AS started_at')
+                        ->get()->keyBy('id');
                     foreach ($feed['tickets'] as &$ticket) {
                         $ticket['service_id'] = $services->get($ticket['visit_id'] ?? '') ?: null;
+                        $ticket['started_at'] = $started->get($ticket['id'])?->started_at;
                     }
                     unset($ticket);
                 }

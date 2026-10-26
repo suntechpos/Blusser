@@ -17,6 +17,7 @@ async function setup(
     appointment_id: string | null;
     version?: number;
     called_at?: string | null;
+    started_at?: string | null;
   }> = [patient],
   calls: string[] = [],
   starts: Array<{ id: string; body: Record<string, unknown> }> = [],
@@ -231,6 +232,62 @@ test("queue-call button explains missing visits.view even when queues.call is pr
   await expect(page.locator(".dw-call-next")).toBeVisible();
   await expect(page.locator(".dw-call-next")).toBeDisabled();
   await expect(page.locator(".dw-queue")).toContainText("Tashriflarni ko‘rish ruxsati berilmagan");
+});
+
+test("Task #02: real in-progress visit reveals the restored clinical layout read-only", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "in_progress", version: 3,
+      started_at: "2026-10-26T06:42:00Z", called_at: "2026-10-26T06:40:00Z" },
+  ]);
+  const clinical = page.getByRole("region", { name: "Boshlangan qabul interfeysi" });
+  await expect(clinical).toBeVisible();
+  await expect(clinical).toContainText("Qabul yozuvi");
+  await expect(clinical).toContainText("11:42"); // 06:42Z in Asia/Tashkent
+  await expect(page.locator(".dw-live-details")).toContainText("Aliyev Alijon");
+  await expect(page.locator(".dw-live-details")).toContainText("Nizomjon Mansurov");
+  for (const name of ["Shikoyatlar", "Anamnez", "Ko‘rik natijalari", "Tavsiyalar"]) {
+    await expect(clinical.getByRole("textbox", { name })).toBeDisabled();
+  }
+  await expect(clinical.getByRole("combobox", { name: "Tashxis turi" })).toBeDisabled();
+  for (const name of ["Yo‘llanma", "Retsept", "Qoralamani saqlash", "Qabulni yakunlash"]) {
+    await expect(clinical.getByRole("button", { name })).toBeDisabled();
+  }
+  await expect(clinical).not.toContainText("Aziz Karimov");
+  await expect(clinical).not.toContainText("Aliyeva Mohira");
+  await expect(clinical).not.toContainText("Qoralama saqlangan");
+});
+
+test("Task #02: old doctor tabs remain visible with empty real-data states and no demo upload", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "in_progress", version: 3,
+      started_at: "2026-10-26T06:42:00Z" },
+  ]);
+  const region = page.getByRole("region", { name: "Boshlangan qabul interfeysi" });
+  await region.getByRole("tab", { name: "Tashriflar tarixi" }).click();
+  await expect(region).toContainText("Tashrif topilmadi");
+  await expect(region).not.toContainText("Aziz Karimov");
+  await region.getByRole("tab", { name: "Tekshiruv natijalari" }).click();
+  await expect(region).toContainText("Tekshiruv natijasi topilmadi");
+  await expect(region.getByRole("button", { name: "Tashqi natija qo‘shish" })).toHaveCount(0);
+  await region.getByRole("tab", { name: "Hujjatlar" }).click();
+  await expect(region).toContainText("Hujjat topilmadi");
+  await expect(region.getByRole("button", { name: "Hujjat yuklash" })).toHaveCount(0);
+});
+
+test("Task #02: called, waiting or completed patients never show editable clinical form", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "called", version: 2 },
+    { ...patient, id: "ticket-completed", visit_id: "visit-completed",
+      patient_id: "another-patient", patient_number: "P-000010",
+      name: "Jumanov Alijon", status: "completed", version: 4, number: 2 },
+  ]);
+  await expect(page.getByRole("button", { name: "Qabulni boshlash" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toHaveCount(0);
+  await page.locator(".dw-queue-tabs").getByRole("button", { name: /Yakunlangan/ }).click();
+  await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toHaveCount(0);
 });
 
 test("Task #01: called walk-in patient starts through real availability slot", async ({ page }) => {

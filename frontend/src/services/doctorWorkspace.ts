@@ -24,6 +24,7 @@ export interface WorkspacePatientRow {
   status: string;
   version?: number;
   called_at?: string | null;
+  started_at?: string | null;
   appointment_id: string | null;
   starts_at?: string;
   visit_id?: string;

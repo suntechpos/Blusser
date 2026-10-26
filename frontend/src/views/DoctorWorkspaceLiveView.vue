@@ -5,6 +5,7 @@ import { can, session } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
 import { resolveDoctorStartSlot } from "../services/doctorVisitStart";
+import DoctorEncounterPreview from "../components/doctor/DoctorEncounterPreview.vue";
 import "../components/employees/employees.css";
 import "../components/doctor/doctor.css";
 
@@ -416,12 +417,17 @@ function genderLabel(gender: string | null) {
                 Faqat bugungi chaqirilgan bemorning qabulini boshlash mumkin.
               </p>
             </div>
-            <p class="dw-live-warning">
-              Qabulning tibbiy yozuvlari hali haqiqiy API bilan ulanmagan. Bu sahifa hozircha
-              faqat bemorlar va navbatning serverdagi holatini ko‘rsatadi; demo shikoyat,
-              tashxis yoki retseptlar haqiqiy bemorga biriktirilmaydi.
+            <p v-if="selected.status !== 'in_progress'" class="dw-live-warning">
+              Qabulning tibbiy yozuvlari hali haqiqiy API bilan ulanmagan.
+              Tibbiy karta interfeysi qabul boshlangandan keyin, faqat ko‘rish rejimida ochiladi.
             </p>
           </article>
+          <DoctorEncounterPreview
+            v-if="selected.source === 'ticket' && selected.status === 'in_progress'
+              && feed?.doctor && feed?.branch"
+            :key="selected.visit_id || selected.id"
+            :patient="selected" :doctor="feed.doctor" :branch="feed.branch" :date="date"
+          />
         </template>
         <article v-else class="dw-card dw-live-empty">
           <UserRound :size="32" />
