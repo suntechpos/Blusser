@@ -134,10 +134,12 @@ test("call button always calls oldest waiting ticket, never selected patient, an
 test("queue call requires server queues.call grant and only works for today's clinic date", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
   await setup(page, false, { "workspace.view": "own" });
-  await expect(page.locator(".dw-call-next")).toHaveCount(0);
+  await expect(page.locator(".dw-call-next")).toBeVisible();
+  await expect(page.locator(".dw-call-next")).toBeDisabled();
+  await expect(page.locator(".dw-queue")).toContainText("ruxsati berilmagan");
   await page.getByLabel("Qabul sanasi").fill("2026-10-27");
   await page.getByLabel("Qabul sanasi").dispatchEvent("change");
-  await expect(page.locator(".dw-call-next")).toHaveCount(0);
+  await expect(page.locator(".dw-call-next")).toBeDisabled();
 });
 
 test("clinic date switching fetches new rows and does not resurrect demo queue", async ({ page }) => {
