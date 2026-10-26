@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { CalendarDays, ChevronRight, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { CalendarDays, ChevronDown, ChevronRight, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
 import { can, session } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
@@ -388,9 +388,12 @@ function genderLabel(gender: string | null) {
               </div>
               <span class="dw-badge blue">{{ statusText(selected) }}</span>
             </div>
-          </article>
-          <article class="dw-card dw-live-visit">
-            <h2><Stethoscope :size="21" /> Qabul tafsilotlari</h2>
+          <details class="dw-visit-disclosure" :key="selected.key">
+            <summary>
+              <Stethoscope :size="18" />
+              <span>Qabul tafsilotlari</span>
+              <ChevronDown :size="18" class="dw-visit-chevron" />
+            </summary>
             <dl>
               <div><dt>Shifokor</dt><dd>{{ feed?.doctor?.name }}</dd></div>
               <div><dt>Xizmat</dt><dd>{{ selected.service }}</dd></div>
@@ -398,6 +401,7 @@ function genderLabel(gender: string | null) {
               <div><dt>Vaqt / Navbat</dt><dd>{{ visitTime(selected) }}</dd></div>
               <div><dt>Holati</dt><dd>{{ statusText(selected) }}</dd></div>
             </dl>
+          </details>
             <div v-if="selected.source === 'ticket' && selected.status === 'called'" class="dw-start-block">
               <button type="button" class="dw-start-button" data-permission="workspace.view"
                 :disabled="!startAllowed" @click="startConsultation">
@@ -451,12 +455,15 @@ function genderLabel(gender: string | null) {
 .dw-live-today, .dw-live-reload { cursor: pointer; border: none; border-radius: 10px; background: #e7f1ff; color: #0875f9; padding: 11px 13px; font: inherit; }
 .dw-live-reload { display: flex; align-items: center; }
 .dw-live-details { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-.dw-live-visit { padding: 24px; }
-.dw-live-visit h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 16px; }
-.dw-live-visit dl { display: grid; gap: 12px; margin: 0; }
-.dw-live-visit dl > div { display: grid; grid-template-columns: 160px 1fr; gap: 16px; border-bottom: 1px solid #e8eff8; padding-bottom: 12px; }
-.dw-live-visit dt { color: #647b99; }
-.dw-live-visit dd { margin: 0; font-weight: 600; }
+.dw-visit-disclosure { margin-top: 15px; border-top: 1px solid #e8eff8; }
+.dw-visit-disclosure summary { padding: 12px 2px 2px; cursor: pointer; display: flex; align-items: center; gap: 9px; color: #426492; font-weight: 600; list-style: none; }
+.dw-visit-disclosure summary::-webkit-details-marker { display: none; }
+.dw-visit-disclosure .dw-visit-chevron { margin-left: auto; transition: transform 160ms; }
+.dw-visit-disclosure[open] .dw-visit-chevron { transform: rotate(180deg); }
+.dw-visit-disclosure dl { display: grid; gap: 11px; margin: 14px 2px 0; }
+.dw-visit-disclosure dl > div { display: grid; grid-template-columns: 145px 1fr; gap: 14px; border-bottom: 1px solid #e8eff8; padding-bottom: 11px; }
+.dw-visit-disclosure dt { color: #647b99; }
+.dw-visit-disclosure dd { margin: 0; font-weight: 600; }
 .dw-start-block { margin-top: 18px; }
 .dw-start-button { min-height: 44px; padding: 10px 18px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 9px; background: #146dff; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .dw-start-button:disabled { opacity: 0.5; cursor: not-allowed; }

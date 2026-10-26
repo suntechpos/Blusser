@@ -258,6 +258,39 @@ test("Task #02: real in-progress visit reveals the restored clinical layout read
   await expect(clinical).not.toContainText("Qoralama saqlangan");
 });
 
+test("Task #02: visit details remain collapsed inside patient header, with old tabs immediately below", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "in_progress", version: 3,
+      started_at: "2026-10-26T06:42:00Z" },
+  ]);
+  const patientCard = page.locator(".dw-patient-card");
+  const details = patientCard.locator("details.dw-visit-disclosure");
+  const tab = page.getByRole("tab", { name: "Bugungi qabul" });
+  await expect(details).not.toHaveAttribute("open", "");
+  await expect(tab).toBeVisible();
+  await expect(page.locator(".dw-live-visit")).toHaveCount(0);
+  await expect(patientCard.locator("dl")).not.toBeVisible();
+  await details.locator("summary").click();
+  await expect(details).toHaveAttribute("open", "");
+  await expect(patientCard).toContainText("Nizomjon Mansurov");
+  await expect(patientCard).toContainText("Tish qo‘ydirish");
+  await details.locator("summary").click();
+  await expect(details).not.toHaveAttribute("open", "");
+  await expect(tab).toBeVisible();
+});
+
+test("Task #02: called ticket keeps start button visible outside collapsed visit details", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, [
+    { ...patient, status: "called", version: 2 },
+  ]);
+  const card = page.locator(".dw-patient-card");
+  await expect(card.locator("details.dw-visit-disclosure")).not.toHaveAttribute("open", "");
+  await expect(card.getByRole("button", { name: "Qabulni boshlash" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toHaveCount(0);
+});
+
 test("Task #02: old doctor tabs remain visible with empty real-data states and no demo upload", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
   await setup(page, false, allServerGrants, [
