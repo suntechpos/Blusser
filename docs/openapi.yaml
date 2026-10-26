@@ -11414,6 +11414,24 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Value of first-party XSRF-TOKEN cookie issued by Sanctum CSRF handshake."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Trusted first-party origin. Required for clinical writes."
           }
         ],
         "requestBody": {
@@ -11726,6 +11744,24 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "X-XSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Value of first-party XSRF-TOKEN cookie issued by Sanctum CSRF handshake."
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Trusted first-party origin. Required for clinical writes."
           }
         ],
         "requestBody": {
