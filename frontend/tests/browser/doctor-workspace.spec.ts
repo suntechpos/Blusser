@@ -13,7 +13,11 @@ async function setup(
   page: Page,
   manager = false,
   grants: Record<string, string> = allServerGrants,
-  rows: Array<typeof patient & { version?: number; called_at?: string | null }> = [patient],
+  rows: Array<Omit<typeof patient, "appointment_id"> & {
+    appointment_id: string | null;
+    version?: number;
+    called_at?: string | null;
+  }> = [patient],
   calls: string[] = [],
   starts: Array<{ id: string; body: Record<string, unknown> }> = [],
 ) {
