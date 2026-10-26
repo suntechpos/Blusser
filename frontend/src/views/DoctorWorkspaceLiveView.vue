@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { CalendarDays, ChevronRight, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
-import { session } from "../services/session";
-import { errorText } from "../services/api";
+import { CalendarDays, ChevronRight, Megaphone, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { can, session } from "../services/session";
+import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
 import "../components/employees/employees.css";
 import "../components/doctor/doctor.css";
@@ -15,10 +15,11 @@ const queueTab = ref<"waiting" | "completed">("waiting");
 const query = ref("");
 const selectedKey = ref("");
 const loading = ref(true);
+const calling = ref(false);
 const error = ref("");
 let sequence = 0;
 
-async function load() {
+async function load(preferredKey = "") {
   const request = ++sequence;
   // Never show the previous doctor's patients while a different identity/doctor loads.
   feed.value = null;
@@ -33,6 +34,7 @@ async function load() {
     });
     if (request !== sequence) return;
     feed.value = result;
+    selectedKey.value = preferredKey;
     doctorId.value = result.doctor?.id || "";
     branchId.value = result.branch?.id || "";
     date.value = result.date || "";
@@ -91,6 +93,50 @@ const rows = computed<DisplayRow[]>(() => {
     return aTime.localeCompare(bTime) || a.key.localeCompare(b.key);
   });
 });
+// Actual queue tickets only; a future appointment is not callable before check-in.
+// A patient clicked in the list is strictly a read-only detail selection.
+const nextTicket = computed(() => feed.value?.tickets
+  .filter((row) => row.status === "waiting")
+  .sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "") || a.id.localeCompare(b.id))[0] || null);
+const clinicToday = computed(() => {
+  const zone = feed.value?.branch?.timezone || "Asia/Tashkent";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((p) => p.type === type)?.value || "";
+  return part("year") + "-" + part("month") + "-" + part("day");
+});
+const callAllowed = computed(() => can("queues.call") && !!nextTicket.value
+  && date.value === clinicToday.value && !loading.value && !calling.value);
+const callLabel = computed(() => feed.value?.has_called_today ? "Keyingi bemor" : "Bemorni chaqirish");
+
+async function callNext() {
+  if (!callAllowed.value || !nextTicket.value) return;
+  // Snapshot the oldest waiting ticket, not the selected/search-filtered patient.
+  const ticket = nextTicket.value;
+  calling.value = true;
+  try {
+    if (!Number.isInteger(ticket.version) || !ticket.version || ticket.version < 1) {
+      throw new Error("Navbat versiyasi mavjud emas. Sahifani yangilang.");
+    }
+    await clinicRequest("queue-tickets/" + encodeURIComponent(ticket.id) + "/call", {
+      method: "POST",
+      body: { expected_version: ticket.version },
+    });
+    query.value = "";
+    queueTab.value = "waiting";
+    await load("ticket:" + ticket.id);
+  } catch (cause) {
+    const message = errorText(cause);
+    try {
+      await load();
+    } finally {
+      error.value = message;
+    }
+  } finally {
+    calling.value = false;
+  }
+}
 const completed = (row: DisplayRow) => row.status === "completed";
 const filteredRows = computed(() => rows.value.filter((row) => {
   if (completed(row) !== (queueTab.value === "completed")) return false;
@@ -174,7 +220,7 @@ function genderLabel(gender: string | null) {
           <input type="date" aria-label="Qabul sanasi" :value="date" @change="changeDate" />
         </label>
         <button type="button" class="dw-live-today" @click="resetDate">Bugun</button>
-        <button type="button" class="dw-live-reload" aria-label="Navbatni yangilash" title="Yangilash" @click="load">
+        <button type="button" class="dw-live-reload" aria-label="Navbatni yangilash" title="Yangilash" @click="load()">
           <RefreshCw :size="18" />
         </button>
       </div>
@@ -218,6 +264,20 @@ function genderLabel(gender: string | null) {
             </p>
           </template>
         </div>
+        <button v-if="feed?.doctor" type="button" class="dw-call-next"
+          data-permission="workspace.view" :disabled="!callAllowed" @click="callNext">
+          <Megaphone :size="18" />
+          {{ calling ? "Chaqirilmoqda..." : callLabel }}
+        </button>
+        <p v-if="feed?.doctor && !can('queues.call')" class="dw-call-hint">
+          Shifokorga bemor chaqirish ruxsati berilmagan.
+        </p>
+        <p v-else-if="feed?.doctor && date !== clinicToday" class="dw-call-hint">
+          Bemorlarni faqat bugungi navbatdan chaqirish mumkin.
+        </p>
+        <p v-else-if="feed?.doctor && !nextTicket && !loading" class="dw-call-hint">
+          Navbatda chaqiriladigan bemor yo‘q.
+        </p>
         <p class="dw-live-footer">Ro‘yxat registratura ma’lumotlari asosida ko‘rsatilmoqda.</p>
       </aside>
 
@@ -283,6 +343,9 @@ function genderLabel(gender: string | null) {
 .dw-live-visit dd { margin: 0; font-weight: 600; }
 .dw-live-warning { background: #f2f7ff; padding: 14px; border-radius: 10px; color: #476488; margin-top: 18px; line-height: 1.5; }
 .dw-live-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; color: #7790b1; min-height: 250px; }
+.dw-call-next { margin: auto 6px 0; width: calc(100% - 12px); min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #146dff; color: white; border: 1px solid #146dff; border-radius: 9px; font: inherit; font-weight: 700; cursor: pointer; }
+.dw-call-next:disabled { opacity: 0.5; cursor: not-allowed; }
+.dw-call-hint { margin: 8px 8px 0 !important; text-align: center; font-size: 12px; }
 .dw-live-footer { color: #7890a9; padding: 10px 16px; font-size: 12px; }
 @media (max-width: 1050px) { .dw-live-filters { width: 100%; } .dw-live-visit dl > div { grid-template-columns: 110px 1fr; } }
 </style>

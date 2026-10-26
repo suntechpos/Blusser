@@ -9,8 +9,15 @@ const patient = {
   number: 1, kind: "walk_in" as const, status: "waiting",
   appointment_id: null, created_at: "2026-10-26T06:00:00Z",
 };
-async function setup(page: Page, manager = false, grants: Record<string, string> = allServerGrants) {
+async function setup(
+  page: Page,
+  manager = false,
+  grants: Record<string, string> = allServerGrants,
+  rows: Array<typeof patient & { version?: number; called_at?: string | null }> = [patient],
+  calls: string[] = [],
+) {
   const requests: string[] = [];
+  const queue = rows.map((row) => ({ ...row, version: row.version ?? 1, called_at: row.called_at ?? null }));
   await page.route("**/api/v1/**", (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -25,6 +32,19 @@ async function setup(page: Page, manager = false, grants: Record<string, string>
     if (path === "/api/v1/clinic/context") return route.fulfill({ json: {
       grants, branches: [], timezone: "Asia/Tashkent",
     }});
+    const callPath = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/call$/);
+    if (callPath) {
+      const ticket = queue.find((item) => item.id === callPath[1]);
+      const expectedVersion = route.request().postDataJSON()?.expected_version;
+      if (route.request().method() !== "POST" || !ticket || ticket.status !== "waiting" || expectedVersion !== ticket.version) {
+        return route.fulfill({ status: 409, json: { message: "Conflict" } });
+      }
+      calls.push(ticket.id);
+      ticket.status = "called";
+      ticket.version++;
+      ticket.called_at = "2026-10-26T07:00:00Z";
+      return route.fulfill({ json: { ticket: { id: ticket.id, status: ticket.status, version: ticket.version } } });
+    }
     if (path === "/api/v1/clinic/doctor-workspace") {
       requests.push(url.search);
       const other = url.searchParams.get("doctor_id") === "doctor-biloldin";
@@ -41,10 +61,11 @@ async function setup(page: Page, manager = false, grants: Record<string, string>
           branches: [{ id: "branch-1", name: "Asosiy filial", timezone: "Asia/Tashkent" }] },
         branch: { id: "branch-1", name: "Asosiy filial", timezone: "Asia/Tashkent" },
         date,
-        tickets: date === "2026-10-26" ? [{
-          ...patient,
+        tickets: date === "2026-10-26" ? queue.map((item) => ({
+          ...item,
           ...(other ? { id: "ticket-biloldin", name: "Boshqa shifokor bemori" } : {}),
-        }] : [],
+        })) : [],
+        has_called_today: queue.some((item) => !!item.called_at),
         scheduled: [],
       }});
     }
@@ -88,6 +109,37 @@ test("doctor with workspace.view only can see and select waiting patients, witho
   await expect(patientRow).toBeVisible();
   await patientRow.click();
   await expect(page.locator(".dw-live-details")).toContainText("Aliyev Alijon");
+});
+
+test("call button always calls oldest waiting ticket, never selected patient, and changes label", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const calls: string[] = [];
+  await setup(page, false, allServerGrants, [
+    { ...patient, id: "ticket-first", version: 1, number: 1, created_at: "2026-10-26T06:00:00Z" },
+    { ...patient, id: "ticket-second", version: 1, number: 2, name: "Jumanov Alijon", created_at: "2026-10-26T06:05:00Z" },
+  ], calls);
+  const button = page.getByRole("button", { name: "Bemorni chaqirish" });
+  await expect(button).toBeEnabled();
+  // Viewing the second patient must not change the next ticket to be called.
+  await page.getByRole("button", { name: /Jumanov Alijon/ }).click();
+  await expect(page.locator(".dw-live-details")).toContainText("Jumanov Alijon");
+  await button.click();
+  await expect(page.getByRole("button", { name: "Keyingi bemor" })).toBeEnabled();
+  expect(calls).toEqual(["ticket-first"]);
+  await page.getByRole("button", { name: "Keyingi bemor" }).click();
+  expect(calls).toEqual(["ticket-first", "ticket-second"]);
+  await expect(page.getByRole("button", { name: "Keyingi bemor" })).toBeDisabled();
+});
+
+test("queue call requires server queues.call grant and only works for today's clinic date", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, { "workspace.view": "own" });
+  await expect(page.locator(".dw-call-next")).toBeVisible();
+  await expect(page.locator(".dw-call-next")).toBeDisabled();
+  await expect(page.locator(".dw-queue")).toContainText("ruxsati berilmagan");
+  await page.getByLabel("Qabul sanasi").fill("2026-10-27");
+  await page.getByLabel("Qabul sanasi").dispatchEvent("change");
+  await expect(page.locator(".dw-call-next")).toBeDisabled();
 });
 
 test("clinic date switching fetches new rows and does not resurrect demo queue", async ({ page }) => {
