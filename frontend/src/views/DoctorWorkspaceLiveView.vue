@@ -18,6 +18,8 @@ const selectedKey = ref("");
 const loading = ref(true);
 const calling = ref(false);
 const starting = ref(false);
+const startError = ref("");
+const startErrorFor = ref("");
 const error = ref("");
 let sequence = 0;
 
@@ -189,6 +191,8 @@ async function startConsultation() {
   if (!startAllowed.value || !ticket || !doctor || !branch) return;
   const chosenKey = ticket.key;
   starting.value = true;
+  startError.value = "";
+  startErrorFor.value = chosenKey;
   error.value = "";
   try {
     if (!Number.isInteger(ticket.version) || (ticket.version ?? 0) < 1) {
@@ -212,7 +216,8 @@ async function startConsultation() {
     try {
       await load(chosenKey);
     } finally {
-      error.value = message;
+      startError.value = message;
+      startErrorFor.value = chosenKey;
     }
   } finally {
     starting.value = false;
@@ -398,6 +403,9 @@ function genderLabel(gender: string | null) {
                 <Play :size="18" />
                 {{ starting ? "Qabul boshlanmoqda..." : "Qabulni boshlash" }}
               </button>
+              <p v-if="startError && startErrorFor === selected.key" class="dw-start-error" role="alert">
+                {{ startError }}
+              </p>
               <p v-if="startPermissionMessage" class="dw-start-hint" role="status">
                 {{ startPermissionMessage }}
               </p>
@@ -447,6 +455,7 @@ function genderLabel(gender: string | null) {
 .dw-start-button { min-height: 44px; padding: 10px 18px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 9px; background: #146dff; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .dw-start-button:disabled { opacity: 0.5; cursor: not-allowed; }
 .dw-start-hint { margin: 8px 0 0; color: #647b99; font-size: 13px; }
+.dw-start-error { margin: 10px 0 0; color: #b42318; font-size: 13px; line-height: 1.5; }
 .dw-live-warning { background: #f2f7ff; padding: 14px; border-radius: 10px; color: #476488; margin-top: 18px; line-height: 1.5; }
 .dw-live-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; color: #7790b1; min-height: 250px; }
 .dw-call-next { margin: auto 6px 0; width: calc(100% - 12px); min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #146dff; color: white; border: 1px solid #146dff; border-radius: 9px; font: inherit; font-weight: 700; cursor: pointer; }
