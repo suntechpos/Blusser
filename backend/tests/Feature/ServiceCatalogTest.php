@@ -11,7 +11,6 @@ use App\Modules\Scheduling\Services\Scheduling;
 use App\Modules\Services\Services\ServiceCatalog;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
