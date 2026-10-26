@@ -126,7 +126,7 @@ test("call button always calls oldest waiting ticket, never selected patient, an
   await expect(page.locator(".dw-live-details")).toContainText("Jumanov Alijon");
   await button.click();
   await expect(page.getByRole("button", { name: "Keyingi bemor" })).toBeDisabled();
-  await expect(page.locator(".dw-queue")).toContainText("qabul yakunlanmaguncha");
+  await expect(page.locator(".dw-queue")).toContainText("Qabul yakunlanmaguncha");
   expect(calls).toEqual(["ticket-first"]);
   // Double-clicking the next button cannot call the second patient.
   await expect(page.locator(".dw-queue-person")).toHaveCount(2);
@@ -159,7 +159,7 @@ test("doctor with an in-progress patient cannot call a second waiting patient", 
       name: "Jumanov Alijon", created_at: "2026-10-26T06:05:00Z" },
   ], calls);
   await expect(page.getByRole("button", { name: "Keyingi bemor" })).toBeDisabled();
-  await expect(page.locator(".dw-queue")).toContainText("qabul yakunlanmaguncha");
+  await expect(page.locator(".dw-queue")).toContainText("Qabul yakunlanmaguncha");
   expect(calls).toEqual([]);
 });
 
