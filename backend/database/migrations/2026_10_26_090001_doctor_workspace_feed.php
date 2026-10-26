@@ -76,8 +76,8 @@ BEGIN
                       ON b.tenant_id=db.tenant_id AND b.id=db.branch_id AND b.active
                       WHERE db.tenant_id=tid AND db.doctor_id=d.id);
         IF did IS NULL THEN
-            SELECT (value->>'id')::uuid INTO did
-            FROM jsonb_array_elements(doctor_options) value LIMIT 1;
+            SELECT (item->>'id')::uuid INTO did
+            FROM jsonb_array_elements(doctor_options) AS selected(item) LIMIT 1;
         END IF;
     END IF;
 
