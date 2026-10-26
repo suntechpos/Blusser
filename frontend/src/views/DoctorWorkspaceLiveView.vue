@@ -160,18 +160,17 @@ async function callNext() {
 const startPermissionMessage = computed(() => {
   if (selected.value?.source !== "ticket" || selected.value.status !== "called") return "";
   if (!can("queues.start")) return "Qabulni boshlash (Navbatlar) ruxsati berilmagan.";
-  if (!can("visits.view") || !can("patients.view")) {
-    return "Tashriflar va Bemorlarni ko‘rish ruxsatlari kerak.";
+  if (!can("queues.view") || !can("visits.view")) {
+    return "Navbatlar va Tashriflarni ko‘rish ruxsatlari kerak.";
   }
-  if (session.grants?.["services.view"] !== "entire_clinic") {
-    return "Xizmatlarni ko‘rish ruxsati «Butun klinika» bo‘lishi kerak.";
-  }
-  if (!can("doctors.view") || !can("rooms.view") || !can("schedules.view")) {
-    return "Shifokor profillari, xonalar va qabul jadvallarini ko‘rish ruxsatlari kerak.";
+  if (session.grants?.["queues.start"] === "own") return "";
+  if (!can("patients.view") || session.grants?.["services.view"] !== "entire_clinic" ||
+      !can("doctors.view") || !can("rooms.view") || !can("schedules.view")) {
+    return "Boshqa shifokor qabuli uchun qo‘shimcha boshqaruv ruxsatlari kerak.";
   }
   if (selected.value.appointment_id &&
     (!can("appointments.view") || !can("appointments.update"))) {
-    return "Bron bilan kelgan bemor uchun qabullarni ko‘rish va tahrirlash ruxsatlari kerak.";
+    return "Bronni ko‘rish va tahrirlash ruxsatlari kerak.";
   }
   return "";
 });

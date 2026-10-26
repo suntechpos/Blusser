@@ -8674,12 +8674,7 @@
         "x-required-permissions": [
           "queues.start",
           "queues.view",
-          "visits.view",
-          "patients.view",
-          "doctors.view",
-          "rooms.view",
-          "schedules.view",
-          "services.view"
+          "visits.view"
         ],
         "security": [
           {
@@ -8769,9 +8764,17 @@
         "x-linked-resource-guards": [
           "appointments.update"
         ],
-        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "description": "Implemented Stage 5 plus own-doctor permission path. All starts recheck queues.start, queues.view, visits.view, own/branch scope, ticket version, state, booking_slot_valid, reservations and conflicts. For queues.start=own and signed-in doctor matching the ticket, do not require global service/catalogue or schedule-list visibility, or appointment/patient management permission. Non-own starts retain the existing linked appointment and reference view/update checks. Idempotency replay reauthorizes the same permissions.",
         "x-conditional-required-permissions": {
-          "linked_appointment": [
+          "own_doctor": [],
+          "non_own_doctor": [
+            "patients.view",
+            "doctors.view",
+            "rooms.view",
+            "schedules.view",
+            "services.view"
+          ],
+          "linked_non_own": [
             "appointments.view",
             "appointments.update"
           ]
@@ -11160,6 +11163,89 @@
           },
           "429": {
             "$ref": "#/components/responses/Failure429"
+          }
+        }
+      }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/own-start-slot": {
+      "get": {
+        "operationId": "get_queue_tickets_ticket_own_start_slot",
+        "summary": "Resolve a real booked/available slot for the signed-in doctor's called ticket",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.start",
+          "queues.view",
+          "visits.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Existing appointment reservation or actual free schedule slot. Only available for the signed-in doctor's own called ticket.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "room_id",
+                    "starts_at",
+                    "ends_at"
+                  ],
+                  "properties": {
+                    "room_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "starts_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "ends_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
           }
         }
       }
