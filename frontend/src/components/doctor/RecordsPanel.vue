@@ -32,6 +32,7 @@ import {
 
 const props = defineProps<{
   kind: "results" | "documents";
+  readonly?: boolean;
   encounter: Encounter;
   results: ResultRow[];
   documents: DocumentRow[];
@@ -134,6 +135,7 @@ function action(d: DocumentRow, kind: "view" | "download" | "print") {
         </p>
       </div>
       <button
+        v-if="!readonly"
         class="e-button"
         :class="{ primary: kind === 'documents' }"
         @click="upload = true"
@@ -330,21 +332,23 @@ function action(d: DocumentRow, kind: "view" | "download" | "print") {
       </div>
     </div>
     <div class="dw-info">
-      <Info :size="20" /><span>{{
-        kind === "results"
+      <Info :size="20" /><span>{{ readonly
+        ? "Bu bo‘limning haqiqiy API integratsiyasi keyingi bosqichda ulanadi."
+        : kind === "results"
           ? "Natijalar — faqat lokal frontend namoyishi. Haqiqiy yo‘llanmalar va tibbiy karta bilan bog‘lanmagan."
           : "Hujjatlar sintetik mock fayllar. Haqiqiy tibbiy hujjat yuklanmagan."
       }}</span>
     </div>
     <p class="dw-footnote">
-      <LockKeyhole :size="17" />{{
-        kind === "results"
+      <LockKeyhole :size="17" />{{ readonly
+        ? "Ma’lumot qo‘shish va yuklash vaqtincha o‘chirilgan."
+        : kind === "results"
           ? "Tayyor natijalar faqat ko‘rish uchun."
           : "Haqiqiy hujjatlar uchun backend ruxsatlari bu namoyishda amalga oshirilmaydi."
       }}
     </p>
     <UploadDialog
-      v-if="upload"
+      v-if="upload && !readonly"
       :encounter="encounter"
       :encounters="encounters"
       :referrals="referrals"
