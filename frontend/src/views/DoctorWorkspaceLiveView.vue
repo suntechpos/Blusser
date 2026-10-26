@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { CalendarDays, ChevronRight, Clock3, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { CalendarDays, ChevronRight, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
 import { session } from "../services/session";
 import { errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
