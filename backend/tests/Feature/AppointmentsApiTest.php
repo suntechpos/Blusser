@@ -487,8 +487,11 @@ final class AppointmentsApiTest extends FoundationTestCase
         ];
         $this->scheduleCommand($a, 'schedules', $rule);
         $db->transaction(function () use ($db, $appt, $start, $end) {
-            $db->table('appointments')->where('id', $appt['id'])->update(['starts_at' => $start, 'ends_at' => $end]);
-            $db->table('resource_reservations')->where('appointment_id', $appt['id'])->update(['starts_at' => $start, 'ends_at' => $end]);
+            // Explicit offsets prevent the database driver from silently treating local wall time as UTC.
+            $startInstant = $start->toIso8601String();
+            $endInstant = $end->toIso8601String();
+            $db->table('appointments')->where('id', $appt['id'])->update(['starts_at' => $startInstant, 'ends_at' => $endInstant]);
+            $db->table('resource_reservations')->where('appointment_id', $appt['id'])->update(['starts_at' => $startInstant, 'ends_at' => $endInstant]);
         });
 
         $this->assertTrue(app(Appointments::class)->show($this->actor($a['user']), $a['tenant'], 'appointments', $appt['id'])['late']);
