@@ -278,6 +278,21 @@ final class AppointmentsApiTest extends FoundationTestCase
         $created = $this->command($a);
         $migration = require database_path('migrations/2026_10_23_000017_add_reception_booking_details.php');
         $previous = DB::getDefaultConnection();
+        // The legacy migration rewrites the booking routines from its original
+        // SQL baseline. Save the *current* definitions so this rollback test
+        // cannot silently remove later catalog and late check-in safeguards
+        // for unrelated tests sharing this disposable database.
+        $definitions = [];
+        foreach ([
+            'governance.booking_validate_payload(text,jsonb)',
+            'governance.booking_command(text,uuid,jsonb,uuid)',
+            'governance.booking_projection(text,uuid)',
+        ] as $signature) {
+            $definitions[] = DB::connection('migration')->selectOne(
+                'SELECT pg_get_functiondef(?::regprocedure) AS definition',
+                [$signature],
+            )->definition;
+        }
         DB::setDefaultConnection('migration');
         try {
             $migration->down();
@@ -294,7 +309,13 @@ final class AppointmentsApiTest extends FoundationTestCase
                 $this->assertStringContainsString('notes exist', $e->getMessage());
             }
         } finally {
-            DB::setDefaultConnection($previous);
+            try {
+                foreach ($definitions as $definition) {
+                    DB::connection('migration')->unprepared($definition);
+                }
+            } finally {
+                DB::setDefaultConnection($previous);
+            }
         }
         $this->assertSame('Preserve me', app(Appointments::class)->show($this->actor($a['user']), $a['tenant'], 'appointments', $created['id'])['note']);
     }
@@ -487,13 +508,49 @@ final class AppointmentsApiTest extends FoundationTestCase
         ];
         $this->scheduleCommand($a, 'schedules', $rule);
         $db->transaction(function () use ($db, $appt, $start, $end) {
-            $db->table('appointments')->where('id', $appt['id'])->update(['starts_at' => $start, 'ends_at' => $end]);
-            $db->table('resource_reservations')->where('appointment_id', $appt['id'])->update(['starts_at' => $start, 'ends_at' => $end]);
+            // Explicit offsets prevent the database driver from silently treating local wall time as UTC.
+            $startInstant = $start->toIso8601String();
+            $endInstant = $end->toIso8601String();
+            $db->table('appointments')->where('id', $appt['id'])->update(['starts_at' => $startInstant, 'ends_at' => $endInstant]);
+            $db->table('resource_reservations')->where('appointment_id', $appt['id'])->update(['starts_at' => $startInstant, 'ends_at' => $endInstant]);
         });
 
         $this->assertTrue(app(Appointments::class)->show($this->actor($a['user']), $a['tenant'], 'appointments', $appt['id'])['late']);
+        // The runtime role intentionally cannot call the internal scheduling
+        // predicate directly. Inspect these invariants with migration credentials
+        // in this disposable test database, not through the application role.
+        // Do not broaden production SQL grants simply to make a test pass.
+        $preflight = $db->transaction(function () use ($db, $a, $appt) {
+            $db->select("SELECT set_config('app.tenant_id', ?, true)", [$a['tenant']]);
+
+            return $db->selectOne(
+                "SELECT
+                    governance.booking_slot_valid(ap.doctor_id, ap.branch_id, ap.service_id,
+                        ap.room_id, ap.starts_at, ap.ends_at) AS valid_slot,
+                    (ap.ends_at + interval '60 minutes' >= clock_timestamp()) AS in_grace,
+                    EXISTS (SELECT 1 FROM public.resource_reservations rr
+                        WHERE rr.tenant_id = ap.tenant_id AND rr.id = ap.reservation_id
+                        AND rr.active) AS reservation_active
+                 FROM public.appointments ap WHERE ap.id = ? AND ap.tenant_id = ?",
+                [$appt['id'], $a['tenant']],
+            );
+        });
+        $this->assertNotNull($preflight);
+        foreach (['valid_slot', 'in_grace', 'reservation_active'] as $condition) {
+            $this->assertTrue((bool) $preflight->$condition, 'Late-arrival prerequisite not met: '.$condition);
+        }
+        // Validate that the live PostgreSQL routine still contains the migrated
+        // 60-minute grace rule (not just the test-side eligibility preflight).
+        $definition = $db->selectOne(
+            "SELECT pg_get_functiondef('governance.booking_command(text,uuid,jsonb,uuid)'::regprocedure) AS sql",
+        )->sql;
+        $this->assertStringContainsString("a.ends_at + interval '60 minutes' < clock_timestamp()", $definition);
         $key = (string) Str::uuid();
-        $att = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1], $key);
+        try {
+            $att = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1], $key);
+        } catch (GovernanceDenied $exception) {
+            $this->fail('Late check-in rejected after passing explicit prerequisites: '.$exception->reason);
+        }
         $this->assertSame('checked_in', $att['appointment']['status']);
         $this->assertSame('waiting', $att['ticket']['status']);
         $replayed = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1], $key);

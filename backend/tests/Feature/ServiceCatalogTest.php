@@ -11,7 +11,6 @@ use App\Modules\Scheduling\Services\Scheduling;
 use App\Modules\Services\Services\ServiceCatalog;
 use App\Modules\Tenancy\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -209,6 +208,7 @@ final class ServiceCatalogTest extends FoundationTestCase
             'name' => 'New configurable doctor',
             'password_hash' => $db->table('users')->where('id', $a['user'])->value('password_hash'),
             'must_change_password' => true,
+            'temporary_password_expires_at' => now()->addDay(),
         ]);
         $db->table('tenant_memberships')->insert([
             'id' => $doctorMembership,
@@ -355,20 +355,27 @@ WORKER;
     public function test_additive_migration_preserves_legacy_records_and_refuses_destructive_rollback_with_catalog_data(): void
     {
         $a = $this->fixture()['a'];
-        try {
-            $this->assertSame(0, Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]));
-            $this->assertFalse(DB::connection('migration')->getSchemaBuilder()->hasColumn('services', 'price'));
-            $this->assertSame('Synthetic service', DB::connection('migration')->table('services')->where('id', $a['service'])->value('name'));
-        } finally {
-            $this->assertSame(0, Artisan::call('migrate', ['--database' => 'migration', '--force' => true]));
-        }
+        // Verify the forward migration preserved pre-existing services. Rolling back
+        // the last step no longer targets the catalog migration after later releases.
+        $this->assertTrue(DB::connection('migration')->getSchemaBuilder()->hasColumn('services', 'price'));
+        $this->assertSame('Synthetic service', DB::connection('migration')->table('services')->where('id', $a['service'])->value('name'));
         $this->assertNull($this->catalog()->show($this->actor($a['user']), $a['tenant'], $a['service'])['price']);
+
         $this->category($a);
+        $originalConnection = DB::getDefaultConnection();
         try {
-            Artisan::call('migrate:rollback', ['--database' => 'migration', '--step' => 1, '--force' => true]);
-            $this->fail('Refuse destructive catalog rollback.');
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('Service catalog data retained', $e->getMessage());
+            // Invoke the catalog migration's own guard, never an unrelated later
+            // migration selected by migrate:rollback --step=1.
+            DB::setDefaultConnection('migration');
+            $migration = require database_path('migrations/2026_10_25_000021_add_service_catalog_metadata.php');
+            try {
+                $migration->down();
+                $this->fail('Refuse destructive catalog rollback.');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('Service catalog data retained', $e->getMessage());
+            }
+        } finally {
+            DB::setDefaultConnection($originalConnection);
         }
         $this->assertSame(1, DB::connection('migration')->table('service_categories')->count());
     }
