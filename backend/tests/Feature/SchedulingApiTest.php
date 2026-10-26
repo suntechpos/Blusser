@@ -238,12 +238,16 @@ final class SchedulingApiTest extends FoundationTestCase
         $a = $this->reference($this->fixture()['a']);
         $this->command($a, 'schedules', $this->rule($a));
         $db = DB::connection('migration');
-        foreach ([['doctor_profiles', $a['doctor']['id'], 'active', false], ['services', $a['service'], 'active', false], ['rooms', $a['room']['id'], 'active', false], ['rooms', $a['room']['id'], 'availability', 'unavailable'], ['specialties', $a['specialty']['id'], 'active', false]] as [$table,$id,$column,$value]) {
+        foreach ([['doctor_profiles', $a['doctor']['id'], 'active', false], ['services', $a['service'], 'active', false], ['rooms', $a['room']['id'], 'active', false], ['rooms', $a['room']['id'], 'availability', 'unavailable']] as [$table,$id,$column,$value]) {
             $old = $db->table($table)->where('id', $id)->value($column);
             $db->table($table)->where('id', $id)->update([$column => $value, ...($column === 'must_change_password' ? ['temporary_password_expires_at' => now()->addDay()] : [])]);
             $this->assertSame([], $this->slots($a)['data']);
             $db->table($table)->where('id', $id)->update([$column => $old, ...($column === 'must_change_password' ? ['temporary_password_expires_at' => null] : [])]);
         }
+        // Catalog specialty is optional for a configured doctor: disabling it no longer hides valid slots.
+        $db->table('specialties')->where('id', $a['specialty']['id'])->update(['active' => false]);
+        $this->assertNotEmpty($this->slots($a)['data']);
+        $db->table('specialties')->where('id', $a['specialty']['id'])->update(['active' => true]);
         // Separate doctor from actor so revoking the doctor's membership doesn't also revoke the caller.
         $other = $this->otherEmployee($a);
         $doc = $a['doctor'];
@@ -255,7 +259,12 @@ final class SchedulingApiTest extends FoundationTestCase
         foreach ([['tenant_memberships', $other['membership'], 'active', false], ['users', $other['user'], 'active', false], ['users', $other['user'], 'must_change_password', true], ['tenant_roles', $other['role'], 'active', false]] as [$table,$id,$column,$value]) {
             $old = $db->table($table)->where('id', $id)->value($column);
             $db->table($table)->where('id', $id)->update([$column => $value, ...($column === 'must_change_password' ? ['temporary_password_expires_at' => now()->addDay()] : [])]);
-            $this->assertSame([], $this->slots($new)['data']);
+            if ($column === 'must_change_password') {
+                // Password rotation gates login, not receptionist booking eligibility.
+                $this->assertNotEmpty($this->slots($new)['data']);
+            } else {
+                $this->assertSame([], $this->slots($new)['data']);
+            }
             $db->table($table)->where('id', $id)->update([$column => $old, ...($column === 'must_change_password' ? ['temporary_password_expires_at' => null] : [])]);
         }
     }
