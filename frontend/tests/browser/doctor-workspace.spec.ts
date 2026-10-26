@@ -20,6 +20,7 @@ async function setup(
   }> = [patient],
   calls: string[] = [],
   starts: Array<{ id: string; body: Record<string, unknown> }> = [],
+  failOwnSlot = false,
 ) {
   const requests: string[] = [];
   const queue = rows.map((row) => ({ ...row, version: row.version ?? 1, called_at: row.called_at ?? null }));
@@ -39,6 +40,9 @@ async function setup(
     }});
     const ownSlot = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/own-start-slot$/);
     if (ownSlot) {
+      if (failOwnSlot) {
+        return route.fulfill({ status: 409, json: { message: "No matching slot" } });
+      }
       const ticket = queue.find((row) => row.id === ownSlot[1]);
       if (!ticket || ticket.status !== "called" || grants["queues.start"] !== "own") {
         return route.fulfill({ status: 404, json: { message: "Unavailable" } });
@@ -244,6 +248,22 @@ test("Task #01: called walk-in patient starts through real availability slot", a
     starts_at: "2026-10-26T07:30:00Z", ends_at: "2026-10-26T08:00:00Z",
   });
   await expect(page.getByRole("button", { name: "Qabulni boshlash" })).toHaveCount(0);
+});
+
+test("Task #01: unavailable schedule stays called and explains why next to start button", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  const starts: Array<{ id: string; body: Record<string, unknown> }> = [];
+  const grants = { ...allServerGrants, "queues.start": "own" };
+  await setup(page, false, grants, [
+    { ...patient, status: "called", version: 2 },
+  ], [], starts, true);
+
+  const button = page.getByRole("button", { name: "Qabulni boshlash" });
+  await button.click();
+  await expect(page.locator(".dw-start-error")).toContainText("bo‘sh xona yoki vaqt yo‘q");
+  await expect(page.locator(".dw-live-details")).toContainText("Chaqirildi");
+  await expect(button).toBeEnabled();
+  expect(starts).toHaveLength(0);
 });
 
 test("Task #01: own-scoped doctor starts without clinic-wide service/room/schedule views", async ({ page }) => {
