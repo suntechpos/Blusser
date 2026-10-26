@@ -115,8 +115,15 @@ const callPermissionMessage = computed(() => {
   }
   return "";
 });
+const activePatient = computed(() => feed.value?.tickets.find(
+  (row) => row.status === "called" || row.status === "in_progress",
+) || null);
+const hasActivePatient = computed(() =>
+  !!feed.value?.has_active_patient || !!activePatient.value,
+);
 const callAllowed = computed(() => !callPermissionMessage.value && !!nextTicket.value
-  && date.value === clinicToday.value && !loading.value && !calling.value);
+  && !hasActivePatient.value && date.value === clinicToday.value
+  && !loading.value && !calling.value);
 const callLabel = computed(() => feed.value?.has_called_today ? "Keyingi bemor" : "Bemorni chaqirish");
 
 async function callNext() {
@@ -280,6 +287,11 @@ function genderLabel(gender: string | null) {
         </button>
         <p v-if="feed?.doctor && callPermissionMessage" class="dw-call-hint">
           {{ callPermissionMessage }}
+        </p>
+        <p v-else-if="feed?.doctor && hasActivePatient" class="dw-call-hint" role="status">
+          {{ activePatient?.name || "Oldingi bemor" }} hali
+          {{ activePatient?.status === "in_progress" ? "qabulda" : "chaqirilgan" }}.
+          Qabul yakunlanmaguncha keyingi bemor chaqirilmaydi.
         </p>
         <p v-else-if="feed?.doctor && date !== clinicToday" class="dw-call-hint">
           Bemorlarni faqat bugungi navbatdan chaqirish mumkin.
