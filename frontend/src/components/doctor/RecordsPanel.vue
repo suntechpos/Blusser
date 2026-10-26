@@ -32,7 +32,7 @@ import {
 
 const props = defineProps<{
   kind: "results" | "documents";
-  readonly?: boolean;
+  previewOnly?: boolean;
   encounter: Encounter;
   results: ResultRow[];
   documents: DocumentRow[];
@@ -135,7 +135,7 @@ function action(d: DocumentRow, kind: "view" | "download" | "print") {
         </p>
       </div>
       <button
-        v-if="!readonly"
+        v-if="!previewOnly"
         class="e-button"
         :class="{ primary: kind === 'documents' }"
         @click="upload = true"
@@ -332,7 +332,7 @@ function action(d: DocumentRow, kind: "view" | "download" | "print") {
       </div>
     </div>
     <div class="dw-info">
-      <Info :size="20" /><span>{{ readonly
+      <Info :size="20" /><span>{{ previewOnly
         ? "Bu bo‘limning haqiqiy API integratsiyasi keyingi bosqichda ulanadi."
         : kind === "results"
           ? "Natijalar — faqat lokal frontend namoyishi. Haqiqiy yo‘llanmalar va tibbiy karta bilan bog‘lanmagan."
@@ -340,7 +340,7 @@ function action(d: DocumentRow, kind: "view" | "download" | "print") {
       }}</span>
     </div>
     <p class="dw-footnote">
-      <LockKeyhole :size="17" />{{ readonly
+      <LockKeyhole :size="17" />{{ previewOnly
         ? "Ma’lumot qo‘shish va yuklash vaqtincha o‘chirilgan."
         : kind === "results"
           ? "Tayyor natijalar faqat ko‘rish uchun."
@@ -348,7 +348,7 @@ function action(d: DocumentRow, kind: "view" | "download" | "print") {
       }}
     </p>
     <UploadDialog
-      v-if="upload && !readonly"
+      v-if="upload && !previewOnly"
       :encounter="encounter"
       :encounters="encounters"
       :referrals="referrals"
