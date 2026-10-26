@@ -518,8 +518,18 @@ final class AppointmentsApiTest extends FoundationTestCase
         foreach (['valid_slot', 'in_grace', 'reservation_active', 'patient_allowed', 'can_check_in', 'can_create_visit', 'can_create_ticket'] as $condition) {
             $this->assertTrue((bool) $preflight->$condition, $condition.' failed for '.$preflight->starts_utc.'–'.$preflight->ends_utc);
         }
+        // Validate that the live PostgreSQL routine still contains the migrated
+        // 60-minute grace rule (not just the test-side eligibility preflight).
+        $definition = $db->selectOne(
+            "SELECT pg_get_functiondef('governance.booking_command(text,uuid,jsonb,uuid)'::regprocedure) AS sql",
+        )->sql;
+        $this->assertStringContainsString("a.ends_at + interval '60 minutes' < clock_timestamp()", $definition);
         $key = (string) Str::uuid();
-        $att = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1], $key);
+        try {
+            $att = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1], $key);
+        } catch (GovernanceDenied $exception) {
+            $this->fail('Late check-in rejected after passing explicit prerequisites: '.$exception->reason);
+        }
         $this->assertSame('checked_in', $att['appointment']['status']);
         $this->assertSame('waiting', $att['ticket']['status']);
         $replayed = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1], $key);
