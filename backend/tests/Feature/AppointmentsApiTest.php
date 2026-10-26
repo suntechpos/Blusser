@@ -278,6 +278,21 @@ final class AppointmentsApiTest extends FoundationTestCase
         $created = $this->command($a);
         $migration = require database_path('migrations/2026_10_23_000017_add_reception_booking_details.php');
         $previous = DB::getDefaultConnection();
+        // The legacy migration rewrites the booking routines from its original
+        // SQL baseline. Save the *current* definitions so this rollback test
+        // cannot silently remove later catalog and late check-in safeguards
+        // for unrelated tests sharing this disposable database.
+        $definitions = [];
+        foreach ([
+            'governance.booking_validate_payload(text,jsonb)',
+            'governance.booking_command(text,uuid,jsonb,uuid)',
+            'governance.booking_projection(text,uuid)',
+        ] as $signature) {
+            $definitions[] = DB::connection('migration')->selectOne(
+                'SELECT pg_get_functiondef(?::regprocedure) AS definition',
+                [$signature],
+            )->definition;
+        }
         DB::setDefaultConnection('migration');
         try {
             $migration->down();
@@ -294,7 +309,13 @@ final class AppointmentsApiTest extends FoundationTestCase
                 $this->assertStringContainsString('notes exist', $e->getMessage());
             }
         } finally {
-            DB::setDefaultConnection($previous);
+            try {
+                foreach ($definitions as $definition) {
+                    DB::connection('migration')->unprepared($definition);
+                }
+            } finally {
+                DB::setDefaultConnection($previous);
+            }
         }
         $this->assertSame('Preserve me', app(Appointments::class)->show($this->actor($a['user']), $a['tenant'], 'appointments', $created['id'])['note']);
     }
