@@ -93,7 +93,19 @@ final class DoctorWorkspaceFeedTest extends FoundationTestCase
         $this->assertSame($first['id'], $mine['doctor']['id']);
         $this->assertCount(1, $mine['tickets']);
         $this->assertSame('Only my patient', $mine['tickets'][0]['name']);
+        $this->assertSame(1, $mine['tickets'][0]['version']);
+        $this->assertNull($mine['tickets'][0]['called_at']);
+        $this->assertFalse($mine['has_called_today']);
         $this->assertSame([], $mine['doctors']);
+
+        app(Queues::class)->command($this->actor($a['user']), $a['tenant'], 'call',
+            $mine['tickets'][0]['id'], ['expected_version' => $mine['tickets'][0]['version']],
+            (string) Str::uuid());
+        $afterCall = $this->feed($a);
+        $this->assertTrue($afterCall['has_called_today']);
+        $this->assertSame('called', $afterCall['tickets'][0]['status']);
+        $this->assertSame(2, $afterCall['tickets'][0]['version']);
+        $this->assertNotNull($afterCall['tickets'][0]['called_at']);
 
         $this->assertSqlState('42501', fn () => $this->feed($a, $second['id']));
 
