@@ -62,7 +62,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
 </script>
 
 <template>
-  <div class="dw-content dw-live-encounter" aria-label="Boshlangan qabul interfeysi">
+  <div class="dw-content dw-live-encounter" role="region" aria-label="Boshlangan qabul interfeysi">
     <div class="dw-tabs" role="tablist" aria-label="Bemor tafsilotlari">
       <button v-for="t in tabs" :key="t" type="button" role="tab"
         :aria-selected="tab === t" :class="{ selected: tab === t }" @click="tab = t">
@@ -146,7 +146,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
       <p class="dw-preview-notice dw-preview-tab-notice" role="status">
         {{ tab }} API hali ulanmagan. Real natija yoki hujjat mavjud deb ko‘rsatilmaydi.
       </p>
-      <RecordsPanel :key="patient.patient_id + tab" readonly
+      <RecordsPanel :key="patient.patient_id + tab" preview-only
         :kind="tab === 'Tekshiruv natijalari' ? 'results' : 'documents'"
         :encounter="encounter" :results="[]" :documents="[]" :encounters="[]" :referrals="[]" />
     </template>
