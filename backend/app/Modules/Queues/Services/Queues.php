@@ -28,6 +28,20 @@ final class Queues
         return json_decode(app(Governance::class)->call('queue_command', [$action, $id, json_encode($payload, JSON_THROW_ON_ERROR), $key], $actor, $tenant), true, flags: JSON_THROW_ON_ERROR);
     }
 
+    /** Ticket-scoped read; SQL only returns a slot for the signed-in doctor. */
+    public function ownStartSlot(User $actor, string $tenant, string $ticket): array
+    {
+        return $this->read($actor, $tenant, function () use ($ticket) {
+            $value = DB::selectOne(
+                'SELECT governance.own_doctor_start_slot(?::uuid) AS value', [$ticket],
+            )->value;
+
+            abort_if($value === null, 409, 'Bugungi jadvalda bu bemor uchun bo‘sh vaqt topilmadi.');
+
+            return json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+        });
+    }
+
     public function listing(User $actor, string $tenant, array $filters): array
     {
         return $this->read($actor, $tenant, function () use ($filters) {
