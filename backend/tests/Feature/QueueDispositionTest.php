@@ -190,6 +190,9 @@ final class QueueDispositionTest extends FoundationTestCase
             $times = array_map(fn ($slot) => (new \DateTimeImmutable($slot['starts_at']))->setTimezone(new \DateTimeZone('Asia/Tashkent'))->format('H:i'), $result['slots']);
             $this->assertNotContains('09:00', $times);
             $this->assertContains('09:30', $times);
+            $busyTimes = array_map(fn ($slot) => (new \DateTimeImmutable($slot['starts_at']))->setTimezone(new \DateTimeZone('Asia/Tashkent'))->format('H:i'), $result['busy_slots']);
+            $this->assertContains('09:00', $busyTimes);
+            $this->assertNotContains('09:30', $busyTimes);
             $this->assertNotContains('13:00', $times);
             $this->assertNotContains('13:30', $times);
             $this->assertSame([$a['room']['id']], array_values(array_unique(array_column($result['slots'], 'room_id'))));

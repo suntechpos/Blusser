@@ -41,6 +41,10 @@ const actionNotice = ref("");
 const optionsLoading = ref(false);
 const optionsError = ref("");
 const rebookingSlots = ref<RebookingSlot[]>([]);
+const busyRebookingSlots = ref<RebookingSlot[]>([]);
+const nextAvailableSuggestion = ref<{ date: string; slot: RebookingSlot } | null>(null);
+const suggestionLoading = ref(false);
+const suggestionError = ref("");
 const rebookingTimezone = ref("");
 let optionsSequence = 0;
 
@@ -365,6 +369,7 @@ function closeActionPreview() {
   ++optionsSequence;
   actionPreview.value = null;
   rebookingSlots.value = [];
+  busyRebookingSlots.value = [];
   optionsError.value = "";
 }
 async function loadRebookingOptions() {
@@ -372,6 +377,7 @@ async function loadRebookingOptions() {
   const preview = actionPreview.value;
   previewTime.value = "";
   rebookingSlots.value = [];
+  busyRebookingSlots.value = [];
   optionsError.value = "";
   optionsLoading.value = false;
   if (!preview || !previewReschedule.value || !canRebook.value ||
@@ -380,17 +386,54 @@ async function loadRebookingOptions() {
   optionsLoading.value = true;
   try {
     const response = await clinicRequest<{
-      local_date: string; timezone: string; slots: RebookingSlot[];
+      local_date: string; timezone: string; slots: RebookingSlot[]; busy_slots?: RebookingSlot[];
     }>("queue-tickets/" + encodeURIComponent(preview.row.id) + "/rebooking-options", {
       params: { action: preview.action, local_date: localDate },
     });
     if (request !== optionsSequence) return;
     rebookingSlots.value = response.data.slots;
+    busyRebookingSlots.value = response.data.busy_slots ?? [];
+    if (nextAvailableSuggestion.value?.date === localDate) {
+      const key = slotKey(nextAvailableSuggestion.value.slot);
+      if (response.data.slots.some(slot => slotKey(slot) === key)) previewTime.value = key;
+    }
     rebookingTimezone.value = response.data.timezone;
   } catch (cause) {
     if (request === optionsSequence) optionsError.value = errorText(cause);
   } finally {
     if (request === optionsSequence) optionsLoading.value = false;
+  }
+}
+async function findNextAvailableDate() {
+  if (!actionPreview.value || !previewReschedule.value || !previewDate.value ||
+      suggestionLoading.value || optionsLoading.value) return;
+  const sequenceAtStart = optionsSequence;
+  const preview = actionPreview.value;
+  suggestionError.value = "";
+  nextAvailableSuggestion.value = null;
+  suggestionLoading.value = true;
+  try {
+    for (let offset = 1; offset <= 14; offset++) {
+      const day = new Date(previewDate.value + "T00:00:00Z");
+      day.setUTCDate(day.getUTCDate() + offset);
+      const localDate = day.toISOString().slice(0, 10);
+      const response = await clinicRequest<{
+        local_date: string; timezone: string; slots: RebookingSlot[];
+      }>("queue-tickets/" + encodeURIComponent(preview.row.id) + "/rebooking-options", {
+        params: { action: preview.action, local_date: localDate },
+      });
+      if (optionsSequence !== sequenceAtStart) return;
+      if (response.data.slots.length) {
+        nextAvailableSuggestion.value = { date: localDate, slot: response.data.slots[0]! };
+        previewDate.value = localDate;
+        return;
+      }
+    }
+    suggestionError.value = "Keyingi 14 kunda bo‘sh vaqt topilmadi.";
+  } catch (cause) {
+    if (optionsSequence === sequenceAtStart) suggestionError.value = errorText(cause);
+  } finally {
+    suggestionLoading.value = false;
   }
 }
 watch([actionPreview, previewReschedule, previewDate], () => void loadRebookingOptions());
@@ -400,6 +443,7 @@ watch([doctorId, branchId, date, () => session.epoch], () => {
   ++optionsSequence;
   actionPreview.value = null;
   rebookingSlots.value = [];
+  busyRebookingSlots.value = [];
   optionsError.value = "";
   actionNotice.value = "";
 });
@@ -794,6 +838,9 @@ function genderLabel(gender: string | null) {
             <select v-model="previewTime" aria-label="Bo‘sh vaqt"
               :disabled="actionSaving || optionsLoading || !rebookingSlots.length">
               <option value="">Vaqtni tanlang</option>
+              <option v-for="slot in busyRebookingSlots" :key="'busy-' + slotKey(slot)" :value="'busy-' + slotKey(slot)" disabled>
+                {{ rebookingTime(slot) }} — Band
+              </option>
               <option v-for="slot in rebookingSlots" :key="slotKey(slot)" :value="slotKey(slot)">
                 {{ rebookingTime(slot) }}
               </option>
@@ -801,10 +848,26 @@ function genderLabel(gender: string | null) {
           </label>
           <p v-if="optionsLoading" role="status">Bo‘sh vaqtlar yuklanmoqda...</p>
           <p v-else-if="optionsError" class="dw-action-error" role="alert">{{ optionsError }}</p>
+          <p v-else-if="previewDate && busyRebookingSlots.length && !rebookingSlots.length" role="status">
+            Bu sanadagi barcha mavjud vaqtlar band. Boshqa sanani tanlang.
+          </p>
           <p v-else-if="previewDate && !rebookingSlots.length" role="status">
-            Ushbu sanada shifokor uchun bo‘sh vaqt topilmadi.
+            Ushbu sanada shifokor uchun bo‘sh vaqt topilmadi. Boshqa sanani tanlang.
+          </p>
+          <p v-else-if="busyRebookingSlots.length" role="status">
+            Band vaqtlar «Band» deb belgilangan va tanlanmaydi. Tavsiya: {{ rebookingTime(rebookingSlots[0]!) }} yoki ro‘yxatdagi boshqa bo‘sh vaqtni tanlang.
           </p>
           <p v-else>Vaqtlar shifokorning haqiqiy jadvalidan, klinika vaqt mintaqasida ko‘rsatiladi.</p>
+          <p v-if="nextAvailableSuggestion?.date === previewDate" role="status">
+            Tavsiya qilingan eng yaqin sana va vaqt: {{ nextAvailableSuggestion.date }},
+            {{ rebookingTime(nextAvailableSuggestion.slot) }}. Bo‘sh vaqt avtomatik tanlandi.
+          </p>
+          <button v-if="previewDate && !optionsLoading && !optionsError && !rebookingSlots.length"
+            type="button" class="dw-next-slot" :disabled="actionSaving || suggestionLoading"
+            @click="findNextAvailableDate">
+            {{ suggestionLoading ? 'Keyingi bo‘sh sana qidirilmoqda...' : 'Keyingi bo‘sh sanani topish (14 kun)' }}
+          </button>
+          <p v-if="suggestionError" class="dw-action-error" role="alert">{{ suggestionError }}</p>
         </div>
         <div class="dw-preview-footer">
           <button type="button" class="dw-preview-dismiss" :disabled="actionSaving" @click="closeActionPreview">Yopish</button>
@@ -952,6 +1015,12 @@ function genderLabel(gender: string | null) {
 .dw-preview-confirm:disabled { opacity: .5; cursor: not-allowed; }
 .dw-action-error { color: #b4233b; font-size: 13px; line-height: 1.5; }
 .dw-preview-datetime > .dw-action-error { color: #b4233b; }
+.dw-next-slot {
+  grid-column: 1 / -1; border: 1px solid #bfd5f5; border-radius: 8px;
+  background: #eef5ff; padding: 10px 12px; color: #1555ab;
+  font: inherit; cursor: pointer;
+}
+.dw-next-slot:disabled { opacity: .6; cursor: not-allowed; }
 .dw-action-helper { color: #6b83a3; font-size: 12px; line-height: 1.5; }
 .dw-live-history-preview { padding: 20px; }
 .dw-live-history-preview .dw-start-button { margin-top: 14px; }
