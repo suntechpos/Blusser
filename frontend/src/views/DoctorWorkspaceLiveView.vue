@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { CalendarDays, ChevronDown, ChevronRight, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { AlertTriangle, Ban, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock3, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
 import { can, session } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
@@ -399,48 +399,72 @@ function genderLabel(gender: string | null) {
 
     <p v-if="error" class="dw-notice" role="alert">{{ error }}</p>
     <section v-if="feed?.doctor && overdueTickets.length" class="dw-overdue" aria-label="Eski kundan qolgan navbatlar">
-      <div class="dw-overdue-header">
-        <div>
+      <header class="dw-overdue-header">
+        <span class="dw-overdue-alert-icon" aria-hidden="true"><AlertTriangle :size="20" /></span>
+        <div class="dw-overdue-heading">
           <h2>Oldingi kundan yakunlanmagan qabullar</h2>
-          <p>Shifokorning avvalgi sanalardagi faol qabullari va chaqirilgan navbatlari.
-            Ular hal etilmaguncha yangi bemorni chaqirish mumkin emas.</p>
+          <p>Avvalgi kunlardan qolgan faol qabullar va chaqirilgan navbatlar.
+            Ular hal etilmaguncha yangi bemorni chaqirib bo‘lmaydi.</p>
         </div>
-        <strong>{{ overdueTickets.length }} ta</strong>
-      </div>
+        <span class="dw-overdue-count">{{ overdueTickets.length }} ta</span>
+      </header>
       <p v-if="overdueError" class="dw-overdue-error" role="alert">{{ overdueError }}</p>
       <div class="dw-overdue-list">
-        <div v-for="item in overdueTickets" :key="item.id" class="dw-overdue-item">
+        <article v-for="item in overdueTickets" :key="item.id" class="dw-overdue-item">
+          <span class="dw-overdue-avatar" aria-hidden="true">{{ initials(item.name) }}</span>
           <div class="dw-overdue-info">
-            <b>{{ item.name }}</b>
-            <span>{{ item.local_date }} · {{ item.branch_name }} · {{ item.service }}</span>
-            <span class="dw-overdue-status">{{ item.status === "in_progress" ? "Qabulda" : "Chaqirildi" }}</span>
+            <strong :title="item.name">{{ item.name }}</strong>
+            <span :title="item.local_date + ' · ' + item.branch_name + ' · ' + item.service">
+              {{ item.local_date }} · {{ item.branch_name }} · {{ item.service }}
+            </span>
           </div>
+          <span class="dw-overdue-state" :class="item.status === 'in_progress' ? 'is-active' : 'is-called'">
+            <span class="dw-overdue-state-dot" aria-hidden="true"></span>
+            {{ item.status === "in_progress" ? "Qabulda" : "Chaqirildi" }}
+          </span>
+          <span class="dw-overdue-time" :title="'Qabul sanasi: ' + item.local_date">
+            <Clock3 :size="16" aria-hidden="true" />
+            <span>{{ item.local_date }}</span>
+          </span>
           <div class="dw-overdue-actions">
-            <button v-if="item.status === 'in_progress'" type="button"
-              :disabled="loading || !!resolvingOverdueId" @click="continueOverdue(item)">
-              Qabulni davom ettirish
-            </button>
-            <button v-if="item.status === 'in_progress' && canResolveOverdue(item, 'complete')"
-              type="button" class="dw-overdue-danger" :disabled="loading || !!resolvingOverdueId"
-              @click="resolveOverdue(item, 'complete')">
-              {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Qabulni yakunlash" }}
-            </button>
-            <button v-if="item.status === 'called' && canResolveOverdue(item, 'skip')"
-              type="button" :disabled="loading || !!resolvingOverdueId"
-              @click="resolveOverdue(item, 'skip')">
-              {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "O‘tkazib yuborish" }}
-            </button>
-            <button v-if="item.status === 'called' && canResolveOverdue(item, 'cancel')"
-              type="button" class="dw-overdue-danger" :disabled="loading || !!resolvingOverdueId"
-              @click="resolveOverdue(item, 'cancel')">
-              {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Navbatni bekor qilish" }}
-            </button>
-            <span v-if="item.status === 'called' && !canResolveOverdue(item, 'skip') && !canResolveOverdue(item, 'cancel')"
-              class="dw-overdue-permission">Navbatni yopish uchun tegishli ruxsat kerak.</span>
+            <template v-if="item.status === 'in_progress'">
+              <button type="button" class="dw-overdue-action is-primary"
+                :disabled="loading || !!resolvingOverdueId" @click="continueOverdue(item)">
+                <Play :size="16" aria-hidden="true" />
+                Qabulni davom ettirish
+              </button>
+              <button v-if="canResolveOverdue(item, 'complete')" type="button"
+                class="dw-overdue-action is-subtle" :disabled="loading || !!resolvingOverdueId"
+                @click="resolveOverdue(item, 'complete')">
+                <CheckCircle2 :size="16" aria-hidden="true" />
+                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Qabulni yakunlash" }}
+              </button>
+            </template>
+            <template v-else>
+              <button v-if="canResolveOverdue(item, 'skip')" type="button"
+                class="dw-overdue-action is-subtle" :disabled="loading || !!resolvingOverdueId"
+                @click="resolveOverdue(item, 'skip')">
+                <FastForward :size="16" aria-hidden="true" />
+                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "O‘tkazib yuborish" }}
+              </button>
+              <button v-if="canResolveOverdue(item, 'cancel')" type="button"
+                class="dw-overdue-action is-danger" :disabled="loading || !!resolvingOverdueId"
+                @click="resolveOverdue(item, 'cancel')">
+                <Ban :size="16" aria-hidden="true" />
+                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Navbatni bekor qilish" }}
+              </button>
+            </template>
+            <span v-if="item.status === 'called' &&
+                !canResolveOverdue(item, 'skip') && !canResolveOverdue(item, 'cancel')"
+              class="dw-overdue-permission" title="Navbatni yopish ruxsatini administratordan so‘rang">
+              Yopish ruxsati kerak
+            </span>
             <span v-if="item.status === 'in_progress' && !canResolveOverdue(item, 'complete')"
-              class="dw-overdue-permission">Yakunlash uchun «Navbatni yakunlash» ruxsati kerak.</span>
+              class="dw-overdue-permission" title="Navbatni yakunlash ruxsatini administratordan so‘rang">
+              Yakunlash ruxsati kerak
+            </span>
           </div>
-        </div>
+        </article>
       </div>
     </section>
     <div class="dw-workspace">
