@@ -70,7 +70,7 @@ watch([appointmentPreview, appointmentDate], async () => {
   appointmentSlotKey.value = "";
   appointmentSlots.value = [];
   appointmentBusySlots.value = [];
-  if (!row || !/^\\d{4}-\\d{2}-\\d{2}$/.test(appointmentDate.value)) return;
+  if (!row || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate.value)) return;
   appointmentLoading.value = true;
   try {
     const result = await clinicRequest<{
