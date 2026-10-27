@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { AlertTriangle, Ban, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock3, Ellipsis, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { AlertTriangle, Ban, CalendarDays, ChevronDown, Ellipsis, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
 import { can, session } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
@@ -18,7 +18,6 @@ const query = ref("");
 const selectedKey = ref("");
 const loading = ref(true);
 const calling = ref(false);
-const resolvingOverdueId = ref("");
 const overdueError = ref("");
 const openMenuKey = ref("");
 const actionPreview = ref<{ name: string; action: "skip" | "cancel" } | null>(null);
@@ -197,20 +196,9 @@ async function callNext() {
 }
 const overdueTickets = computed(() => feed.value?.overdue ?? []);
 
-function canResolveOverdue(row: { status: string; appointment_id: string | null }, action: "skip" | "cancel" | "complete") {
-  if (row.status === "in_progress") {
-    return action === "complete" && can("queues.complete") &&
-      (!row.appointment_id || can("appointments.update"));
-  }
-  if (row.status !== "called") return false;
-  if (action === "skip") return can("queues.skip");
-  return action === "cancel" && can("queues.cancel") &&
-    (!row.appointment_id || can("appointments.cancel"));
-}
-
 async function continueOverdue(row: { id: string; local_date: string; branch_id: string }) {
   // Navigation alone: no queue status or medical record mutation.
-  if (loading.value || resolvingOverdueId.value) return;
+  if (loading.value) return;
   queueTab.value = "unresolved";
   query.value = "";
   openMenuKey.value = "";
@@ -218,37 +206,6 @@ async function continueOverdue(row: { id: string; local_date: string; branch_id:
   date.value = row.local_date;
   branchId.value = row.branch_id;
   await load("ticket:" + row.id);
-}
-
-async function resolveOverdue(
-  row: { id: string; name: string; status: string; version: number; appointment_id: string | null },
-  action: "skip" | "cancel" | "complete",
-) {
-  if (resolvingOverdueId.value || loading.value || !canResolveOverdue(row, action)) return;
-  const description = action === "complete"
-    ? `${row.name} qabuli yakunlansinmi? Oldingi tibbiy yozuvlar saqlanadi, lekin yakunlangan qabulni tahrirlab bo‘lmaydi.`
-    : action === "skip"
-      ? `${row.name} navbati «O‘tkazib yuborilgan» holatiga o‘tkazilsinmi? Bemor ma’lumotlari o‘chirilmaydi.`
-      : `${row.name} navbati bekor qilinsinmi? Bu amal bron va navbat holatiga ham ta’sir qiladi.`;
-  if (!window.confirm(description)) return;
-  resolvingOverdueId.value = row.id;
-  overdueError.value = "";
-  try {
-    await clinicRequest("queue-tickets/" + encodeURIComponent(row.id) + "/" + action, {
-      method: "POST",
-      body: { expected_version: row.version, reason_code: "previous_day_manual_resolution" },
-    });
-    await load();
-  } catch (cause) {
-    const message = errorText(cause);
-    try {
-      await load();
-    } finally {
-      overdueError.value = message;
-    }
-  } finally {
-    resolvingOverdueId.value = "";
-  }
 }
 
 // "Qabulni boshlash" is a separate, explicit action on the selected
