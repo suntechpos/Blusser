@@ -33,6 +33,23 @@ export interface WorkspacePatientRow {
   kind?: "scheduled" | "walk_in";
   created_at?: string;
 }
+export interface OverdueDoctorTicket {
+  id: string;
+  visit_id: string;
+  patient_id: string;
+  patient_number: string;
+  name: string;
+  service: string;
+  status: "called" | "in_progress";
+  version: number;
+  local_date: string;
+  branch_id: string;
+  branch_name: string;
+  appointment_id: string | null;
+  number: number;
+  kind: "scheduled" | "walk_in";
+}
+
 export interface DoctorWorkspaceFeed {
   manager: boolean;
   doctors: WorkspaceDoctor[];
@@ -43,6 +60,7 @@ export interface DoctorWorkspaceFeed {
   tickets: WorkspacePatientRow[];
   has_called_today?: boolean;
   has_active_patient?: boolean;
+  overdue?: OverdueDoctorTicket[];
 }
 
 /** All access control is enforced by the server using the signed-in identity. */
