@@ -324,3 +324,37 @@ test("a late availability response cannot replace slots for the newly selected d
   await expect(dialog).toHaveCount(0);
   expect(fixture.commands[0]?.body.rebook).toEqual(nextDaySlot);
 });
+
+
+test("occupied time is disabled and the doctor is offered a free alternative", async ({ page }) => {
+  const busySlot = {
+    ...slot,
+    starts_at: "2030-01-07T04:00:00Z",
+    ends_at: "2030-01-07T04:30:00Z",
+  };
+  const freeSlot = {
+    ...slot,
+    starts_at: "2030-01-07T04:30:00Z",
+    ends_at: "2030-01-07T05:00:00Z",
+  };
+  const fixture = await setup(page, {
+    availability: async (route, date) => {
+      await route.fulfill({
+        json: { local_date: date, timezone: "Asia/Tashkent",
+          slots: [freeSlot], busy_slots: [busySlot] },
+      });
+    },
+  });
+  const dialog = await openAction(page, "skip");
+  await dialog.getByLabel("Sabab", { exact: true }).selectOption("patient_requested");
+  await dialog.getByLabel("Bemorni boshqa kunga qayta yozish (ixtiyoriy)").check();
+  await dialog.getByLabel("Yangi sana").fill("2030-01-07");
+  const times = dialog.getByLabel("Bo‘sh vaqt", { exact: true });
+  const occupied = times.getByRole("option", { name: /09:00.*09:30.*Band/ });
+  await expect(occupied).toBeDisabled();
+  await expect(dialog).toContainText(/Tavsiya: 09:30.*10:00/);
+  await expect(dialog.getByRole("button", { name: "Tasdiqlash" })).toBeDisabled();
+  await times.selectOption({ index: 2 });
+  await dialog.getByRole("button", { name: "Tasdiqlash" }).click();
+  expect(fixture.commands[0]?.body.rebook).toEqual(freeSlot);
+});
