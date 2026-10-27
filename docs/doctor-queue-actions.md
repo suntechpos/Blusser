@@ -99,3 +99,27 @@ The following failures also reproduced on pristine base commit `09afd1d` with th
 | `clinic date switching fetches new rows and does not resurrect demo queue` | Hardcoded fixture date assumption conflicts with the current date. |
 
 The entire repository suite has not been claimed green. GitHub CI results are separate from these local checks.
+
+## Own-scope appointment creation follow-up
+
+Migration `2026_10_27_000003_allow_own_appointment_creation` adds `own` to the existing `appointments.create` catalog entry. It does not alter role grants or memberships. In Settings, an authorized administrator can now explicitly grant `Qabul yaratish → O‘ziga tegishli`, alongside the doctor's own appointment/patient/visit/queue views and skip/cancel permissions. Reload the permission catalog after applying the migration.
+
+A role may combine a broader page view with narrower actions: `own ⊆ assigned_branches ⊆ entire_clinic`. Both the frontend editor and the current/legacy backend role writers enforce that dependency rule, including secondary parent views. Missing or narrower views still reject the save. Actor delegation and branch-delegation rules retain their previous separate checks.
+
+Own creation uses the existing server-side doctor identity and live membership/doctor branch checks. It cannot create for a different doctor or a removed branch. Ticket rebooking works with own appointment creation/view and patient view without granting clinic/branch-wide appointment access or broad catalog lists. Generic appointment creation retains its existing catalog-read prerequisites. No booking, queue transaction, occupancy or idempotency guard was removed.
+
+The CEO deployment backfill retains strict catalog validation and recognizes only the exact old and reviewed new appointment-create scope arrays. This keeps historical migrations and the existing backfill command compatible; it does not automatically grant the new own scope.
+
+The same containment rule now resolves effective role-action/page-grant intersections. A role's own action with an assigned-branches page grant remains own; the reverse combination also narrows to own. Missing role actions remain absent. Existing page-view overrides and legacy profiles with no page-grant overrides retain their behavior. This fixes the disabled rebooking option for real employee profiles, beyond merely saving a valid role.
+
+Follow-up local verification: 10 focused `DoctorQueueScopeTest` cases and 17 related existing backend cases passed (27 unique cases across targeted runs); 3 permission-editor browser cases plus the 6 queue-action browser cases passed. TypeScript, production build, and Pint for the 3 changed PHP files passed. The known unrelated failures documented above were not rerun or suppressed. No remote CI result is inferred from local checks.
+
+Focused follow-up commands (backend requires the isolated fresh `blusser_test` described above):
+
+```sh
+docker compose run --rm test php artisan test --filter=DoctorQueueScopeTest
+cd frontend
+npx playwright test tests/browser/appointment-permission-scopes.spec.ts tests/browser/doctor-queue-actions.spec.ts
+```
+
+After deployment, reload Settings and explicitly choose the doctor's `Qabul yaratish → O‘ziga tegishli` grant. Own appointment/patient/visit/queue views and the required skip/cancel actions must also be granted; role grants are not provisioned automatically by this migration.

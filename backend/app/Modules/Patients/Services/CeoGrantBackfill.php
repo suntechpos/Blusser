@@ -31,7 +31,14 @@ final class CeoGrantBackfill
                 $added = 0;
                 foreach (OperationsContract::permissions() as $code => $scopes) {
                     $permission = $connection->table('permissions')->where('code', $code)->first();
-                    if (! $permission || $permission->allowed_scopes !== '{'.implode(',', $scopes).'}') {
+                    $acceptedScopes = ['{'.implode(',', $scopes).'}'];
+                    // The historical stage-2 migration invokes this service too.
+                    // Accept only the reviewed forward scope addition, retaining
+                    // exact catalog validation for every other definition.
+                    if ($code === 'appointments.create') {
+                        $acceptedScopes[] = '{own,assigned_branches,entire_clinic}';
+                    }
+                    if (! $permission || ! in_array($permission->allowed_scopes, $acceptedScopes, true)) {
                         throw new RuntimeException('Permission catalog mismatch.');
                     }
                     $key = ['tenant_id' => $ceo->tenant_id, 'role_id' => $ceo->role_id, 'permission_id' => $permission->id];

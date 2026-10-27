@@ -40,7 +40,7 @@ async function setup(
     "queues.skip": "own",
     "queues.cancel": "own",
     "appointments.view": "own",
-    "appointments.create": "assigned_branches",
+    "appointments.create": "own",
     "appointments.cancel": "own",
     "patients.view": "own",
   };
