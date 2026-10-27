@@ -491,7 +491,7 @@ function genderLabel(gender: string | null) {
         <p v-else-if="feed?.doctor && hasActivePatient" class="dw-call-hint" role="status">
           {{ activePatient?.name || "Oldingi bemor" }} hali
           {{ activePatient?.status === "in_progress" ? "qabulda" : "chaqirilgan" }}.
-          Qabul yoki navbat yopilmaguncha keyingi bemor chaqirilmaydi.
+          Qabul yakunlanmaguncha keyingi bemor chaqirilmaydi.
         </p>
         <p v-else-if="feed?.doctor && date !== clinicToday" class="dw-call-hint">
           Bemorlarni faqat bugungi navbatdan chaqirish mumkin.
