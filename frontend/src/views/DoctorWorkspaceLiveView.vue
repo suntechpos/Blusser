@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { AlertTriangle, Ban, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock3, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { AlertTriangle, Ban, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock3, Ellipsis, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
 import { can, session } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
@@ -13,13 +13,20 @@ const feed = ref<DoctorWorkspaceFeed | null>(null);
 const date = ref("");
 const doctorId = ref("");
 const branchId = ref("");
-const queueTab = ref<"waiting" | "completed">("waiting");
+const queueTab = ref<"waiting" | "unresolved" | "completed">("waiting");
 const query = ref("");
 const selectedKey = ref("");
 const loading = ref(true);
 const calling = ref(false);
 const resolvingOverdueId = ref("");
 const overdueError = ref("");
+const openMenuKey = ref("");
+const actionPreview = ref<{ name: string; action: "skip" | "cancel" } | null>(null);
+const previewReason = ref("");
+const previewComment = ref("");
+const previewReschedule = ref(false);
+const previewDate = ref("");
+const previewTime = ref("");
 
 const starting = ref(false);
 const startError = ref("");
@@ -175,6 +182,7 @@ async function callNext() {
     });
     query.value = "";
     queueTab.value = "waiting";
+    openMenuKey.value = "";
     await load("ticket:" + ticket.id);
   } catch (cause) {
     const message = errorText(cause);
@@ -203,8 +211,9 @@ function canResolveOverdue(row: { status: string; appointment_id: string | null 
 async function continueOverdue(row: { id: string; local_date: string; branch_id: string }) {
   // Navigation alone: no queue status or medical record mutation.
   if (loading.value || resolvingOverdueId.value) return;
-  queueTab.value = "waiting";
+  queueTab.value = "unresolved";
   query.value = "";
+  openMenuKey.value = "";
   overdueError.value = "";
   date.value = row.local_date;
   branchId.value = row.branch_id;
@@ -308,19 +317,79 @@ async function startConsultation() {
     starting.value = false;
   }
 }
+// Keep historical data in its own tab, but do not fetch a second, more
+// privileged patient feed. The overdue projection already enforces access.
+type QueueDisplayRow = DisplayRow & {
+  historicDate?: string;
+  historicBranchId?: string;
+  historicBranchName?: string;
+};
+const unresolvedRows = computed<QueueDisplayRow[]>(() => {
+  const todayRows = new Map(rows.value.filter((r) => r.source === "ticket")
+    .map((r) => [r.id, r] as const));
+  return overdueTickets.value.map((item) => ({
+    ...(todayRows.get(item.id) ?? {
+      ...item,
+      dob: "",
+      gender: null,
+      phone: null,
+      source: "ticket" as const,
+      key: "ticket:" + item.id,
+    }),
+    historicDate: item.local_date,
+    historicBranchId: item.branch_id,
+    historicBranchName: item.branch_name,
+  }));
+});
+const overdueIds = computed(() => new Set(overdueTickets.value.map((item) => item.id)));
+const unresolvedCount = computed(() => unresolvedRows.value.length);
 const completed = (row: DisplayRow) => row.status === "completed";
-const filteredRows = computed(() => rows.value.filter((row) => {
-  if (completed(row) !== (queueTab.value === "completed")) return false;
+function hasHistoricScope(row: QueueDisplayRow) {
+  return !!row.historicDate && (row.historicDate !== date.value ||
+    row.historicBranchId !== branchId.value);
+}
+function toggleRowMenu(key: string) {
+  openMenuKey.value = openMenuKey.value === key ? "" : key;
+}
+function showActionPreview(row: QueueDisplayRow, action: "skip" | "cancel") {
+  openMenuKey.value = "";
+  actionPreview.value = { name: row.name, action };
+  previewReason.value = "";
+  previewComment.value = "";
+  previewReschedule.value = false;
+  previewDate.value = "";
+  previewTime.value = "";
+}
+function closeActionPreview() {
+  actionPreview.value = null;
+}
+function resumeRow(row: QueueDisplayRow) {
+  openMenuKey.value = "";
+  if (row.historicDate && row.historicBranchId) {
+    void continueOverdue({ id: row.id, local_date: row.historicDate, branch_id: row.historicBranchId });
+  } else {
+    selectedKey.value = row.key;
+  }
+}
+
+const filteredRows = computed<QueueDisplayRow[]>(() => {
+  const source = queueTab.value === "unresolved" ? unresolvedRows.value
+    : rows.value.filter((row) => queueTab.value === "completed"
+      ? completed(row) : !completed(row) && !overdueIds.value.has(row.id));
   const search = query.value.trim().toLocaleLowerCase();
-  return !search || [row.name, row.patient_number, String(row.number ?? ""), row.service]
-    .some((item) => item?.toLocaleLowerCase().includes(search));
-}));
-const waitingCount = computed(() => rows.value.filter((row) => !completed(row)).length);
+  return source.filter((row) => !search ||
+    [row.name, row.patient_number, String(row.number ?? ""), row.service]
+      .some((item) => item?.toLocaleLowerCase().includes(search)));
+});
+const waitingCount = computed(() => rows.value.filter(
+  (row) => !completed(row) && !overdueIds.value.has(row.id),
+).length);
 const completedCount = computed(() => rows.value.filter(completed).length);
 const selected = computed(() => filteredRows.value.find((r) => r.key === selectedKey.value) || filteredRows.value[0] || null);
-function setTab(tab: "waiting" | "completed") {
+function setTab(tab: "waiting" | "unresolved" | "completed") {
   queueTab.value = tab;
   selectedKey.value = "";
+  openMenuKey.value = "";
 }
 const timezone = computed(() => feed.value?.branch?.timezone || "Asia/Tashkent");
 function visitTime(row: DisplayRow) {
