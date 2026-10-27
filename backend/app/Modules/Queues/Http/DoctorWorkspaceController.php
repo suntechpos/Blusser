@@ -32,6 +32,24 @@ final class DoctorWorkspaceController
 
                 $feed = json_decode($value, true, flags: JSON_THROW_ON_ERROR);
 
+                // The workspace feed's scheduled projection may omit optimistic-lock
+                // versions. Resolve them from RLS-visible appointments for this doctor
+                // and branch; never trust a client-supplied version.
+                if (($feed['doctor']['id'] ?? null) && ($feed['branch']['id'] ?? null) && ! empty($feed['scheduled'])) {
+                    $appointmentIds = array_values(array_filter(array_column($feed['scheduled'], 'id')));
+                    $versions = DB::table('appointments')
+                        ->whereRaw('tenant_id = public.context_tenant()')
+                        ->where('doctor_id', $feed['doctor']['id'])
+                        ->where('branch_id', $feed['branch']['id'])
+                        ->whereIn('id', $appointmentIds)
+                        ->pluck('version', 'id');
+                    foreach ($feed['scheduled'] as &$appointment) {
+                        $version = $versions->get($appointment['id']);
+                        $appointment['version'] = $version === null ? null : (int) $version;
+                    }
+                    unset($appointment);
+                }
+
                 // Cross-day active visits are not part of the selected day's
                 // patient list. Show only authorized, doctor-scoped overdue
                 // tickets; unresolved inaccessible tickets still block call

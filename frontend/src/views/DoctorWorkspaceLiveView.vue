@@ -119,7 +119,15 @@ watch([appointmentPreview, appointmentDate], async () => {
 async function submitAppointmentReschedule() {
   const row = appointmentPreview.value;
   const slot = appointmentSlots.value.find(item => slotKey(item) === appointmentSlotKey.value);
-  if (!row || !slot || !row.version || appointmentSaving.value) return;
+  if (appointmentSaving.value) return;
+  if (!row || !slot) {
+    appointmentError.value = "Bo‘sh vaqtni qayta tanlang.";
+    return;
+  }
+  if (!Number.isInteger(row.version) || !row.version || row.version < 1) {
+    appointmentError.value = "Qabul versiyasi yuklanmadi. Sahifani yangilang.";
+    return;
+  }
   appointmentSaving.value = true;
   appointmentError.value = "";
   try {
