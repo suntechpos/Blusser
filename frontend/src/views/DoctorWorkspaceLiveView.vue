@@ -598,25 +598,126 @@ function genderLabel(gender: string | null) {
 </template>
 
 <style scoped>
-.dw-overdue { margin: 0 0 16px; border: 1px solid #f3d29a; background: #fffaf1; border-radius: 12px; padding: 16px; }
-.dw-overdue-header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
-.dw-overdue-header h2 { margin:0 0 6px; font-size:17px; color:#7c4b11; }
-.dw-overdue-header p { margin:0 0 12px; font-size:13px; color:#885f2f; line-height:1.5; }
-.dw-overdue-header strong { background:#ffedd0; padding:5px 9px; border-radius:6px; color:#86550e; white-space:nowrap; }
-.dw-overdue-list { display:grid; gap:9px; }
-.dw-overdue-item { display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fff; border:1px solid #f3ddbd; padding:12px; border-radius:9px; }
-.dw-overdue-info { display:flex; flex-direction:column; gap:4px; min-width:0; }
-.dw-overdue-info b { color:#163664; font-size:14px; }
-.dw-overdue-info span { color:#6d7990; font-size:12px; }
-.dw-overdue-info .dw-overdue-status { color:#a85a12; font-weight:600; }
-.dw-overdue-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.dw-overdue-actions button { color:#0d66d9; background:#edf5ff; border:1px solid #cddfff; border-radius:7px; padding:9px 12px; font-size:13px; font-weight:600; cursor:pointer; }
-.dw-overdue-actions button.dw-overdue-danger { background:#fff1ee; border-color:#f5c9c3; color:#a53024; }
-.dw-overdue-actions button:disabled { opacity:.5; cursor:not-allowed; }
-.dw-overdue-permission { font-size:12px; color:#876c50; }
-.dw-overdue-error { color:#b42318; font-size:13px; margin:2px 0 10px; }
-@media(max-width:760px) { .dw-overdue-item { flex-direction:column; align-items:stretch; } }
 
+.dw-overdue {
+  margin: 0 0 16px; padding: 14px 16px;
+  border: 1px solid #f4d4aa; border-radius: 12px;
+  background: linear-gradient(120deg, #fffaf4 0%, #fff8ef 55%, #fffaf5 100%);
+  color: #17325a;
+}
+.dw-overdue-header {
+  display: flex; align-items: flex-start; gap: 12px; margin: 0 2px 12px;
+}
+.dw-overdue-alert-icon {
+  flex: 0 0 39px; width: 39px; height: 39px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #d96b15; background: #ffead1; border-radius: 50%;
+}
+.dw-overdue-heading { flex: 1; min-width: 0; }
+.dw-overdue-heading h2 {
+  margin: 1px 0 4px; font-size: 16px; line-height: 1.4;
+  font-weight: 750; color: #6d440f;
+}
+.dw-overdue-heading p {
+  margin: 0; color: #806546; font-size: 12.5px; line-height: 1.5;
+}
+.dw-overdue-count {
+  flex: 0 0 auto; border-radius: 8px; background: #ffebcf;
+  color: #925504; padding: 6px 11px; font-size: 13px; font-weight: 700;
+}
+.dw-overdue-list { display: grid; gap: 7px; }
+.dw-overdue-item {
+  display: grid;
+  grid-template-columns: 44px minmax(160px, 1fr) auto minmax(105px, .38fr) minmax(180px, auto);
+  align-items: center; gap: 12px; min-height: 72px; padding: 10px 13px;
+  background: #fff; border: 1px solid #f0e5d5; border-radius: 10px;
+  box-shadow: 0 1px 3px rgb(33 67 117 / 3%);
+}
+.dw-overdue-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: #6336df; background: #efe8ff; font-size: 16px; font-weight: 700;
+}
+.dw-overdue-info { display: grid; min-width: 0; gap: 5px; }
+.dw-overdue-info strong {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #132a50; font-size: 14px; line-height: 1.2;
+}
+.dw-overdue-info > span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #6680a4; font-size: 12px;
+}
+.dw-overdue-state {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: max-content; border-radius: 8px; padding: 7px 10px;
+  font-size: 12px; font-weight: 650; white-space: nowrap;
+}
+.dw-overdue-state.is-active { color: #c22635; background: #fff0f2; }
+.dw-overdue-state.is-called { color: #aa680a; background: #fff3d9; }
+.dw-overdue-state-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+}
+.dw-overdue-time {
+  display: flex; align-items: center; gap: 7px; color: #627997;
+  border-left: 1px solid #e4eaf5; padding-left: 12px;
+  font-size: 12px; white-space: nowrap;
+}
+.dw-overdue-actions {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 7px; flex-wrap: wrap; min-width: 0;
+}
+.dw-overdue-action {
+  min-height: 37px; display: inline-flex; align-items: center;
+  justify-content: center; gap: 7px; white-space: nowrap;
+  padding: 8px 12px; border: 1px solid transparent;
+  border-radius: 8px; font: inherit; font-size: 12.5px; font-weight: 650;
+  cursor: pointer; transition: background 140ms, border-color 140ms;
+}
+.dw-overdue-action.is-primary {
+  color: white; background: #156dff; border-color: #156dff;
+  box-shadow: 0 2px 6px rgb(21 109 255 / 14%);
+}
+.dw-overdue-action.is-primary:hover:not(:disabled) { background: #075ce2; }
+.dw-overdue-action.is-subtle {
+  color: #225285; background: #f3f7ff; border-color: #dce8fa;
+}
+.dw-overdue-action.is-subtle:hover:not(:disabled) { background: #e8f2ff; }
+.dw-overdue-action.is-danger {
+  color: #b72836; background: #fff1f2; border-color: #ffe0e3;
+}
+.dw-overdue-action.is-danger:hover:not(:disabled) { background: #ffe6e9; }
+.dw-overdue-action:focus-visible { outline: 2px solid #146dff; outline-offset: 2px; }
+.dw-overdue-action:disabled { opacity: .55; cursor: not-allowed; }
+.dw-overdue-permission {
+  font-size: 11px; color: #937657; text-align: right;
+  max-width: 120px; line-height: 1.4;
+}
+.dw-overdue-error {
+  margin: 0 0 10px; padding: 10px 12px; border-radius: 8px;
+  background: #fff0f0; color: #b42318; font-size: 13px;
+}
+@media (max-width: 1400px) {
+  .dw-overdue-item { grid-template-columns: 42px minmax(170px, 1fr) auto minmax(170px, auto); }
+  .dw-overdue-time { display: none; }
+}
+@media (max-width: 1000px) {
+  .dw-overdue-item { grid-template-columns: 42px minmax(0, 1fr) auto; }
+  .dw-overdue-actions { grid-column: 2 / -1; justify-content: flex-start; }
+}
+@media (max-width: 650px) {
+  .dw-overdue { padding: 11px; }
+  .dw-overdue-header { gap: 8px; margin-bottom: 10px; }
+  .dw-overdue-alert-icon { width: 32px; height: 32px; flex-basis: 32px; }
+  .dw-overdue-heading h2 { font-size: 14px; }
+  .dw-overdue-heading p { font-size: 12px; }
+  .dw-overdue-item {
+    gap: 9px; grid-template-columns: 38px minmax(0, 1fr); padding: 10px;
+  }
+  .dw-overdue-avatar { width: 36px; height: 36px; font-size: 14px; }
+  .dw-overdue-state { grid-column: 2; padding: 5px 8px; }
+  .dw-overdue-actions { grid-column: 1 / -1; }
+  .dw-overdue-action { flex: 1 1 140px; }
+}
 .dw-live-ui { min-height: 66vh; }
 .dw-live-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .dw-live-date, .dw-live-select { min-height: 42px; border: 1px solid #d5e3f8; border-radius: 10px; background: white; display: flex; align-items: center; gap: 7px; padding: 8px 12px; color: #234371; }
