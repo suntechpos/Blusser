@@ -25,6 +25,7 @@ async function setup(
   options: {
     failFirst?: boolean;
     delayedMutation?: boolean;
+    scheduledAppointment?: boolean;
     availability?: (route: Route, date: string | null) => Promise<void>;
   } = {},
 ): Promise<Fixture> {
@@ -42,6 +43,7 @@ async function setup(
     "appointments.view": "own",
     "appointments.create": "own",
     "appointments.cancel": "own",
+    "appointments.update": "own",
     "patients.view": "own",
   };
   await page.clock.setFixedTime(new Date("2026-10-27T07:00:00Z"));
@@ -102,7 +104,20 @@ async function setup(
             timezone: "Asia/Tashkent",
           },
           date: url.searchParams.get("date") || "2026-10-27",
-          scheduled: [],
+          scheduled: options.scheduledAppointment ? [{
+            id: "a251fe34-a912-4f3c-8e22-aa11a2ac1211",
+            patient_id: "patient-booked",
+            patient_number: "P-000002",
+            name: "Karimov Vali",
+            dob: "1990-02-01",
+            gender: "male",
+            phone: "+998900000000",
+            service: "Ko‘rik",
+            status: "scheduled",
+            version: 2,
+            appointment_id: "a251fe34-a912-4f3c-8e22-aa11a2ac1211",
+            starts_at: "2030-01-07T04:00:00Z",
+          }] : [],
           overdue: [],
           has_active_patient: false,
           has_called_today: false,
@@ -136,6 +151,18 @@ async function setup(
       return route.fulfill({
         json: { local_date: date, timezone: "Asia/Tashkent", slots: [slot] },
       });
+    }
+    if (path === "/api/v1/clinic/appointments/a251fe34-a912-4f3c-8e22-aa11a2ac1211/doctor-rebooking-options") {
+      return route.fulfill({ json: {
+        timezone: "Asia/Tashkent",
+        local_date: url.searchParams.get("local_date"),
+        slots: [nextDaySlot],
+        busy_slots: [slot],
+      } });
+    }
+    if (path === "/api/v1/clinic/appointments/a251fe34-a912-4f3c-8e22-aa11a2ac1211/reschedule" && request.method() === "POST") {
+      commands.push({ action: "skip", body: request.postDataJSON(), key: request.headers()["idempotency-key"] || "" });
+      return route.fulfill({ json: { id: "a251fe34-a912-4f3c-8e22-aa11a2ac1211", version: 3, status: "scheduled" } });
     }
     const mutation = path.match(/\/queue-tickets\/[^/]+\/(skip|cancel)$/);
     if (mutation && request.method() === "POST") {
@@ -409,4 +436,26 @@ test("recommendation uses clinic 24-hour clock and a free slot after a busy time
   await expect(times.getByRole("option", { name: /13:00.*13:30/ })).toHaveCount(1);
   await expect(times.getByRole("option", { name: /09:30.*10:00.*Band/ })).toBeDisabled();
   expect(fixture.commands).toHaveLength(0);
+});
+
+test("scheduled patient can reschedule during an active waiting queue with busy times disabled", async ({ page }) => {
+  const fixture = await setup(page, { scheduledAppointment: true });
+  await page.getByRole("button", { name: "Bemor amallari: Karimov Vali" }).click();
+  await page.getByRole("menuitem", { name: "Boshqa kunga ko‘chirish" }).click();
+  const dialog = page.getByRole("dialog", { name: "Qabulni boshqa kunga ko‘chirish" });
+  await dialog.getByLabel("Ko‘chirish sanasi").fill("2030-01-08");
+  const times = dialog.getByLabel("Ko‘chirish vaqti");
+  await expect(times.getByRole("option", { name: /09:00.*09:30.*Band/ })).toBeDisabled();
+  await times.selectOption({ index: 2 });
+  await dialog.getByRole("button", { name: "Tasdiqlash" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(fixture.commands).toHaveLength(1);
+  expect(fixture.commands[0]?.body).toEqual({
+    doctor_id: "doctor-a",
+    branch_id: "branch-a",
+    room_id: nextDaySlot.room_id,
+    starts_at: nextDaySlot.starts_at,
+    ends_at: nextDaySlot.ends_at,
+    expected_version: 2,
+  });
 });
