@@ -37,12 +37,41 @@ final class Queues
                     'SELECT governance.own_doctor_start_slot(?::uuid) AS value', [$ticket],
                 )->value;
             } catch (QueryException $exception) {
-                if (($exception->errorInfo[0] ?? null) === '42501') abort(403);
-                if (($exception->errorInfo[0] ?? null) === 'P0002') abort(404);
+                if (($exception->errorInfo[0] ?? null) === '42501') {
+                    abort(403);
+                }
+                if (($exception->errorInfo[0] ?? null) === 'P0002') {
+                    abort(404);
+                }
                 throw $exception;
             }
 
             abort_if($value === null, 409, 'Bugungi jadvalda bu bemor uchun bo‘sh vaqt topilmadi.');
+
+            return json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+        });
+    }
+
+    public function rebookingOptions(User $actor, string $tenant, string $ticket, array $filters): array
+    {
+        return $this->read($actor, $tenant, function () use ($ticket, $filters) {
+            try {
+                $value = DB::selectOne(
+                    'SELECT governance.queue_rebooking_options(?::uuid,?::text,?::date) AS value',
+                    [$ticket, $filters['action'], $filters['local_date']],
+                )->value;
+            } catch (QueryException $exception) {
+                if (($exception->errorInfo[0] ?? null) === '42501') {
+                    abort(403);
+                }
+                if (($exception->errorInfo[0] ?? null) === 'P0002') {
+                    abort(404);
+                }
+                if (($exception->errorInfo[0] ?? null) === '23505') {
+                    abort(409, 'Navbat holati o‘zgargan. Yangilang.');
+                }
+                throw $exception;
+            }
 
             return json_decode($value, true, flags: JSON_THROW_ON_ERROR);
         });

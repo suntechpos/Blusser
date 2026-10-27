@@ -8978,16 +8978,27 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CommandInput"
+                "$ref": "#/components/schemas/QueueDispositionInput"
               }
             }
           }
         },
         "x-linked-resource-guards": [],
-        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility. A nonblank reason_code is mandatory; note is optional. Optional rebook creates a new appointment for the ticket's existing patient, doctor, branch and service in the SAME transaction as the queue transition. Invalid/occupied slots, stale versions and permission failures leave the entire old attendance unchanged. Linked rebooking is returned as rebooked_appointment (null when absent or no longer visible). Superseded skipped tickets retain history and cannot requeue or create a second replacement appointment.",
         "x-conditional-required-permissions": {
           "linked_appointment": [
             "appointments.view"
+          ],
+          "rebook": [
+            "appointments.create",
+            "appointments.view",
+            "patients.view"
+          ],
+          "staff_rebook_catalogs": [
+            "services.view",
+            "doctors.view",
+            "rooms.view",
+            "schedules.view"
           ]
         }
       }
@@ -9082,7 +9093,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CommandInput"
+                "$ref": "#/components/schemas/QueueDispositionInput"
               }
             }
           }
@@ -9090,11 +9101,22 @@
         "x-linked-resource-guards": [
           "appointments.cancel"
         ],
-        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility.",
+        "description": "Implemented Stage 5. First-party Sanctum cookie/CSRF, full identity and active clinic; fresh tenant/branch/own scope on every read and write. Mutations use mandatory UUID Idempotency-Key; replay reauthorizes, payload mismatch or stale expected_version returns 409. Version is checked after the ticket row lock. Attendance mutations independently require queues.view and visits.view, plus appointments.view when linked. Linked start/complete additionally require appointments.update; linked cancel requires appointments.cancel. Start/requeue revalidate patient visibility and live eligibility. Start also requires doctors.view, rooms.view, schedules.view and services.view, valid offset-aware schedule and doctor/room interval; linked starts reuse the exact existing reservation. Terminal states cannot reopen. Overview intersects reception.view scope with each source view scope, omits unauthorized sections and their counts, uses branch-local dates (tenant timezone as fallback). arrived counts visible Visits, other counts correspond to visible source states; late is derived. Reference permission checks fail closed for absent/NULL grants, including idempotency replay. Call/recall recheck live doctor/branch/service eligibility. A nonblank reason_code is mandatory; note is optional. Optional rebook creates a new appointment for the ticket's existing patient, doctor, branch and service in the SAME transaction as the queue transition. Invalid/occupied slots, stale versions and permission failures leave the entire old attendance unchanged. Linked rebooking is returned as rebooked_appointment (null when absent or no longer visible). Superseded skipped tickets retain history and cannot requeue or create a second replacement appointment.",
         "x-conditional-required-permissions": {
           "linked_appointment": [
             "appointments.view",
             "appointments.cancel"
+          ],
+          "rebook": [
+            "appointments.create",
+            "appointments.view",
+            "patients.view"
+          ],
+          "staff_rebook_catalogs": [
+            "services.view",
+            "doctors.view",
+            "rooms.view",
+            "schedules.view"
           ]
         }
       }
@@ -12030,6 +12052,131 @@
           }
         }
       }
+    },
+    "/api/v1/clinic/queue-tickets/{ticket}/rebooking-options": {
+      "get": {
+        "operationId": "get_queue_tickets_ticket_rebooking_options",
+        "summary": "Get real free schedule slots for a visible ticket before skip or cancel",
+        "x-implementation-status": "implemented",
+        "x-required-permissions": [
+          "queues.view",
+          "visits.view",
+          "appointments.create",
+          "appointments.view",
+          "patients.view"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "skip",
+                "cancel"
+              ]
+            }
+          },
+          {
+            "name": "local_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Actual available slots only; empty array when there is no available schedule.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store, private"
+                },
+                "description": "Sensitive operational response; no caching."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "local_date",
+                    "timezone",
+                    "slots"
+                  ],
+                  "properties": {
+                    "local_date": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "slots": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/QueueRebookingSlot"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Failure401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Failure403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Failure404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Failure409"
+          },
+          "419": {
+            "$ref": "#/components/responses/Failure419"
+          },
+          "422": {
+            "$ref": "#/components/responses/Failure422"
+          }
+        },
+        "x-conditional-required-permissions": {
+          "action": [
+            "queues.skip OR queues.cancel"
+          ],
+          "linked_cancel": [
+            "appointments.cancel"
+          ],
+          "staff_catalogs": [
+            "services.view",
+            "doctors.view",
+            "rooms.view",
+            "schedules.view"
+          ]
+        },
+        "description": "Ticket-scoped availability; derives patient, doctor, branch and service from the authorized ticket. Uses branch timezone, live schedules, exceptions, breaks and active reservations. Own doctors do not require broad catalog listing permissions. A final POST rechecks availability under locks; an availability result does not reserve a slot."
+      }
     }
   },
   "components": {
@@ -13768,6 +13915,16 @@
                 "type": "null"
               }
             ]
+          },
+          "rebooked_appointment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Appointment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -13911,6 +14068,25 @@
           "local_date": {
             "type": "string",
             "format": "date"
+          },
+          "reason_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rebooked_appointment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           }
         },
         "required": [
@@ -15044,6 +15220,59 @@
             "items": {
               "$ref": "#/components/schemas/CatalogBranch"
             }
+          }
+        }
+      },
+      "QueueRebookingSlot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "room_id",
+          "starts_at",
+          "ends_at"
+        ],
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "QueueDispositionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expected_version",
+          "reason_code"
+        ],
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason_code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "\\S"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "rebook": {
+            "$ref": "#/components/schemas/QueueRebookingSlot"
           }
         }
       }

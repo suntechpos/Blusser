@@ -419,7 +419,7 @@ WORKER;
         $this->denied(fn () => $queues->command($this->actor($a['user']), $a['tenant'], 'create', null, $queuePayload, $queueKey), 'not_found');
         $this->denied(fn () => $queues->command($this->actor($a['user']), $a['tenant'], 'call', $queued['ticket']['id'], ['expected_version' => $queued['ticket']['version']], (string) Str::uuid()), 'not_found');
         // Historical attendance stays addressable and can still be cancelled.
-        $cancelled = $queues->command($this->actor($a['user']), $a['tenant'], 'cancel', $queued['ticket']['id'], ['expected_version' => $queued['ticket']['version']], (string) Str::uuid());
+        $cancelled = $queues->command($this->actor($a['user']), $a['tenant'], 'cancel', $queued['ticket']['id'], ['expected_version' => $queued['ticket']['version'], 'reason_code' => 'patient_request'], (string) Str::uuid());
         $this->assertSame('cancelled', $cancelled['ticket']['status']);
         $this->assertSame(2, $db->table('visits')->where('service_id', $service['id'])->count());
     }

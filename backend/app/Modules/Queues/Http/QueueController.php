@@ -36,6 +36,18 @@ final class QueueController
         );
     }
 
+    public function rebookingOptions(Request $request)
+    {
+        $data = $this->validate($request->query(), [
+            'action' => 'required|in:skip,cancel',
+            'local_date' => 'required|date_format:Y-m-d',
+        ]);
+
+        return response()->json($this->queues->rebookingOptions(
+            $request->user(), $this->tenant($request), $request->route('ticket'), $data,
+        ));
+    }
+
     public function store(Request $request)
     {
         return $this->write($request, 'create', 201);
@@ -58,9 +70,22 @@ final class QueueController
         $rules = match ($action) {
             'create' => ['patient_id' => 'required|uuid', 'doctor_id' => 'required|uuid', 'branch_id' => 'required|uuid', 'service_id' => 'required|uuid'],
             'start' => ['expected_version' => 'required|integer|min:1', 'room_id' => 'required|uuid', 'starts_at' => $this->date('required'), 'ends_at' => [...$this->date('required'), 'after:starts_at']],
+            'skip', 'cancel' => [
+                'expected_version' => 'required|integer|min:1',
+                'reason_code' => 'required|string|min:1|max:64',
+                'note' => 'sometimes|nullable|string|max:2000',
+                'rebook' => 'sometimes|array:room_id,starts_at,ends_at',
+            ],
             default => ['expected_version' => 'required|integer|min:1', 'reason_code' => 'sometimes|string|min:1|max:64'],
         };
         $data = $this->validate($request->all(), $rules);
+        if (in_array($action, ['skip', 'cancel'], true) && isset($data['rebook'])) {
+            $data['rebook'] = validator($data['rebook'], [
+                'room_id' => 'required|uuid',
+                'starts_at' => $this->date('required'),
+                'ends_at' => [...$this->date('required'), 'after:starts_at'],
+            ])->validate();
+        }
         $key = $request->header('Idempotency-Key');
         validator(['key' => $key], ['key' => 'required|uuid'])->validate();
 
