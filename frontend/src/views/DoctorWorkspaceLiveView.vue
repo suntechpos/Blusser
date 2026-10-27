@@ -468,84 +468,24 @@ function genderLabel(gender: string | null) {
 
     <p v-if="error" class="dw-notice" role="alert">{{ error }}</p>
     <section v-if="feed?.doctor && overdueTickets.length" class="dw-overdue" aria-label="Eski kundan qolgan navbatlar">
-      <header class="dw-overdue-header">
-        <span class="dw-overdue-alert-icon" aria-hidden="true"><AlertTriangle :size="20" /></span>
-        <div class="dw-overdue-heading">
-          <h2>Oldingi kundan yakunlanmagan qabullar</h2>
-          <p>Avvalgi kunlardan qolgan faol qabullar va chaqirilgan navbatlar.
-            Ular hal etilmaguncha yangi bemorni chaqirib bo‘lmaydi.</p>
-        </div>
-        <span class="dw-overdue-count">{{ overdueTickets.length }} ta</span>
-      </header>
-      <p v-if="overdueError" class="dw-overdue-error" role="alert">{{ overdueError }}</p>
-      <div class="dw-overdue-list">
-        <article v-for="item in overdueTickets" :key="item.id" class="dw-overdue-item">
-          <span class="dw-overdue-avatar" aria-hidden="true">{{ initials(item.name) }}</span>
-          <div class="dw-overdue-info">
-            <strong :title="item.name">{{ item.name }}</strong>
-            <span :title="item.local_date + ' · ' + item.branch_name + ' · ' + item.service">
-              {{ item.local_date }} · {{ item.branch_name }} · {{ item.service }}
-            </span>
-          </div>
-          <span class="dw-overdue-state" :class="item.status === 'in_progress' ? 'is-active' : 'is-called'">
-            <span class="dw-overdue-state-dot" aria-hidden="true"></span>
-            {{ item.status === "in_progress" ? "Qabulda" : "Chaqirildi" }}
-          </span>
-          <span class="dw-overdue-time" :title="'Qabul sanasi: ' + item.local_date">
-            <Clock3 :size="16" aria-hidden="true" />
-            <span>{{ item.local_date }}</span>
-          </span>
-          <div class="dw-overdue-actions">
-            <template v-if="item.status === 'in_progress'">
-              <button type="button" class="dw-overdue-action is-primary"
-                :disabled="loading || !!resolvingOverdueId" @click="continueOverdue(item)">
-                <Play :size="16" aria-hidden="true" />
-                Qabulni davom ettirish
-              </button>
-              <button v-if="canResolveOverdue(item, 'complete')" type="button"
-                class="dw-overdue-action is-subtle" :disabled="loading || !!resolvingOverdueId"
-                @click="resolveOverdue(item, 'complete')">
-                <CheckCircle2 :size="16" aria-hidden="true" />
-                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Qabulni yakunlash" }}
-              </button>
-            </template>
-            <template v-else>
-              <button type="button"
-                class="dw-overdue-action is-subtle"
-                :disabled="loading || !!resolvingOverdueId || !canResolveOverdue(item, 'skip')"
-                :title="canResolveOverdue(item, 'skip') ? 'Navbatni o‘tkazib yuborish' : 'Navbatni o‘tkazib yuborish uchun ruxsat kerak'"
-                @click="resolveOverdue(item, 'skip')">
-                <FastForward :size="16" aria-hidden="true" />
-                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "O‘tkazib yuborish" }}
-              </button>
-              <button type="button"
-                class="dw-overdue-action is-danger"
-                :disabled="loading || !!resolvingOverdueId || !canResolveOverdue(item, 'cancel')"
-                :title="canResolveOverdue(item, 'cancel') ? 'Navbatni bekor qilish' : 'Navbatni bekor qilish uchun ruxsat kerak'"
-                @click="resolveOverdue(item, 'cancel')">
-                <Ban :size="16" aria-hidden="true" />
-                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Navbatni bekor qilish" }}
-              </button>
-            </template>
-            <span v-if="item.status === 'called' &&
-                !canResolveOverdue(item, 'skip') && !canResolveOverdue(item, 'cancel')"
-              class="dw-overdue-permission" title="Navbat amallarini faollashtirish uchun ruxsat kerak">
-              Ruxsat kerak
-            </span>
-            <span v-if="item.status === 'in_progress' && !canResolveOverdue(item, 'complete')"
-              class="dw-overdue-permission" title="Navbatni yakunlash ruxsatini administratordan so‘rang">
-              Yakunlash ruxsati kerak
-            </span>
-          </div>
-        </article>
+      <span class="dw-overdue-alert-icon" aria-hidden="true"><AlertTriangle :size="20" /></span>
+      <div class="dw-overdue-heading">
+        <h2>Oldingi kundan {{ overdueTickets.length }} ta yakunlanmagan qabul mavjud</h2>
+        <p>Eski qabullarni «Yakunlanmagan» tabida ko‘rib chiqishingiz mumkin.
+          Ular hal etilmaguncha yangi bemorni chaqirib bo‘lmaydi.</p>
       </div>
+      <span class="dw-overdue-count">{{ overdueTickets.length }} ta</span>
     </section>
+    <p v-if="overdueError" class="dw-overdue-error" role="alert">{{ overdueError }}</p>
     <div class="dw-workspace">
       <aside class="dw-card dw-queue">
         <h2>Bugungi navbat</h2>
         <div class="dw-queue-tabs">
           <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'waiting' }" @click="setTab('waiting')">
             Kutilmoqda <b>{{ waitingCount }}</b>
+          </button>
+          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'unresolved' }" @click="setTab('unresolved')">
+            Yakunlanmagan <b>{{ unresolvedCount }}</b>
           </button>
           <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'completed' }" @click="setTab('completed')">
             Yakunlangan <b>{{ completedCount }}</b>
@@ -558,22 +498,50 @@ function genderLabel(gender: string | null) {
         <div class="dw-queue-list">
           <p v-if="loading" class="dw-empty" role="status">Navbat yuklanmoqda...</p>
           <template v-else>
-            <button v-for="row in filteredRows" :key="row.key" type="button"
-              class="dw-queue-person" data-permission="workspace.view" :class="{ selected: selected?.key === row.key }"
-              :aria-label="row.name + ' · ' + row.patient_number" @click="selectedKey = row.key">
-              <span class="dw-avatar purple">{{ initials(row.name) }}</span>
-              <span class="dw-queue-person-info">
-                <b>{{ row.name }}</b>
-                <small>{{ visitTime(row) }}</small>
-                <small>{{ row.service }}</small>
-              </span>
-              <span class="dw-badge" :class="completed(row) ? 'green' : row.status === 'in_progress' ? 'blue' : 'yellow'">
-                {{ statusText(row) }}
-              </span>
-              <ChevronRight :size="18" />
-            </button>
+            <div v-for="row in filteredRows" :key="row.key" class="dw-queue-entry">
+              <button type="button" class="dw-queue-person" data-permission="workspace.view"
+                :class="{ selected: selected?.key === row.key }"
+                :aria-label="row.name + ' · ' + row.patient_number"
+                @click="selectedKey = row.key; openMenuKey = ''">
+                <span class="dw-avatar purple">{{ initials(row.name) }}</span>
+                <span class="dw-queue-person-info">
+                  <b>{{ row.name }}</b>
+                  <small v-if="row.historicDate">№{{ row.number || '—' }} · {{ row.historicDate }}</small>
+                  <small v-else>{{ visitTime(row) }}</small>
+                  <small>{{ row.service }}<template v-if="row.historicBranchName"> · {{ row.historicBranchName }}</template></small>
+                </span>
+                <span class="dw-badge" :class="completed(row) ? 'green' : row.status === 'in_progress' ? 'blue' : 'yellow'">
+                  {{ statusText(row) }}
+                </span>
+              </button>
+              <button v-if="!completed(row)" type="button" class="dw-queue-menu-trigger"
+                :aria-label="'Bemor amallari: ' + row.name"
+                :aria-expanded="openMenuKey === row.key" aria-haspopup="menu"
+                @click="toggleRowMenu(row.key)">
+                <Ellipsis :size="20" />
+              </button>
+              <div v-if="openMenuKey === row.key" class="dw-queue-popup" role="menu"
+                :aria-label="row.name + ' uchun amallar'">
+                <button v-if="row.status === 'in_progress'" type="button" role="menuitem"
+                  @click="resumeRow(row)">
+                  <Play :size="17" /> Qabulni davom ettirish
+                </button>
+                <template v-else>
+                  <button type="button" role="menuitem" @click="showActionPreview(row, 'skip')">
+                    <FastForward :size="17" /> O‘tkazib yuborish
+                  </button>
+                  <button type="button" role="menuitem" class="dw-menu-danger"
+                    @click="showActionPreview(row, 'cancel')">
+                    <Ban :size="17" /> Navbatni bekor qilish
+                  </button>
+                </template>
+              </div>
+            </div>
             <p v-if="!filteredRows.length && !error" class="dw-empty">
-              {{ rows.length ? "Qidiruv bo‘yicha bemor topilmadi." : "Ushbu sanada bemorlar yo‘q." }}
+              {{ query.trim() ? "Qidiruv bo‘yicha bemor topilmadi." :
+                queueTab === "unresolved" ? "Oldingi kundan qolgan ochiq navbat yo‘q." :
+                queueTab === "completed" ? "Yakunlangan qabul topilmadi." :
+                "Ushbu sanada kutayotgan bemorlar yo‘q." }}
             </p>
           </template>
         </div>
@@ -600,7 +568,28 @@ function genderLabel(gender: string | null) {
       </aside>
 
       <section class="dw-live-details">
-        <template v-if="selected">
+        <article v-if="selected && hasHistoricScope(selected)" class="dw-card dw-live-history-preview">
+          <div class="dw-patient-line">
+            <span class="dw-avatar large purple">{{ initials(selected.name) }}</span>
+            <div>
+              <h2>{{ selected.name }}</h2>
+              <p>{{ selected.patient_number }} · {{ selected.historicDate }} · {{ selected.service }}</p>
+              <p>{{ selected.historicBranchName }}</p>
+            </div>
+            <span class="dw-badge" :class="selected.status === 'in_progress' ? 'blue' : 'yellow'">
+              {{ statusText(selected) }}
+            </span>
+          </div>
+          <p class="dw-live-warning">
+            Bu oldingi sanadagi navbat. Qabulning haqiqiy tibbiy yozuvlarini ko‘rish
+            uchun avval eski sanani oching.
+          </p>
+          <button v-if="selected.status === 'in_progress'" type="button"
+            class="dw-start-button" @click="resumeRow(selected)">
+            <Play :size="18" /> Qabulni davom ettirish
+          </button>
+        </article>
+        <template v-else-if="selected">
           <article class="dw-card dw-patient-card">
             <div class="dw-patient-line">
               <span class="dw-avatar large purple">{{ initials(selected.name) }}</span>
@@ -623,7 +612,7 @@ function genderLabel(gender: string | null) {
             <dl>
               <div><dt>Shifokor</dt><dd>{{ feed?.doctor?.name }}</dd></div>
               <div><dt>Xizmat</dt><dd>{{ selected.service }}</dd></div>
-              <div><dt>Qabul sanasi</dt><dd>{{ date }}</dd></div>
+              <div><dt>Qabul sanasi</dt><dd>{{ selected.historicDate || date }}</dd></div>
               <div><dt>Vaqt / Navbat</dt><dd>{{ visitTime(selected) }}</dd></div>
               <div><dt>Holati</dt><dd>{{ statusText(selected) }}</dd></div>
             </dl>
@@ -665,6 +654,55 @@ function genderLabel(gender: string | null) {
           <p v-else-if="error">Server ma’lumotlarini qayta yuklang.</p>
           <p v-else>Ko‘rish uchun navbatdagi bemorni tanlang.</p>
         </article>
+      </section>
+    </div>
+
+    <div v-if="actionPreview" class="dw-preview-backdrop" @click.self="closeActionPreview">
+      <section class="dw-preview-dialog" role="dialog" aria-modal="true"
+        :aria-label="actionPreview.action === 'skip' ? 'O‘tkazib yuborish' : 'Navbatni bekor qilish'">
+        <div class="dw-preview-heading">
+          <div>
+            <h2>{{ actionPreview.action === 'skip' ? 'O‘tkazib yuborish' : 'Navbatni bekor qilish' }}</h2>
+            <p>{{ actionPreview.name }}</p>
+          </div>
+          <button type="button" class="dw-preview-close" aria-label="Modalni yopish" @click="closeActionPreview">×</button>
+        </div>
+        <p class="dw-preview-hint">
+          Bu faqat veryostka namoyishi. Navbat holati va bronlar o‘zgarmaydi.
+          Amallar va bo‘sh vaqtlarni tekshirish backendga keyin ulanadi.
+        </p>
+        <label class="dw-preview-field">Sabab
+          <select v-model="previewReason">
+            <option value="">Sababni tanlang</option>
+            <option value="patient_late">Bemor kechikdi</option>
+            <option value="patient_absent">Bemor kelmadi</option>
+            <option value="patient_requested">Bemorning iltimosi</option>
+            <option value="other">Boshqa sabab</option>
+          </select>
+        </label>
+        <label class="dw-preview-field">Izoh (ixtiyoriy)
+          <textarea v-model="previewComment" rows="3" maxlength="200" placeholder="Qisqa izoh..."></textarea>
+        </label>
+        <label class="dw-preview-switch">
+          <input v-model="previewReschedule" type="checkbox" />
+          Bemorni boshqa kunga qayta yozish (ixtiyoriy)
+        </label>
+        <div v-if="previewReschedule" class="dw-preview-datetime">
+          <label class="dw-preview-field">Yangi sana
+            <input v-model="previewDate" type="date" />
+          </label>
+          <label class="dw-preview-field">So‘ralgan vaqt
+            <input v-model="previewTime" type="time" />
+          </label>
+          <p>Tanlangan vaqtning bo‘sh yoki bandligi hozir tekshirilmaydi.
+            Bron yaratish funksiyasi keyingi bosqichda ulanadi.</p>
+        </div>
+        <div class="dw-preview-footer">
+          <button type="button" class="dw-preview-dismiss" @click="closeActionPreview">Yopish</button>
+          <button type="button" class="dw-preview-disabled" disabled>
+            Tasdiqlash (API keyin ulanadi)
+          </button>
+        </div>
       </section>
     </div>
   </section>
