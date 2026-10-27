@@ -352,6 +352,8 @@ test("occupied time is disabled and the doctor is offered a free alternative", a
   const times = dialog.getByLabel("Bo‘sh vaqt", { exact: true });
   const occupied = times.getByRole("option", { name: /09:00.*09:30.*Band/ });
   await expect(occupied).toBeDisabled();
+  await expect(times.locator("option").nth(1)).toContainText("09:00");
+  await expect(times.locator("option").nth(2)).toContainText("09:30");
   await expect(dialog).toContainText(/Tavsiya: 09:30.*10:00/);
   await expect(dialog.getByRole("button", { name: "Tasdiqlash" })).toBeDisabled();
   await times.selectOption({ index: 2 });
