@@ -15,6 +15,16 @@ final class AppointmentController
         return response()->json($this->appointments->listing($request->user(), $this->tenant($request), $this->kind($request), $this->filters($request), $request->route('patient')));
     }
 
+    public function doctorRebookingOptions(Request $request)
+    {
+        $this->allow($request->query(), ['local_date']);
+        $data = $request->validate(['local_date' => 'required|date_format:Y-m-d']);
+
+        return response()->json($this->appointments->doctorRebookingOptions(
+            $request->user(), $this->tenant($request), $request->route('appointment'), $data['local_date'],
+        ));
+    }
+
     public function bookingOptions(Request $request)
     {
         $this->allow($request->query(), ['branch_id', 'page', 'per_page']);

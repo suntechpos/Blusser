@@ -20,6 +20,25 @@ final class Appointments
         return json_decode(app(Governance::class)->call('booking_command', [$action, $id, json_encode($payload, JSON_THROW_ON_ERROR), $key], $actor, $tenant), true, flags: JSON_THROW_ON_ERROR);
     }
 
+    public function doctorRebookingOptions(User $actor, string $tenant, string $appointment, string $localDate): array
+    {
+        return app(Scheduling::class)->context($actor, $tenant, function () use ($appointment, $localDate) {
+            try {
+                $value = DB::selectOne(
+                    'SELECT governance.appointment_doctor_rebooking_options(?::uuid,?::date) AS value',
+                    [$appointment, $localDate],
+                )->value;
+            } catch (\\Illuminate\\Database\\QueryException $exception) {
+                $code = $exception->errorInfo[0] ?? null;
+                if ($code === '42501') abort(403);
+                if ($code === 'P0002') abort(404);
+                if ($code === '23505') abort(409, 'Qabul holati o‘zgargan.');
+                throw $exception;
+            }
+            return json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+        });
+    }
+
     public function bookingOptions(User $actor, string $tenant, array $filters): array
     {
         return app(Scheduling::class)->context($actor, $tenant, function () use ($filters) {

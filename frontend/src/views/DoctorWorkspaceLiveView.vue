@@ -25,6 +25,98 @@ interface RebookingSlot {
   starts_at: string;
   ends_at: string;
 }
+const appointmentPreview = ref<QueueDisplayRow | null>(null);
+const appointmentDate = ref("");
+const appointmentSlotKey = ref("");
+const appointmentSlots = ref<RebookingSlot[]>([]);
+const appointmentBusySlots = ref<RebookingSlot[]>([]);
+const appointmentTimezone = ref("");
+const appointmentLoading = ref(false);
+const appointmentSaving = ref(false);
+const appointmentError = ref("");
+let appointmentSequence = 0;
+const appointmentChoices = computed(() => [
+  ...appointmentSlots.value.map(slot => ({ slot, busy: false })),
+  ...appointmentBusySlots.value.map(slot => ({ slot, busy: true })),
+].sort((a, b) => a.slot.starts_at.localeCompare(b.slot.starts_at)));
+function appointmentTime(slot: RebookingSlot) {
+  const format = new Intl.DateTimeFormat("en-GB", {
+    timeZone: appointmentTimezone.value || timezone.value,
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  return format.format(new Date(slot.starts_at)) + "–" + format.format(new Date(slot.ends_at));
+}
+function closeAppointmentPreview() {
+  if (appointmentSaving.value) return;
+  appointmentSequence++;
+  appointmentPreview.value = null;
+  appointmentError.value = "";
+}
+function openAppointmentPreview(row: QueueDisplayRow) {
+  openMenuKey.value = "";
+  if (row.source !== "appointment" || row.status !== "scheduled" ||
+      !can("appointments.view") || !can("appointments.update") ||
+      !can("patients.view")) return;
+  appointmentPreview.value = { ...row };
+  appointmentDate.value = "";
+  appointmentSlotKey.value = "";
+  appointmentSlots.value = [];
+  appointmentBusySlots.value = [];
+  appointmentError.value = "";
+}
+watch([appointmentPreview, appointmentDate], async () => {
+  const request = ++appointmentSequence;
+  const row = appointmentPreview.value;
+  appointmentSlotKey.value = "";
+  appointmentSlots.value = [];
+  appointmentBusySlots.value = [];
+  if (!row || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate.value)) return;
+  appointmentLoading.value = true;
+  try {
+    const result = await clinicRequest<{
+      timezone: string; slots: RebookingSlot[]; busy_slots?: RebookingSlot[];
+    }>("appointments/" + encodeURIComponent(row.id) + "/doctor-rebooking-options", {
+      params: { local_date: appointmentDate.value },
+    });
+    if (request !== appointmentSequence) return;
+    appointmentTimezone.value = result.data.timezone;
+    appointmentSlots.value = result.data.slots;
+    appointmentBusySlots.value = result.data.busy_slots ?? [];
+  } catch (cause) {
+    if (request === appointmentSequence) appointmentError.value = errorText(cause);
+  } finally {
+    if (request === appointmentSequence) appointmentLoading.value = false;
+  }
+});
+async function submitAppointmentReschedule() {
+  const row = appointmentPreview.value;
+  const slot = appointmentSlots.value.find(item => slotKey(item) === appointmentSlotKey.value);
+  if (!row || !slot || !row.version || appointmentSaving.value) return;
+  appointmentSaving.value = true;
+  appointmentError.value = "";
+  try {
+    await clinicRequest("appointments/" + encodeURIComponent(row.id) + "/reschedule", {
+      method: "POST",
+      body: {
+        doctor_id: doctorId.value,
+        branch_id: branchId.value,
+        room_id: slot.room_id,
+        starts_at: slot.starts_at,
+        ends_at: slot.ends_at,
+        expected_version: row.version,
+      },
+    });
+    appointmentSaving.value = false;
+    closeAppointmentPreview();
+    await load();
+  } catch (cause) {
+    appointmentError.value = errorText(cause);
+    // Refresh the availability after a possible concurrent reservation.
+    appointmentDate.value = "";
+  } finally {
+    appointmentSaving.value = false;
+  }
+}
 const actionPreview = ref<{
   name: string;
   row: QueueDisplayRow;
@@ -668,7 +760,7 @@ function genderLabel(gender: string | null) {
                   {{ statusText(row) }}
                 </span>
               </button>
-              <button v-if="row.source === 'ticket' && ['waiting', 'called', 'skipped', 'in_progress'].includes(row.status)" type="button" class="dw-queue-menu-trigger" data-permission="workspace.view"
+              <button v-if="(row.source === 'appointment' && row.status === 'scheduled' || row.source === 'ticket' && ['waiting', 'called', 'skipped', 'in_progress'].includes(row.status))" type="button" class="dw-queue-menu-trigger" data-permission="workspace.view"
                 :aria-label="'Bemor amallari: ' + row.name"
                 :aria-expanded="openMenuKey === row.key" aria-haspopup="menu"
                 @click="toggleRowMenu(row.key)">
@@ -680,6 +772,11 @@ function genderLabel(gender: string | null) {
                   @click="resumeRow(row)">
                   <Play :size="17" /> Qabulni davom ettirish
                 </button>
+                <template v-else-if="row.source === 'appointment'">
+                  <button type="button" role="menuitem" :disabled="!can('appointments.update') || !can('appointments.view') || !can('patients.view')" @click="openAppointmentPreview(row)">
+                    <CalendarDays :size="17" /> Boshqa kunga ko‘chirish
+                  </button>
+                </template>
                 <template v-else>
                   <button v-if="row.status !== 'skipped'" type="button" role="menuitem" data-permission="workspace.view" :disabled="!actionAllowed(row, 'skip')" @click="showActionPreview(row, 'skip')">
                     <FastForward :size="17" /> O‘tkazib yuborish
@@ -812,6 +909,40 @@ function genderLabel(gender: string | null) {
       </section>
     </div>
 
+    <div v-if="appointmentPreview" class="dw-preview-backdrop" @click.self="closeAppointmentPreview">
+      <section class="dw-preview-dialog" role="dialog" aria-modal="true" aria-label="Qabulni boshqa kunga ko‘chirish">
+        <div class="dw-preview-heading">
+          <div>
+            <h2>Qabulni boshqa kunga ko‘chirish</h2>
+            <p>{{ appointmentPreview.name }}</p>
+          </div>
+          <button type="button" class="dw-preview-close" @click="closeAppointmentPreview">×</button>
+        </div>
+        <p class="dw-preview-hint">Faqat shu shifokorning band bo‘lmagan haqiqiy jadval vaqtlari tanlanadi.</p>
+        <p v-if="appointmentError" class="dw-action-error" role="alert">{{ appointmentError }}</p>
+        <div class="dw-preview-datetime">
+          <label class="dw-preview-field">Yangi sana
+            <input v-model="appointmentDate" aria-label="Ko‘chirish sanasi" type="date" :min="clinicToday" :disabled="appointmentSaving" />
+          </label>
+          <label class="dw-preview-field">Bo‘sh vaqt
+            <select v-model="appointmentSlotKey" aria-label="Ko‘chirish vaqti" :disabled="appointmentSaving || appointmentLoading || !appointmentSlots.length">
+              <option value="">Vaqtni tanlang</option>
+              <option v-for="entry in appointmentChoices" :key="slotKey(entry.slot)" :value="slotKey(entry.slot)" :disabled="entry.busy">
+                {{ appointmentTime(entry.slot) }}{{ entry.busy ? ' — Band' : '' }}
+              </option>
+            </select>
+          </label>
+          <p v-if="appointmentLoading">Vaqtlar tekshirilmoqda...</p>
+          <p v-else-if="appointmentDate && !appointmentSlots.length">Bu sanada bo‘sh vaqt yo‘q. Boshqa sanani tanlang.</p>
+        </div>
+        <div class="dw-preview-footer">
+          <button type="button" class="dw-preview-dismiss" @click="closeAppointmentPreview">Yopish</button>
+          <button type="button" class="dw-preview-confirm" :disabled="appointmentSaving || !appointmentSlotKey || appointmentLoading" @click="submitAppointmentReschedule">
+            {{ appointmentSaving ? 'Saqlanmoqda...' : 'Tasdiqlash' }}
+          </button>
+        </div>
+      </section>
+    </div>
     <div v-if="actionPreview" class="dw-preview-backdrop" @click.self="closeActionPreview">
       <section class="dw-preview-dialog" role="dialog" aria-modal="true"
         :aria-label="actionPreview.action === 'skip' ? 'O‘tkazib yuborish' : 'Navbatni bekor qilish'">

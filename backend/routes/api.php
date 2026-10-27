@@ -72,6 +72,8 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                 }
                 Route::get('reception/overview', [QueueController::class, 'overview']);
                 Route::get('appointments/booking-options', [AppointmentController::class, 'bookingOptions']);
+                Route::get('appointments/{appointment}/doctor-rebooking-options', [AppointmentController::class, 'doctorRebookingOptions'])->whereUuid('appointment');
+
                 Route::get('appointments/export', [AppointmentController::class, 'export']);
                 foreach (['appointments' => 'appointment', 'visits' => 'visit'] as $kind => $parameter) {
                     Route::get($kind, [AppointmentController::class, 'index'])->defaults('resourceKind', $kind);
