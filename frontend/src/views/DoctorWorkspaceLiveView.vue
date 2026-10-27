@@ -18,6 +18,9 @@ const query = ref("");
 const selectedKey = ref("");
 const loading = ref(true);
 const calling = ref(false);
+const resolvingOverdueId = ref("");
+const overdueError = ref("");
+
 const starting = ref(false);
 const startError = ref("");
 const startErrorFor = ref("");
@@ -184,6 +187,61 @@ async function callNext() {
     calling.value = false;
   }
 }
+const overdueTickets = computed(() => feed.value?.overdue ?? []);
+
+function canResolveOverdue(row: { status: string; appointment_id: string | null }, action: "skip" | "cancel" | "complete") {
+  if (row.status === "in_progress") {
+    return action === "complete" && can("queues.complete") &&
+      (!row.appointment_id || can("appointments.update"));
+  }
+  if (row.status !== "called") return false;
+  if (action === "skip") return can("queues.skip");
+  return action === "cancel" && can("queues.cancel") &&
+    (!row.appointment_id || can("appointments.cancel"));
+}
+
+async function continueOverdue(row: { id: string; local_date: string; branch_id: string }) {
+  // Navigation alone: no queue status or medical record mutation.
+  if (loading.value || resolvingOverdueId.value) return;
+  queueTab.value = "waiting";
+  query.value = "";
+  overdueError.value = "";
+  date.value = row.local_date;
+  branchId.value = row.branch_id;
+  await load("ticket:" + row.id);
+}
+
+async function resolveOverdue(
+  row: { id: string; name: string; status: string; version: number; appointment_id: string | null },
+  action: "skip" | "cancel" | "complete",
+) {
+  if (resolvingOverdueId.value || loading.value || !canResolveOverdue(row, action)) return;
+  const description = action === "complete"
+    ? `${row.name} qabuli yakunlansinmi? Oldingi tibbiy yozuvlar saqlanadi, lekin yakunlangan qabulni tahrirlab bo‘lmaydi.`
+    : action === "skip"
+      ? `${row.name} navbati «O‘tkazib yuborilgan» holatiga o‘tkazilsinmi? Bemor ma’lumotlari o‘chirilmaydi.`
+      : `${row.name} navbati bekor qilinsinmi? Bu amal bron va navbat holatiga ham ta’sir qiladi.`;
+  if (!window.confirm(description)) return;
+  resolvingOverdueId.value = row.id;
+  overdueError.value = "";
+  try {
+    await clinicRequest("queue-tickets/" + encodeURIComponent(row.id) + "/" + action, {
+      method: "POST",
+      body: { expected_version: row.version, reason_code: "previous_day_manual_resolution" },
+    });
+    await load();
+  } catch (cause) {
+    const message = errorText(cause);
+    try {
+      await load();
+    } finally {
+      overdueError.value = message;
+    }
+  } finally {
+    resolvingOverdueId.value = "";
+  }
+}
+
 // "Qabulni boshlash" is a separate, explicit action on the selected
 // *called* ticket. Clicking patient rows never starts a consultation.
 const startPermissionMessage = computed(() => {
@@ -340,6 +398,51 @@ function genderLabel(gender: string | null) {
     </header>
 
     <p v-if="error" class="dw-notice" role="alert">{{ error }}</p>
+    <section v-if="feed?.doctor && overdueTickets.length" class="dw-overdue" aria-label="Eski kundan qolgan navbatlar">
+      <div class="dw-overdue-header">
+        <div>
+          <h2>Oldingi kundan yakunlanmagan qabullar</h2>
+          <p>Shifokorning avvalgi sanalardagi faol qabullari va chaqirilgan navbatlari.
+            Ular hal etilmaguncha yangi bemorni chaqirish mumkin emas.</p>
+        </div>
+        <strong>{{ overdueTickets.length }} ta</strong>
+      </div>
+      <p v-if="overdueError" class="dw-overdue-error" role="alert">{{ overdueError }}</p>
+      <div class="dw-overdue-list">
+        <div v-for="item in overdueTickets" :key="item.id" class="dw-overdue-item">
+          <div class="dw-overdue-info">
+            <b>{{ item.name }}</b>
+            <span>{{ item.local_date }} · {{ item.branch_name }} · {{ item.service }}</span>
+            <span class="dw-overdue-status">{{ item.status === "in_progress" ? "Qabulda" : "Chaqirildi" }}</span>
+          </div>
+          <div class="dw-overdue-actions">
+            <button v-if="item.status === 'in_progress'" type="button"
+              :disabled="loading || !!resolvingOverdueId" @click="continueOverdue(item)">
+              Qabulni davom ettirish
+            </button>
+            <button v-if="item.status === 'in_progress' && canResolveOverdue(item, 'complete')"
+              type="button" class="dw-overdue-danger" :disabled="loading || !!resolvingOverdueId"
+              @click="resolveOverdue(item, 'complete')">
+              {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Qabulni yakunlash" }}
+            </button>
+            <button v-if="item.status === 'called' && canResolveOverdue(item, 'skip')"
+              type="button" :disabled="loading || !!resolvingOverdueId"
+              @click="resolveOverdue(item, 'skip')">
+              {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "O‘tkazib yuborish" }}
+            </button>
+            <button v-if="item.status === 'called' && canResolveOverdue(item, 'cancel')"
+              type="button" class="dw-overdue-danger" :disabled="loading || !!resolvingOverdueId"
+              @click="resolveOverdue(item, 'cancel')">
+              {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Navbatni bekor qilish" }}
+            </button>
+            <span v-if="item.status === 'called' && !canResolveOverdue(item, 'skip') && !canResolveOverdue(item, 'cancel')"
+              class="dw-overdue-permission">Navbatni yopish uchun tegishli ruxsat kerak.</span>
+            <span v-if="item.status === 'in_progress' && !canResolveOverdue(item, 'complete')"
+              class="dw-overdue-permission">Yakunlash uchun «Navbatni yakunlash» ruxsati kerak.</span>
+          </div>
+        </div>
+      </div>
+    </section>
     <div class="dw-workspace">
       <aside class="dw-card dw-queue">
         <h2>Bugungi navbat</h2>
@@ -388,7 +491,7 @@ function genderLabel(gender: string | null) {
         <p v-else-if="feed?.doctor && hasActivePatient" class="dw-call-hint" role="status">
           {{ activePatient?.name || "Oldingi bemor" }} hali
           {{ activePatient?.status === "in_progress" ? "qabulda" : "chaqirilgan" }}.
-          Qabul yakunlanmaguncha keyingi bemor chaqirilmaydi.
+          Qabul yoki navbat yopilmaguncha keyingi bemor chaqirilmaydi.
         </p>
         <p v-else-if="feed?.doctor && date !== clinicToday" class="dw-call-hint">
           Bemorlarni faqat bugungi navbatdan chaqirish mumkin.
@@ -471,6 +574,25 @@ function genderLabel(gender: string | null) {
 </template>
 
 <style scoped>
+.dw-overdue { margin: 0 0 16px; border: 1px solid #f3d29a; background: #fffaf1; border-radius: 12px; padding: 16px; }
+.dw-overdue-header { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+.dw-overdue-header h2 { margin:0 0 6px; font-size:17px; color:#7c4b11; }
+.dw-overdue-header p { margin:0 0 12px; font-size:13px; color:#885f2f; line-height:1.5; }
+.dw-overdue-header strong { background:#ffedd0; padding:5px 9px; border-radius:6px; color:#86550e; white-space:nowrap; }
+.dw-overdue-list { display:grid; gap:9px; }
+.dw-overdue-item { display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fff; border:1px solid #f3ddbd; padding:12px; border-radius:9px; }
+.dw-overdue-info { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.dw-overdue-info b { color:#163664; font-size:14px; }
+.dw-overdue-info span { color:#6d7990; font-size:12px; }
+.dw-overdue-info .dw-overdue-status { color:#a85a12; font-weight:600; }
+.dw-overdue-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.dw-overdue-actions button { color:#0d66d9; background:#edf5ff; border:1px solid #cddfff; border-radius:7px; padding:9px 12px; font-size:13px; font-weight:600; cursor:pointer; }
+.dw-overdue-actions button.dw-overdue-danger { background:#fff1ee; border-color:#f5c9c3; color:#a53024; }
+.dw-overdue-actions button:disabled { opacity:.5; cursor:not-allowed; }
+.dw-overdue-permission { font-size:12px; color:#876c50; }
+.dw-overdue-error { color:#b42318; font-size:13px; margin:2px 0 10px; }
+@media(max-width:760px) { .dw-overdue-item { flex-direction:column; align-items:stretch; } }
+
 .dw-live-ui { min-height: 66vh; }
 .dw-live-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .dw-live-date, .dw-live-select { min-height: 42px; border: 1px solid #d5e3f8; border-radius: 10px; background: white; display: flex; align-items: center; gap: 7px; padding: 8px 12px; color: #234371; }
