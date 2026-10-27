@@ -358,3 +358,29 @@ test("occupied time is disabled and the doctor is offered a free alternative", a
   await dialog.getByRole("button", { name: "Tasdiqlash" }).click();
   expect(fixture.commands[0]?.body.rebook).toEqual(freeSlot);
 });
+
+
+test("when all slots are occupied, suggests the next free date without booking an occupied slot", async ({ page }) => {
+  const freeTomorrow = {
+    ...slot, starts_at: "2030-01-08T05:00:00Z", ends_at: "2030-01-08T05:30:00Z",
+  };
+  const fixture = await setup(page, {
+    availability: async (route, date) => {
+      await route.fulfill({
+        json: { local_date: date, timezone: "Asia/Tashkent",
+          slots: date === "2030-01-08" ? [freeTomorrow] : [],
+          busy_slots: date === "2030-01-07" ? [slot] : [] },
+      });
+    },
+  });
+  const dialog = await openAction(page, "skip");
+  await dialog.getByLabel("Sabab", { exact: true }).selectOption("patient_late");
+  await dialog.getByLabel("Bemorni boshqa kunga qayta yozish (ixtiyoriy)").check();
+  await dialog.getByLabel("Yangi sana").fill("2030-01-07");
+  await expect(dialog).toContainText("Bu sanadagi barcha mavjud vaqtlar band");
+  await dialog.getByRole("button", { name: "Keyingi bo‘sh sanani topish (14 kun)" }).click();
+  await expect(dialog.getByLabel("Yangi sana")).toHaveValue("2030-01-08");
+  await expect(dialog).toContainText(/Tavsiya qilingan eng yaqin sana va vaqt/);
+  await dialog.getByRole("button", { name: "Tasdiqlash" }).click();
+  expect(fixture.commands[0]?.body.rebook).toEqual(freeTomorrow);
+});
