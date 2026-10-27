@@ -710,124 +710,143 @@ function genderLabel(gender: string | null) {
 
 <style scoped>
 
+
+/* Compact prior-day warning; patient rows now belong to the left tab. */
 .dw-overdue {
-  margin: 0 0 16px; padding: 14px 16px;
-  border: 1px solid #f4d4aa; border-radius: 12px;
-  background: linear-gradient(120deg, #fffaf4 0%, #fff8ef 55%, #fffaf5 100%);
-  color: #17325a;
-}
-.dw-overdue-header {
-  display: flex; align-items: flex-start; gap: 12px; margin: 0 2px 12px;
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 0 15px; padding: 11px 15px;
+  border: 1px solid #f4d4aa; border-radius: 11px;
+  background: #fff8f0; color: #17325a;
 }
 .dw-overdue-alert-icon {
-  flex: 0 0 39px; width: 39px; height: 39px;
-  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 34px; width: 34px; height: 34px;
+  display: grid; place-items: center;
   color: #d96b15; background: #ffead1; border-radius: 50%;
 }
 .dw-overdue-heading { flex: 1; min-width: 0; }
 .dw-overdue-heading h2 {
-  margin: 1px 0 4px; font-size: 16px; line-height: 1.4;
-  font-weight: 750; color: #6d440f;
+  margin: 0; font-size: 15px; line-height: 1.35; font-weight: 750; color: #754813;
 }
 .dw-overdue-heading p {
-  margin: 0; color: #806546; font-size: 12.5px; line-height: 1.5;
+  margin: 3px 0 0; font-size: 12px; line-height: 1.4; color: #846445;
 }
 .dw-overdue-count {
-  flex: 0 0 auto; border-radius: 8px; background: #ffebcf;
-  color: #925504; padding: 6px 11px; font-size: 13px; font-weight: 700;
-}
-.dw-overdue-list { display: grid; gap: 7px; }
-.dw-overdue-item {
-  display: grid;
-  grid-template-columns: 44px minmax(150px, 1fr) 112px 138px minmax(310px, 365px);
-  align-items: center; gap: 12px; min-height: 72px; padding: 10px 13px;
-  background: #fff; border: 1px solid #f0e5d5; border-radius: 10px;
-  box-shadow: 0 1px 3px rgb(33 67 117 / 3%);
-}
-.dw-overdue-avatar {
-  width: 42px; height: 42px; border-radius: 50%;
-  display: grid; place-items: center;
-  color: #6336df; background: #efe8ff; font-size: 16px; font-weight: 700;
-}
-.dw-overdue-info { display: grid; min-width: 0; gap: 5px; }
-.dw-overdue-info strong {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: #132a50; font-size: 14px; line-height: 1.2;
-}
-.dw-overdue-info > span {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: #6680a4; font-size: 12px;
-}
-.dw-overdue-state {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  width: max-content; justify-self: start; border-radius: 8px; padding: 7px 10px;
-  font-size: 12px; font-weight: 650; white-space: nowrap;
-}
-.dw-overdue-state.is-active { color: #c22635; background: #fff0f2; }
-.dw-overdue-state.is-called { color: #aa680a; background: #fff3d9; }
-.dw-overdue-state-dot {
-  width: 7px; height: 7px; border-radius: 50%; background: currentColor;
-}
-.dw-overdue-time {
-  display: flex; align-items: center; gap: 7px; color: #627997;
-  border-left: 1px solid #e4eaf5; padding-left: 12px;
-  font-size: 12px; white-space: nowrap;
-}
-.dw-overdue-actions {
-  display: flex; justify-content: flex-end; align-items: center;
-  gap: 7px; flex-wrap: wrap; min-width: 0;
-}
-.dw-overdue-action {
-  min-height: 37px; display: inline-flex; align-items: center;
-  justify-content: center; gap: 7px; white-space: nowrap;
-  padding: 8px 12px; border: 1px solid transparent;
-  border-radius: 8px; font: inherit; font-size: 12.5px; font-weight: 650;
-  cursor: pointer; transition: background 140ms, border-color 140ms;
-}
-.dw-overdue-action.is-primary {
-  color: white; background: #156dff; border-color: #156dff;
-  box-shadow: 0 2px 6px rgb(21 109 255 / 14%);
-}
-.dw-overdue-action.is-primary:hover:not(:disabled) { background: #075ce2; }
-.dw-overdue-action.is-subtle {
-  color: #225285; background: #f3f7ff; border-color: #dce8fa;
-}
-.dw-overdue-action.is-subtle:hover:not(:disabled) { background: #e8f2ff; }
-.dw-overdue-action.is-danger {
-  color: #b72836; background: #fff1f2; border-color: #ffe0e3;
-}
-.dw-overdue-action.is-danger:hover:not(:disabled) { background: #ffe6e9; }
-.dw-overdue-action:focus-visible { outline: 2px solid #146dff; outline-offset: 2px; }
-.dw-overdue-action:disabled { opacity: .66; cursor: not-allowed; }
-.dw-overdue-permission {
-  font-size: 11px; color: #937657; text-align: right;
-  max-width: 120px; line-height: 1.4;
+  flex: 0 0 auto; border-radius: 7px; background: #ffebcf;
+  color: #925504; padding: 6px 10px; font-size: 13px; font-weight: 700;
 }
 .dw-overdue-error {
   margin: 0 0 10px; padding: 10px 12px; border-radius: 8px;
   background: #fff0f0; color: #b42318; font-size: 13px;
 }
-@media (max-width: 1400px) {
-  .dw-overdue-item { grid-template-columns: 42px minmax(150px, 1fr) 112px minmax(310px, 365px); }
-  .dw-overdue-time { display: none; }
+/* The third tab fits the existing narrow doctor queue panel. */
+.dw-ui .dw-queue-tabs button {
+  font-size: 12px; gap: 5px; padding-inline: 2px;
+  min-width: 0; letter-spacing: -0.15px;
 }
-@media (max-width: 1000px) {
-  .dw-overdue-item { grid-template-columns: 42px minmax(0, 1fr) auto; }
-  .dw-overdue-actions { grid-column: 2 / -1; justify-content: flex-start; }
+.dw-ui .dw-queue-tabs b {
+  min-width: 21px; width: auto; height: 22px; padding-inline: 4px; font-size: 12px;
 }
-@media (max-width: 650px) {
-  .dw-overdue { padding: 11px; }
-  .dw-overdue-header { gap: 8px; margin-bottom: 10px; }
-  .dw-overdue-alert-icon { width: 32px; height: 32px; flex-basis: 32px; }
-  .dw-overdue-heading h2 { font-size: 14px; }
-  .dw-overdue-heading p { font-size: 12px; }
-  .dw-overdue-item {
-    gap: 9px; grid-template-columns: 38px minmax(0, 1fr); padding: 10px;
-  }
-  .dw-overdue-avatar { width: 36px; height: 36px; font-size: 14px; }
-  .dw-overdue-state { grid-column: 2; padding: 5px 8px; }
-  .dw-overdue-actions { grid-column: 1 / -1; }
-  .dw-overdue-action { flex: 1 1 140px; }
+/* Selection stays a semantic button. The more-menu is a sibling, not nested. */
+.dw-queue-entry { position: relative; min-width: 0; }
+.dw-ui .dw-queue-entry > .dw-queue-person {
+  padding-right: 51px; cursor: pointer;
+}
+.dw-ui .dw-queue-entry > .dw-queue-person .dw-queue-person-info {
+  min-width: 0;
+}
+.dw-queue-entry > .dw-queue-menu-trigger {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid #dae6f9; background: #fff; color: #436b9e;
+  cursor: pointer; z-index: 1;
+}
+.dw-queue-entry > .dw-queue-menu-trigger:hover,
+.dw-queue-entry > .dw-queue-menu-trigger[aria-expanded="true"] {
+  background: #edf5ff; border-color: #9ec6ff; color: #0b6cf5;
+}
+.dw-queue-entry > .dw-queue-menu-trigger:focus-visible {
+  outline: 2px solid #1476ff; outline-offset: 2px;
+}
+.dw-queue-popup {
+  position: absolute; z-index: 10; top: calc(50% + 17px); right: 8px;
+  width: 226px; display: grid; padding: 6px;
+  border: 1px solid #d9e6f7; border-radius: 10px; background: #fff;
+  box-shadow: 0 8px 28px rgb(25 48 92 / 15%);
+}
+.dw-queue-popup button {
+  display: flex; align-items: center; gap: 9px;
+  padding: 11px 10px; border: 0; border-radius: 7px;
+  background: #fff; font: inherit; color: #264978;
+  text-align: left; font-size: 13px; cursor: pointer;
+}
+.dw-queue-popup button:hover { background: #edf5ff; color: #0768ee; }
+.dw-queue-popup button.dw-menu-danger { color: #bd3340; }
+.dw-queue-popup button.dw-menu-danger:hover { background: #fff0f2; }
+/* Modal is visually complete, but intentionally has no write action. */
+.dw-preview-backdrop {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: center; padding: 16px;
+  background: rgb(13 30 56 / 45%);
+}
+.dw-preview-dialog {
+  width: min(100%, 515px); max-height: min(90vh, 780px);
+  overflow: auto; padding: 23px; background: white; border-radius: 14px;
+  border: 1px solid #dce6f5; box-shadow: 0 18px 65px rgb(13 34 69 / 22%);
+}
+.dw-preview-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.dw-preview-heading h2 { margin: 0 0 5px; color: #0b2552; font-size: 20px; }
+.dw-preview-heading p { margin: 0; color: #6b83a3; }
+.dw-preview-close {
+  cursor: pointer; border: 0; border-radius: 7px; background: #eef5ff;
+  color: #46658f; width: 32px; height: 32px; font-size: 24px;
+}
+.dw-preview-hint {
+  margin: 17px 0; padding: 12px; border-radius: 9px;
+  background: #edf5ff; color: #47688f; font-size: 13px; line-height: 1.5;
+}
+.dw-preview-field {
+  display: flex; flex-direction: column; gap: 7px; margin: 13px 0;
+  font-size: 13px; font-weight: 600; color: #264978;
+}
+.dw-preview-field select, .dw-preview-field textarea, .dw-preview-field input {
+  width: 100%; box-sizing: border-box; border: 1px solid #d2e1f5;
+  border-radius: 8px; padding: 10px 12px; font: inherit; font-weight: 400;
+  background: white; color: #143461;
+}
+.dw-preview-switch { display: flex; align-items: center; gap: 9px; margin: 16px 0; font-size: 13px; }
+.dw-preview-switch input { accent-color: #1673ff; width: 18px; height: 18px; }
+.dw-preview-datetime { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.dw-preview-datetime > p {
+  grid-column: 1 / -1; margin: 0;
+  color: #9a631d; font-size: 12px; line-height: 1.4;
+}
+.dw-preview-footer {
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  gap: 9px; margin-top: 20px;
+}
+.dw-preview-footer button {
+  border-radius: 8px; min-height: 39px; padding: 10px 13px; font: inherit;
+  font-size: 13px; font-weight: 600;
+}
+.dw-preview-dismiss {
+  border: 1px solid #d7e4f6; background: #f6f9ff;
+  color: #335680; cursor: pointer;
+}
+.dw-preview-disabled {
+  border: 1px solid #a9cbfa; background: #b9d6ff;
+  color: white; cursor: not-allowed;
+}
+.dw-live-history-preview { padding: 20px; }
+.dw-live-history-preview .dw-start-button { margin-top: 14px; }
+@media (max-width: 1100px) {
+  .dw-ui .dw-queue-tabs button { font-size: 11px; gap: 3px; }
+}
+@media (max-width: 700px) {
+  .dw-overdue-heading h2 { font-size: 13px; }
+  .dw-overdue-heading p { font-size: 11px; }
+  .dw-queue-popup { left: 12px; right: auto; }
+  .dw-preview-datetime { grid-template-columns: 1fr; }
 }
 .dw-live-ui { min-height: 66vh; }
 .dw-live-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
