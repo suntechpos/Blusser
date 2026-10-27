@@ -106,6 +106,7 @@ async function submitAppointmentReschedule() {
         expected_version: row.version,
       },
     });
+    appointmentSaving.value = false;
     closeAppointmentPreview();
     await load();
   } catch (cause) {
