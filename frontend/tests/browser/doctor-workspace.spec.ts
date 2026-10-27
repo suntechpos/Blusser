@@ -34,7 +34,8 @@ async function setup(
   const queue = rows.map((row) => ({ ...row, version: row.version ?? 1, called_at: row.called_at ?? null }));
   // Separate mock of the server-authorized overdue projection. Today's rows
   // remain independent so an old patient can block the next day's FIFO call.
-  const overdue = overdueItems.map((row) => ({ ...row }));
+  const overdue: Array<Omit<(typeof overdueItems)[number], "status"> & { status: string }> =
+    overdueItems.map((row) => ({ ...row }));
   const today = todayItems.map((row) => ({ ...row }));
   const clinicalNotes = new Map<string, {
     id: string; visit_id: string; patient_id: string;
@@ -197,7 +198,7 @@ async function setup(
         return route.fulfill({ status: 409, json: { message: "Conflict" } });
       }
       overdueActions.push({ id: ticket.id, action });
-      ticket.status = action === "complete" ? "completed" : action === "skip" ? "skipped" : "cancelled" as any;
+      ticket.status = action === "complete" ? "completed" : action === "skip" ? "skipped" : "cancelled";
       ticket.version++;
       return route.fulfill({ json: { ticket: { id: ticket.id, status: ticket.status, version: ticket.version } } });
     }
