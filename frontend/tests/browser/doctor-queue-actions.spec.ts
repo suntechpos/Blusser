@@ -160,6 +160,10 @@ async function setup(
         busy_slots: [slot],
       } });
     }
+    if (path === "/api/v1/clinic/appointments/a251fe34-a912-4f3c-8e22-aa11a2ac1211/cancel" && request.method() === "POST") {
+      commands.push({ action: "cancel", body: request.postDataJSON(), key: request.headers()["idempotency-key"] || "" });
+      return route.fulfill({ json: { id: "a251fe34-a912-4f3c-8e22-aa11a2ac1211", status: "cancelled", version: 3 } });
+    }
     if (path === "/api/v1/clinic/appointments/a251fe34-a912-4f3c-8e22-aa11a2ac1211/reschedule" && request.method() === "POST") {
       commands.push({ action: "skip", body: request.postDataJSON(), key: request.headers()["idempotency-key"] || "" });
       return route.fulfill({ json: { id: "a251fe34-a912-4f3c-8e22-aa11a2ac1211", version: 3, status: "scheduled" } });
@@ -458,4 +462,18 @@ test("scheduled patient can reschedule during an active waiting queue with busy 
     ends_at: nextDaySlot.ends_at,
     expected_version: 2,
   });
+});
+
+test("scheduled patient menu keeps both reschedule and cancel; cancellation requires confirmation", async ({ page }) => {
+  const fixture = await setup(page, { scheduledAppointment: true });
+  await page.getByRole("button", { name: "Bemor amallari: Karimov Vali" }).click();
+  await expect(page.getByRole("menuitem", { name: "Boshqa kunga ko‘chirish" })).toBeEnabled();
+  await page.getByRole("menuitem", { name: "Navbatni bekor qilish" }).click();
+  const dialog = page.getByRole("dialog", { name: "Yozilgan qabulni bekor qilish" });
+  await expect(dialog).toBeVisible();
+  expect(fixture.commands).toHaveLength(0);
+  await dialog.getByRole("button", { name: "Bekor qilishni tasdiqlash" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(fixture.commands).toHaveLength(1);
+  expect(fixture.commands[0]?.body).toEqual({ expected_version: 2 });
 });

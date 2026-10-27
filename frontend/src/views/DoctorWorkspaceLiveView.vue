@@ -25,6 +25,34 @@ interface RebookingSlot {
   starts_at: string;
   ends_at: string;
 }
+const appointmentCancelPreview = ref<QueueDisplayRow | null>(null);
+const appointmentCancelSaving = ref(false);
+const appointmentCancelError = ref("");
+function openAppointmentCancel(row: QueueDisplayRow) {
+  openMenuKey.value = "";
+  if (row.source !== "appointment" || row.status !== "scheduled" ||
+    !can("appointments.view") || !can("appointments.cancel")) return;
+  appointmentCancelError.value = "";
+  appointmentCancelPreview.value = { ...row };
+}
+async function cancelScheduledAppointment() {
+  const row = appointmentCancelPreview.value;
+  if (!row || row.status !== "scheduled" || !row.version || appointmentCancelSaving.value) return;
+  appointmentCancelSaving.value = true;
+  appointmentCancelError.value = "";
+  try {
+    await clinicRequest("appointments/" + encodeURIComponent(row.id) + "/cancel", {
+      method: "POST",
+      body: { expected_version: row.version },
+    });
+    appointmentCancelPreview.value = null;
+    await load();
+  } catch (cause) {
+    appointmentCancelError.value = errorText(cause);
+  } finally {
+    appointmentCancelSaving.value = false;
+  }
+}
 const appointmentPreview = ref<QueueDisplayRow | null>(null);
 const appointmentDate = ref("");
 const appointmentSlotKey = ref("");
@@ -776,6 +804,11 @@ function genderLabel(gender: string | null) {
                   <button type="button" role="menuitem" :disabled="!can('appointments.update') || !can('appointments.view') || !can('patients.view')" @click="openAppointmentPreview(row)">
                     <CalendarDays :size="17" /> Boshqa kunga ko‘chirish
                   </button>
+                  <button type="button" role="menuitem" class="dw-menu-danger"
+                    :disabled="!can('appointments.cancel') || !can('appointments.view')"
+                    @click="openAppointmentCancel(row)">
+                    <Ban :size="17" /> Navbatni bekor qilish
+                  </button>
                 </template>
                 <template v-else>
                   <button v-if="row.status !== 'skipped'" type="button" role="menuitem" data-permission="workspace.view" :disabled="!actionAllowed(row, 'skip')" @click="showActionPreview(row, 'skip')">
@@ -909,6 +942,26 @@ function genderLabel(gender: string | null) {
       </section>
     </div>
 
+    <div v-if="appointmentCancelPreview" class="dw-preview-backdrop" @click.self="!appointmentCancelSaving && (appointmentCancelPreview = null)">
+      <section class="dw-preview-dialog" role="dialog" aria-modal="true" aria-label="Yozilgan qabulni bekor qilish">
+        <div class="dw-preview-heading">
+          <div>
+            <h2>Navbatni bekor qilish</h2>
+            <p>{{ appointmentCancelPreview.name }}</p>
+          </div>
+          <button type="button" class="dw-preview-close" :disabled="appointmentCancelSaving"
+            @click="appointmentCancelPreview = null">×</button>
+        </div>
+        <p class="dw-preview-hint">Bu bemorning rejalashtirilgan qabuli bekor qilinadi va vaqt boshqa bemorlarga bo‘shaydi. Davom etasizmi?</p>
+        <p v-if="appointmentCancelError" class="dw-action-error" role="alert">{{ appointmentCancelError }}</p>
+        <div class="dw-preview-footer">
+          <button type="button" class="dw-preview-dismiss" :disabled="appointmentCancelSaving"
+            @click="appointmentCancelPreview = null">Yopish</button>
+          <button type="button" class="dw-preview-confirm" :disabled="appointmentCancelSaving"
+            @click="cancelScheduledAppointment">{{ appointmentCancelSaving ? 'Saqlanmoqda...' : 'Bekor qilishni tasdiqlash' }}</button>
+        </div>
+      </section>
+    </div>
     <div v-if="appointmentPreview" class="dw-preview-backdrop" @click.self="closeAppointmentPreview">
       <section class="dw-preview-dialog" role="dialog" aria-modal="true" aria-label="Qabulni boshqa kunga ko‘chirish">
         <div class="dw-preview-heading">
