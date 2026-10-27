@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { AlertTriangle, Ban, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock3, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { AlertTriangle, Ban, CalendarDays, ChevronDown, Ellipsis, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
 import { can, session } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
@@ -13,13 +13,19 @@ const feed = ref<DoctorWorkspaceFeed | null>(null);
 const date = ref("");
 const doctorId = ref("");
 const branchId = ref("");
-const queueTab = ref<"waiting" | "completed">("waiting");
+const queueTab = ref<"waiting" | "unresolved" | "completed">("waiting");
 const query = ref("");
 const selectedKey = ref("");
 const loading = ref(true);
 const calling = ref(false);
-const resolvingOverdueId = ref("");
 const overdueError = ref("");
+const openMenuKey = ref("");
+const actionPreview = ref<{ name: string; action: "skip" | "cancel" } | null>(null);
+const previewReason = ref("");
+const previewComment = ref("");
+const previewReschedule = ref(false);
+const previewDate = ref("");
+const previewTime = ref("");
 
 const starting = ref(false);
 const startError = ref("");
@@ -175,6 +181,7 @@ async function callNext() {
     });
     query.value = "";
     queueTab.value = "waiting";
+    openMenuKey.value = "";
     await load("ticket:" + ticket.id);
   } catch (cause) {
     const message = errorText(cause);
@@ -189,57 +196,16 @@ async function callNext() {
 }
 const overdueTickets = computed(() => feed.value?.overdue ?? []);
 
-function canResolveOverdue(row: { status: string; appointment_id: string | null }, action: "skip" | "cancel" | "complete") {
-  if (row.status === "in_progress") {
-    return action === "complete" && can("queues.complete") &&
-      (!row.appointment_id || can("appointments.update"));
-  }
-  if (row.status !== "called") return false;
-  if (action === "skip") return can("queues.skip");
-  return action === "cancel" && can("queues.cancel") &&
-    (!row.appointment_id || can("appointments.cancel"));
-}
-
 async function continueOverdue(row: { id: string; local_date: string; branch_id: string }) {
   // Navigation alone: no queue status or medical record mutation.
-  if (loading.value || resolvingOverdueId.value) return;
-  queueTab.value = "waiting";
+  if (loading.value) return;
+  queueTab.value = "unresolved";
   query.value = "";
+  openMenuKey.value = "";
   overdueError.value = "";
   date.value = row.local_date;
   branchId.value = row.branch_id;
   await load("ticket:" + row.id);
-}
-
-async function resolveOverdue(
-  row: { id: string; name: string; status: string; version: number; appointment_id: string | null },
-  action: "skip" | "cancel" | "complete",
-) {
-  if (resolvingOverdueId.value || loading.value || !canResolveOverdue(row, action)) return;
-  const description = action === "complete"
-    ? `${row.name} qabuli yakunlansinmi? Oldingi tibbiy yozuvlar saqlanadi, lekin yakunlangan qabulni tahrirlab bo‘lmaydi.`
-    : action === "skip"
-      ? `${row.name} navbati «O‘tkazib yuborilgan» holatiga o‘tkazilsinmi? Bemor ma’lumotlari o‘chirilmaydi.`
-      : `${row.name} navbati bekor qilinsinmi? Bu amal bron va navbat holatiga ham ta’sir qiladi.`;
-  if (!window.confirm(description)) return;
-  resolvingOverdueId.value = row.id;
-  overdueError.value = "";
-  try {
-    await clinicRequest("queue-tickets/" + encodeURIComponent(row.id) + "/" + action, {
-      method: "POST",
-      body: { expected_version: row.version, reason_code: "previous_day_manual_resolution" },
-    });
-    await load();
-  } catch (cause) {
-    const message = errorText(cause);
-    try {
-      await load();
-    } finally {
-      overdueError.value = message;
-    }
-  } finally {
-    resolvingOverdueId.value = "";
-  }
 }
 
 // "Qabulni boshlash" is a separate, explicit action on the selected
@@ -266,7 +232,7 @@ const anotherConsultation = computed(() => feed.value?.tickets.some((ticket) =>
 ) ?? false);
 const startAllowed = computed(() =>
   selected.value?.source === "ticket" && selected.value.status === "called" &&
-  !startPermissionMessage.value && !anotherConsultation.value &&
+  !hasHistoricScope(selected.value) && !startPermissionMessage.value && !anotherConsultation.value &&
   date.value === clinicToday.value && !loading.value && !starting.value,
 );
 async function startConsultation() {
@@ -308,19 +274,79 @@ async function startConsultation() {
     starting.value = false;
   }
 }
+// Keep historical data in its own tab, but do not fetch a second, more
+// privileged patient feed. The overdue projection already enforces access.
+type QueueDisplayRow = DisplayRow & {
+  historicDate?: string;
+  historicBranchId?: string;
+  historicBranchName?: string;
+};
+const unresolvedRows = computed<QueueDisplayRow[]>(() => {
+  const todayRows = new Map(rows.value.filter((r) => r.source === "ticket")
+    .map((r) => [r.id, r] as const));
+  return overdueTickets.value.map((item) => ({
+    ...(todayRows.get(item.id) ?? {
+      ...item,
+      dob: "",
+      gender: null,
+      phone: null,
+      source: "ticket" as const,
+      key: "ticket:" + item.id,
+    }),
+    historicDate: item.local_date,
+    historicBranchId: item.branch_id,
+    historicBranchName: item.branch_name,
+  }));
+});
+const overdueIds = computed(() => new Set(overdueTickets.value.map((item) => item.id)));
+const unresolvedCount = computed(() => unresolvedRows.value.length);
 const completed = (row: DisplayRow) => row.status === "completed";
-const filteredRows = computed(() => rows.value.filter((row) => {
-  if (completed(row) !== (queueTab.value === "completed")) return false;
+function hasHistoricScope(row: QueueDisplayRow) {
+  return !!row.historicDate && (row.historicDate !== date.value ||
+    row.historicBranchId !== branchId.value);
+}
+function toggleRowMenu(key: string) {
+  openMenuKey.value = openMenuKey.value === key ? "" : key;
+}
+function showActionPreview(row: QueueDisplayRow, action: "skip" | "cancel") {
+  openMenuKey.value = "";
+  actionPreview.value = { name: row.name, action };
+  previewReason.value = "";
+  previewComment.value = "";
+  previewReschedule.value = false;
+  previewDate.value = "";
+  previewTime.value = "";
+}
+function closeActionPreview() {
+  actionPreview.value = null;
+}
+function resumeRow(row: QueueDisplayRow) {
+  openMenuKey.value = "";
+  if (row.historicDate && row.historicBranchId) {
+    void continueOverdue({ id: row.id, local_date: row.historicDate, branch_id: row.historicBranchId });
+  } else {
+    selectedKey.value = row.key;
+  }
+}
+
+const filteredRows = computed<QueueDisplayRow[]>(() => {
+  const source = queueTab.value === "unresolved" ? unresolvedRows.value
+    : rows.value.filter((row) => queueTab.value === "completed"
+      ? completed(row) : !completed(row) && !overdueIds.value.has(row.id));
   const search = query.value.trim().toLocaleLowerCase();
-  return !search || [row.name, row.patient_number, String(row.number ?? ""), row.service]
-    .some((item) => item?.toLocaleLowerCase().includes(search));
-}));
-const waitingCount = computed(() => rows.value.filter((row) => !completed(row)).length);
+  return source.filter((row) => !search ||
+    [row.name, row.patient_number, String(row.number ?? ""), row.service]
+      .some((item) => item?.toLocaleLowerCase().includes(search)));
+});
+const waitingCount = computed(() => rows.value.filter(
+  (row) => !completed(row) && !overdueIds.value.has(row.id),
+).length);
 const completedCount = computed(() => rows.value.filter(completed).length);
 const selected = computed(() => filteredRows.value.find((r) => r.key === selectedKey.value) || filteredRows.value[0] || null);
-function setTab(tab: "waiting" | "completed") {
+function setTab(tab: "waiting" | "unresolved" | "completed") {
   queueTab.value = tab;
   selectedKey.value = "";
+  openMenuKey.value = "";
 }
 const timezone = computed(() => feed.value?.branch?.timezone || "Asia/Tashkent");
 function visitTime(row: DisplayRow) {
@@ -399,84 +425,24 @@ function genderLabel(gender: string | null) {
 
     <p v-if="error" class="dw-notice" role="alert">{{ error }}</p>
     <section v-if="feed?.doctor && overdueTickets.length" class="dw-overdue" aria-label="Eski kundan qolgan navbatlar">
-      <header class="dw-overdue-header">
-        <span class="dw-overdue-alert-icon" aria-hidden="true"><AlertTriangle :size="20" /></span>
-        <div class="dw-overdue-heading">
-          <h2>Oldingi kundan yakunlanmagan qabullar</h2>
-          <p>Avvalgi kunlardan qolgan faol qabullar va chaqirilgan navbatlar.
-            Ular hal etilmaguncha yangi bemorni chaqirib bo‘lmaydi.</p>
-        </div>
-        <span class="dw-overdue-count">{{ overdueTickets.length }} ta</span>
-      </header>
-      <p v-if="overdueError" class="dw-overdue-error" role="alert">{{ overdueError }}</p>
-      <div class="dw-overdue-list">
-        <article v-for="item in overdueTickets" :key="item.id" class="dw-overdue-item">
-          <span class="dw-overdue-avatar" aria-hidden="true">{{ initials(item.name) }}</span>
-          <div class="dw-overdue-info">
-            <strong :title="item.name">{{ item.name }}</strong>
-            <span :title="item.local_date + ' · ' + item.branch_name + ' · ' + item.service">
-              {{ item.local_date }} · {{ item.branch_name }} · {{ item.service }}
-            </span>
-          </div>
-          <span class="dw-overdue-state" :class="item.status === 'in_progress' ? 'is-active' : 'is-called'">
-            <span class="dw-overdue-state-dot" aria-hidden="true"></span>
-            {{ item.status === "in_progress" ? "Qabulda" : "Chaqirildi" }}
-          </span>
-          <span class="dw-overdue-time" :title="'Qabul sanasi: ' + item.local_date">
-            <Clock3 :size="16" aria-hidden="true" />
-            <span>{{ item.local_date }}</span>
-          </span>
-          <div class="dw-overdue-actions">
-            <template v-if="item.status === 'in_progress'">
-              <button type="button" class="dw-overdue-action is-primary"
-                :disabled="loading || !!resolvingOverdueId" @click="continueOverdue(item)">
-                <Play :size="16" aria-hidden="true" />
-                Qabulni davom ettirish
-              </button>
-              <button v-if="canResolveOverdue(item, 'complete')" type="button"
-                class="dw-overdue-action is-subtle" :disabled="loading || !!resolvingOverdueId"
-                @click="resolveOverdue(item, 'complete')">
-                <CheckCircle2 :size="16" aria-hidden="true" />
-                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Qabulni yakunlash" }}
-              </button>
-            </template>
-            <template v-else>
-              <button type="button"
-                class="dw-overdue-action is-subtle"
-                :disabled="loading || !!resolvingOverdueId || !canResolveOverdue(item, 'skip')"
-                :title="canResolveOverdue(item, 'skip') ? 'Navbatni o‘tkazib yuborish' : 'Navbatni o‘tkazib yuborish uchun ruxsat kerak'"
-                @click="resolveOverdue(item, 'skip')">
-                <FastForward :size="16" aria-hidden="true" />
-                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "O‘tkazib yuborish" }}
-              </button>
-              <button type="button"
-                class="dw-overdue-action is-danger"
-                :disabled="loading || !!resolvingOverdueId || !canResolveOverdue(item, 'cancel')"
-                :title="canResolveOverdue(item, 'cancel') ? 'Navbatni bekor qilish' : 'Navbatni bekor qilish uchun ruxsat kerak'"
-                @click="resolveOverdue(item, 'cancel')">
-                <Ban :size="16" aria-hidden="true" />
-                {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Navbatni bekor qilish" }}
-              </button>
-            </template>
-            <span v-if="item.status === 'called' &&
-                !canResolveOverdue(item, 'skip') && !canResolveOverdue(item, 'cancel')"
-              class="dw-overdue-permission" title="Navbat amallarini faollashtirish uchun ruxsat kerak">
-              Ruxsat kerak
-            </span>
-            <span v-if="item.status === 'in_progress' && !canResolveOverdue(item, 'complete')"
-              class="dw-overdue-permission" title="Navbatni yakunlash ruxsatini administratordan so‘rang">
-              Yakunlash ruxsati kerak
-            </span>
-          </div>
-        </article>
+      <span class="dw-overdue-alert-icon" aria-hidden="true"><AlertTriangle :size="20" /></span>
+      <div class="dw-overdue-heading">
+        <h2>Oldingi kundan {{ overdueTickets.length }} ta yakunlanmagan qabul mavjud</h2>
+        <p>Eski qabullarni «Yakunlanmagan» tabida ko‘rib chiqishingiz mumkin.
+          Ular hal etilmaguncha yangi bemorni chaqirib bo‘lmaydi.</p>
       </div>
+      <span class="dw-overdue-count">{{ overdueTickets.length }} ta</span>
     </section>
+    <p v-if="overdueError" class="dw-overdue-error" role="alert">{{ overdueError }}</p>
     <div class="dw-workspace">
       <aside class="dw-card dw-queue">
         <h2>Bugungi navbat</h2>
         <div class="dw-queue-tabs">
           <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'waiting' }" @click="setTab('waiting')">
             Kutilmoqda <b>{{ waitingCount }}</b>
+          </button>
+          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'unresolved' }" @click="setTab('unresolved')">
+            Yakunlanmagan <b>{{ unresolvedCount }}</b>
           </button>
           <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'completed' }" @click="setTab('completed')">
             Yakunlangan <b>{{ completedCount }}</b>
@@ -489,22 +455,50 @@ function genderLabel(gender: string | null) {
         <div class="dw-queue-list">
           <p v-if="loading" class="dw-empty" role="status">Navbat yuklanmoqda...</p>
           <template v-else>
-            <button v-for="row in filteredRows" :key="row.key" type="button"
-              class="dw-queue-person" data-permission="workspace.view" :class="{ selected: selected?.key === row.key }"
-              :aria-label="row.name + ' · ' + row.patient_number" @click="selectedKey = row.key">
-              <span class="dw-avatar purple">{{ initials(row.name) }}</span>
-              <span class="dw-queue-person-info">
-                <b>{{ row.name }}</b>
-                <small>{{ visitTime(row) }}</small>
-                <small>{{ row.service }}</small>
-              </span>
-              <span class="dw-badge" :class="completed(row) ? 'green' : row.status === 'in_progress' ? 'blue' : 'yellow'">
-                {{ statusText(row) }}
-              </span>
-              <ChevronRight :size="18" />
-            </button>
+            <div v-for="row in filteredRows" :key="row.key" class="dw-queue-entry">
+              <button type="button" class="dw-queue-person" data-permission="workspace.view"
+                :class="{ selected: selected?.key === row.key }"
+                :aria-label="row.name + ' · ' + row.patient_number"
+                @click="selectedKey = row.key; openMenuKey = ''">
+                <span class="dw-avatar purple">{{ initials(row.name) }}</span>
+                <span class="dw-queue-person-info">
+                  <b>{{ row.name }}</b>
+                  <small v-if="row.historicDate">№{{ row.number || '—' }} · {{ row.historicDate }}</small>
+                  <small v-else>{{ visitTime(row) }}</small>
+                  <small>{{ row.service }}<template v-if="row.historicBranchName"> · {{ row.historicBranchName }}</template></small>
+                </span>
+                <span class="dw-badge" :class="completed(row) ? 'green' : row.status === 'in_progress' ? 'blue' : 'yellow'">
+                  {{ statusText(row) }}
+                </span>
+              </button>
+              <button v-if="!completed(row)" type="button" class="dw-queue-menu-trigger"
+                :aria-label="'Bemor amallari: ' + row.name"
+                :aria-expanded="openMenuKey === row.key" aria-haspopup="menu"
+                @click="toggleRowMenu(row.key)">
+                <Ellipsis :size="20" />
+              </button>
+              <div v-if="openMenuKey === row.key" class="dw-queue-popup" role="menu"
+                :aria-label="row.name + ' uchun amallar'">
+                <button v-if="row.status === 'in_progress'" type="button" role="menuitem"
+                  @click="resumeRow(row)">
+                  <Play :size="17" /> Qabulni davom ettirish
+                </button>
+                <template v-else>
+                  <button type="button" role="menuitem" @click="showActionPreview(row, 'skip')">
+                    <FastForward :size="17" /> O‘tkazib yuborish
+                  </button>
+                  <button type="button" role="menuitem" class="dw-menu-danger"
+                    @click="showActionPreview(row, 'cancel')">
+                    <Ban :size="17" /> Navbatni bekor qilish
+                  </button>
+                </template>
+              </div>
+            </div>
             <p v-if="!filteredRows.length && !error" class="dw-empty">
-              {{ rows.length ? "Qidiruv bo‘yicha bemor topilmadi." : "Ushbu sanada bemorlar yo‘q." }}
+              {{ query.trim() ? "Qidiruv bo‘yicha bemor topilmadi." :
+                queueTab === "unresolved" ? "Oldingi kundan qolgan ochiq navbat yo‘q." :
+                queueTab === "completed" ? "Yakunlangan qabul topilmadi." :
+                "Ushbu sanada kutayotgan bemorlar yo‘q." }}
             </p>
           </template>
         </div>
@@ -531,7 +525,28 @@ function genderLabel(gender: string | null) {
       </aside>
 
       <section class="dw-live-details">
-        <template v-if="selected">
+        <article v-if="selected && hasHistoricScope(selected)" class="dw-card dw-live-history-preview">
+          <div class="dw-patient-line">
+            <span class="dw-avatar large purple">{{ initials(selected.name) }}</span>
+            <div>
+              <h2>{{ selected.name }}</h2>
+              <p>{{ selected.patient_number }} · {{ selected.historicDate }} · {{ selected.service }}</p>
+              <p>{{ selected.historicBranchName }}</p>
+            </div>
+            <span class="dw-badge" :class="selected.status === 'in_progress' ? 'blue' : 'yellow'">
+              {{ statusText(selected) }}
+            </span>
+          </div>
+          <p class="dw-live-warning">
+            Bu oldingi sanadagi navbat. Qabulning haqiqiy tibbiy yozuvlarini ko‘rish
+            uchun avval eski sanani oching.
+          </p>
+          <button v-if="selected.status === 'in_progress'" type="button"
+            class="dw-start-button" @click="resumeRow(selected)">
+            <Play :size="18" /> Qabulni davom ettirish
+          </button>
+        </article>
+        <template v-else-if="selected">
           <article class="dw-card dw-patient-card">
             <div class="dw-patient-line">
               <span class="dw-avatar large purple">{{ initials(selected.name) }}</span>
@@ -554,12 +569,12 @@ function genderLabel(gender: string | null) {
             <dl>
               <div><dt>Shifokor</dt><dd>{{ feed?.doctor?.name }}</dd></div>
               <div><dt>Xizmat</dt><dd>{{ selected.service }}</dd></div>
-              <div><dt>Qabul sanasi</dt><dd>{{ date }}</dd></div>
+              <div><dt>Qabul sanasi</dt><dd>{{ selected.historicDate || date }}</dd></div>
               <div><dt>Vaqt / Navbat</dt><dd>{{ visitTime(selected) }}</dd></div>
               <div><dt>Holati</dt><dd>{{ statusText(selected) }}</dd></div>
             </dl>
           </details>
-            <div v-if="selected.source === 'ticket' && selected.status === 'called'" class="dw-start-block">
+            <div v-if="selected.source === 'ticket' && selected.status === 'called' && !hasHistoricScope(selected)" class="dw-start-block">
               <button type="button" class="dw-start-button" data-permission="workspace.view"
                 :disabled="!startAllowed" @click="startConsultation">
                 <Play :size="18" />
@@ -598,129 +613,197 @@ function genderLabel(gender: string | null) {
         </article>
       </section>
     </div>
+
+    <div v-if="actionPreview" class="dw-preview-backdrop" @click.self="closeActionPreview">
+      <section class="dw-preview-dialog" role="dialog" aria-modal="true"
+        :aria-label="actionPreview.action === 'skip' ? 'O‘tkazib yuborish' : 'Navbatni bekor qilish'">
+        <div class="dw-preview-heading">
+          <div>
+            <h2>{{ actionPreview.action === 'skip' ? 'O‘tkazib yuborish' : 'Navbatni bekor qilish' }}</h2>
+            <p>{{ actionPreview.name }}</p>
+          </div>
+          <button type="button" class="dw-preview-close" aria-label="Modalni yopish" @click="closeActionPreview">×</button>
+        </div>
+        <p class="dw-preview-hint">
+          Bu faqat veryostka namoyishi. Navbat holati va bronlar o‘zgarmaydi.
+          Amallar va bo‘sh vaqtlarni tekshirish backendga keyin ulanadi.
+        </p>
+        <label class="dw-preview-field">Sabab
+          <select v-model="previewReason">
+            <option value="">Sababni tanlang</option>
+            <option value="patient_late">Bemor kechikdi</option>
+            <option value="patient_absent">Bemor kelmadi</option>
+            <option value="patient_requested">Bemorning iltimosi</option>
+            <option value="other">Boshqa sabab</option>
+          </select>
+        </label>
+        <label class="dw-preview-field">Izoh (ixtiyoriy)
+          <textarea v-model="previewComment" rows="3" maxlength="200" placeholder="Qisqa izoh..."></textarea>
+        </label>
+        <label class="dw-preview-switch">
+          <input v-model="previewReschedule" type="checkbox" />
+          Bemorni boshqa kunga qayta yozish (ixtiyoriy)
+        </label>
+        <div v-if="previewReschedule" class="dw-preview-datetime">
+          <label class="dw-preview-field">Yangi sana
+            <input v-model="previewDate" type="date" />
+          </label>
+          <label class="dw-preview-field">So‘ralgan vaqt
+            <input v-model="previewTime" type="time" />
+          </label>
+          <p>Tanlangan vaqtning bo‘sh yoki bandligi hozir tekshirilmaydi.
+            Bron yaratish funksiyasi keyingi bosqichda ulanadi.</p>
+        </div>
+        <div class="dw-preview-footer">
+          <button type="button" class="dw-preview-dismiss" @click="closeActionPreview">Yopish</button>
+          <button type="button" class="dw-preview-disabled" disabled>
+            Tasdiqlash (API keyin ulanadi)
+          </button>
+        </div>
+      </section>
+    </div>
   </section>
 </template>
 
 <style scoped>
 
+
+/* Compact prior-day warning; patient rows now belong to the left tab. */
 .dw-overdue {
-  margin: 0 0 16px; padding: 14px 16px;
-  border: 1px solid #f4d4aa; border-radius: 12px;
-  background: linear-gradient(120deg, #fffaf4 0%, #fff8ef 55%, #fffaf5 100%);
-  color: #17325a;
-}
-.dw-overdue-header {
-  display: flex; align-items: flex-start; gap: 12px; margin: 0 2px 12px;
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 0 15px; padding: 11px 15px;
+  border: 1px solid #f4d4aa; border-radius: 11px;
+  background: #fff8f0; color: #17325a;
 }
 .dw-overdue-alert-icon {
-  flex: 0 0 39px; width: 39px; height: 39px;
-  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 34px; width: 34px; height: 34px;
+  display: grid; place-items: center;
   color: #d96b15; background: #ffead1; border-radius: 50%;
 }
 .dw-overdue-heading { flex: 1; min-width: 0; }
 .dw-overdue-heading h2 {
-  margin: 1px 0 4px; font-size: 16px; line-height: 1.4;
-  font-weight: 750; color: #6d440f;
+  margin: 0; font-size: 15px; line-height: 1.35; font-weight: 750; color: #754813;
 }
 .dw-overdue-heading p {
-  margin: 0; color: #806546; font-size: 12.5px; line-height: 1.5;
+  margin: 3px 0 0; font-size: 12px; line-height: 1.4; color: #846445;
 }
 .dw-overdue-count {
-  flex: 0 0 auto; border-radius: 8px; background: #ffebcf;
-  color: #925504; padding: 6px 11px; font-size: 13px; font-weight: 700;
-}
-.dw-overdue-list { display: grid; gap: 7px; }
-.dw-overdue-item {
-  display: grid;
-  grid-template-columns: 44px minmax(150px, 1fr) 112px 138px minmax(310px, 365px);
-  align-items: center; gap: 12px; min-height: 72px; padding: 10px 13px;
-  background: #fff; border: 1px solid #f0e5d5; border-radius: 10px;
-  box-shadow: 0 1px 3px rgb(33 67 117 / 3%);
-}
-.dw-overdue-avatar {
-  width: 42px; height: 42px; border-radius: 50%;
-  display: grid; place-items: center;
-  color: #6336df; background: #efe8ff; font-size: 16px; font-weight: 700;
-}
-.dw-overdue-info { display: grid; min-width: 0; gap: 5px; }
-.dw-overdue-info strong {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: #132a50; font-size: 14px; line-height: 1.2;
-}
-.dw-overdue-info > span {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: #6680a4; font-size: 12px;
-}
-.dw-overdue-state {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  width: max-content; justify-self: start; border-radius: 8px; padding: 7px 10px;
-  font-size: 12px; font-weight: 650; white-space: nowrap;
-}
-.dw-overdue-state.is-active { color: #c22635; background: #fff0f2; }
-.dw-overdue-state.is-called { color: #aa680a; background: #fff3d9; }
-.dw-overdue-state-dot {
-  width: 7px; height: 7px; border-radius: 50%; background: currentColor;
-}
-.dw-overdue-time {
-  display: flex; align-items: center; gap: 7px; color: #627997;
-  border-left: 1px solid #e4eaf5; padding-left: 12px;
-  font-size: 12px; white-space: nowrap;
-}
-.dw-overdue-actions {
-  display: flex; justify-content: flex-end; align-items: center;
-  gap: 7px; flex-wrap: wrap; min-width: 0;
-}
-.dw-overdue-action {
-  min-height: 37px; display: inline-flex; align-items: center;
-  justify-content: center; gap: 7px; white-space: nowrap;
-  padding: 8px 12px; border: 1px solid transparent;
-  border-radius: 8px; font: inherit; font-size: 12.5px; font-weight: 650;
-  cursor: pointer; transition: background 140ms, border-color 140ms;
-}
-.dw-overdue-action.is-primary {
-  color: white; background: #156dff; border-color: #156dff;
-  box-shadow: 0 2px 6px rgb(21 109 255 / 14%);
-}
-.dw-overdue-action.is-primary:hover:not(:disabled) { background: #075ce2; }
-.dw-overdue-action.is-subtle {
-  color: #225285; background: #f3f7ff; border-color: #dce8fa;
-}
-.dw-overdue-action.is-subtle:hover:not(:disabled) { background: #e8f2ff; }
-.dw-overdue-action.is-danger {
-  color: #b72836; background: #fff1f2; border-color: #ffe0e3;
-}
-.dw-overdue-action.is-danger:hover:not(:disabled) { background: #ffe6e9; }
-.dw-overdue-action:focus-visible { outline: 2px solid #146dff; outline-offset: 2px; }
-.dw-overdue-action:disabled { opacity: .66; cursor: not-allowed; }
-.dw-overdue-permission {
-  font-size: 11px; color: #937657; text-align: right;
-  max-width: 120px; line-height: 1.4;
+  flex: 0 0 auto; border-radius: 7px; background: #ffebcf;
+  color: #925504; padding: 6px 10px; font-size: 13px; font-weight: 700;
 }
 .dw-overdue-error {
   margin: 0 0 10px; padding: 10px 12px; border-radius: 8px;
   background: #fff0f0; color: #b42318; font-size: 13px;
 }
-@media (max-width: 1400px) {
-  .dw-overdue-item { grid-template-columns: 42px minmax(150px, 1fr) 112px minmax(310px, 365px); }
-  .dw-overdue-time { display: none; }
+/* The third tab fits the existing narrow doctor queue panel. */
+.dw-ui .dw-queue-tabs button {
+  font-size: 12px; gap: 5px; padding-inline: 2px;
+  min-width: 0; letter-spacing: -0.15px;
 }
-@media (max-width: 1000px) {
-  .dw-overdue-item { grid-template-columns: 42px minmax(0, 1fr) auto; }
-  .dw-overdue-actions { grid-column: 2 / -1; justify-content: flex-start; }
+.dw-ui .dw-queue-tabs b {
+  min-width: 21px; width: auto; height: 22px; padding-inline: 4px; font-size: 12px;
 }
-@media (max-width: 650px) {
-  .dw-overdue { padding: 11px; }
-  .dw-overdue-header { gap: 8px; margin-bottom: 10px; }
-  .dw-overdue-alert-icon { width: 32px; height: 32px; flex-basis: 32px; }
-  .dw-overdue-heading h2 { font-size: 14px; }
-  .dw-overdue-heading p { font-size: 12px; }
-  .dw-overdue-item {
-    gap: 9px; grid-template-columns: 38px minmax(0, 1fr); padding: 10px;
-  }
-  .dw-overdue-avatar { width: 36px; height: 36px; font-size: 14px; }
-  .dw-overdue-state { grid-column: 2; padding: 5px 8px; }
-  .dw-overdue-actions { grid-column: 1 / -1; }
-  .dw-overdue-action { flex: 1 1 140px; }
+/* Selection stays a semantic button. The more-menu is a sibling, not nested. */
+.dw-queue-entry { position: relative; min-width: 0; }
+.dw-ui .dw-queue-entry > .dw-queue-person {
+  padding-right: 51px; cursor: pointer;
+}
+.dw-ui .dw-queue-entry > .dw-queue-person .dw-queue-person-info {
+  min-width: 0;
+}
+.dw-queue-entry > .dw-queue-menu-trigger {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid #dae6f9; background: #fff; color: #436b9e;
+  cursor: pointer; z-index: 1;
+}
+.dw-queue-entry > .dw-queue-menu-trigger:hover,
+.dw-queue-entry > .dw-queue-menu-trigger[aria-expanded="true"] {
+  background: #edf5ff; border-color: #9ec6ff; color: #0b6cf5;
+}
+.dw-queue-entry > .dw-queue-menu-trigger:focus-visible {
+  outline: 2px solid #1476ff; outline-offset: 2px;
+}
+.dw-queue-popup {
+  position: absolute; z-index: 10; top: calc(50% + 17px); right: 8px;
+  width: 226px; display: grid; padding: 6px;
+  border: 1px solid #d9e6f7; border-radius: 10px; background: #fff;
+  box-shadow: 0 8px 28px rgb(25 48 92 / 15%);
+}
+.dw-queue-popup button {
+  display: flex; align-items: center; gap: 9px;
+  padding: 11px 10px; border: 0; border-radius: 7px;
+  background: #fff; font: inherit; color: #264978;
+  text-align: left; font-size: 13px; cursor: pointer;
+}
+.dw-queue-popup button:hover { background: #edf5ff; color: #0768ee; }
+.dw-queue-popup button.dw-menu-danger { color: #bd3340; }
+.dw-queue-popup button.dw-menu-danger:hover { background: #fff0f2; }
+/* Modal is visually complete, but intentionally has no write action. */
+.dw-preview-backdrop {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: center; padding: 16px;
+  background: rgb(13 30 56 / 45%);
+}
+.dw-preview-dialog {
+  width: min(100%, 515px); max-height: min(90vh, 780px);
+  overflow: auto; padding: 23px; background: white; border-radius: 14px;
+  border: 1px solid #dce6f5; box-shadow: 0 18px 65px rgb(13 34 69 / 22%);
+}
+.dw-preview-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.dw-preview-heading h2 { margin: 0 0 5px; color: #0b2552; font-size: 20px; }
+.dw-preview-heading p { margin: 0; color: #6b83a3; }
+.dw-preview-close {
+  cursor: pointer; border: 0; border-radius: 7px; background: #eef5ff;
+  color: #46658f; width: 32px; height: 32px; font-size: 24px;
+}
+.dw-preview-hint {
+  margin: 17px 0; padding: 12px; border-radius: 9px;
+  background: #edf5ff; color: #47688f; font-size: 13px; line-height: 1.5;
+}
+.dw-preview-field {
+  display: flex; flex-direction: column; gap: 7px; margin: 13px 0;
+  font-size: 13px; font-weight: 600; color: #264978;
+}
+.dw-preview-field select, .dw-preview-field textarea, .dw-preview-field input {
+  width: 100%; box-sizing: border-box; border: 1px solid #d2e1f5;
+  border-radius: 8px; padding: 10px 12px; font: inherit; font-weight: 400;
+  background: white; color: #143461;
+}
+.dw-preview-switch { display: flex; align-items: center; gap: 9px; margin: 16px 0; font-size: 13px; }
+.dw-preview-switch input { accent-color: #1673ff; width: 18px; height: 18px; }
+.dw-preview-datetime { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.dw-preview-datetime > p {
+  grid-column: 1 / -1; margin: 0;
+  color: #9a631d; font-size: 12px; line-height: 1.4;
+}
+.dw-preview-footer {
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  gap: 9px; margin-top: 20px;
+}
+.dw-preview-footer button {
+  border-radius: 8px; min-height: 39px; padding: 10px 13px; font: inherit;
+  font-size: 13px; font-weight: 600;
+}
+.dw-preview-dismiss {
+  border: 1px solid #d7e4f6; background: #f6f9ff;
+  color: #335680; cursor: pointer;
+}
+.dw-preview-disabled {
+  border: 1px solid #a9cbfa; background: #b9d6ff;
+  color: white; cursor: not-allowed;
+}
+.dw-live-history-preview { padding: 20px; }
+.dw-live-history-preview .dw-start-button { margin-top: 14px; }
+@media (max-width: 1100px) {
+  .dw-ui .dw-queue-tabs button { font-size: 11px; gap: 3px; }
+}
+@media (max-width: 700px) {
+  .dw-overdue-heading h2 { font-size: 13px; }
+  .dw-overdue-heading p { font-size: 11px; }
+  .dw-queue-popup { left: 12px; right: auto; }
+  .dw-preview-datetime { grid-template-columns: 1fr; }
 }
 .dw-live-ui { min-height: 66vh; }
 .dw-live-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }

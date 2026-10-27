@@ -239,10 +239,10 @@ async function setup(
 }
 test.use({ viewport: { width: 1672, height: 941 }, locale: "uz-UZ" });
 
-test("old consultations are visible and cannot be silently bypassed; resume preserves clinical view", async ({ page }) => {
+test("UI: prior-day warning is compact and unfinished tickets live in one queue tab", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-27T07:00:00Z"));
   const actions: Array<{ id: string; action: string }> = [];
-  const old = {
+  const oldActive = {
     ...patient, id: "ticket-old-active", visit_id: "visit-old-active",
     name: "Aliyev Alijon", version: 3, status: "in_progress" as const,
     local_date: "2026-10-26", branch_id: "branch-1", branch_name: "Asosiy filial",
@@ -252,46 +252,41 @@ test("old consultations are visible and cannot be silently bypassed; resume pres
     name: "Jumanov Alijon", version: 2, status: "called" as const,
     local_date: "2026-10-26", branch_id: "branch-1", branch_name: "Asosiy filial",
   };
-  const waitingToday = { ...patient, id: "ticket-today", visit_id: "visit-today",
+  const today = { ...patient, id: "ticket-today", visit_id: "visit-today",
     name: "Bugungi bemor", version: 1, created_at: "2026-10-27T06:00:00Z" };
   await setup(page, false, allServerGrants, [], [], [], false, [],
-    [old, oldCalled], [waitingToday], actions);
-  await page.getByLabel("Qabul sanasi").fill("2026-10-27");
-  await page.getByLabel("Qabul sanasi").dispatchEvent("change");
-  const warning = page.getByRole("region", { name: "Eski kundan qolgan navbatlar" });
-  await expect(warning).toContainText("Aliyev Alijon");
-  await expect(warning).toContainText("Jumanov Alijon");
-  await expect(warning).toContainText("2026-10-26");
-  // Approved UI: compact card-style patient rows, avatars, clear status chips
-  // and semantic action buttons without changing queue authorization.
-  await expect(warning.locator(".dw-overdue-item")).toHaveCount(2);
-  await expect(warning.locator(".dw-overdue-avatar")).toHaveText(["AA", "JA"]);
-  await expect(warning.locator(".dw-overdue-state")).toHaveText(["Qabulda", "Chaqirildi"]);
-  // Both statuses share one fixed grid column regardless of row actions.
-  await expect(warning.locator(".dw-overdue-item")).toHaveCount(2);
-  await expect(warning.locator(".dw-overdue-count")).toHaveText("2 ta");
+    [oldActive, oldCalled], [today], actions);
+
+  const banner = page.getByRole("region", { name: "Eski kundan qolgan navbatlar" });
+  await expect(banner).toContainText("2 ta yakunlanmagan qabul");
+  await expect(banner.locator(".dw-overdue-item")).toHaveCount(0);
+  const left = page.locator(".dw-queue");
+  await expect(left.locator(".dw-queue-tabs button")).toHaveCount(3);
+  const waiting = left.getByRole("button", { name: /Kutilmoqda/ });
+  const unresolved = left.getByRole("button", { name: /Yakunlanmagan/ });
+  const completed = left.getByRole("button", { name: /^Yakunlangan/ });
+  await expect(waiting).toContainText("1");
+  await expect(unresolved).toContainText("2");
+  await waiting.click();
+  await expect(left.locator(".dw-queue-person")).toHaveCount(1);
+  await expect(left).toContainText("Bugungi bemor");
+  await expect(left).not.toContainText("Jumanov Alijon");
+  await unresolved.click();
+  await expect(left.locator(".dw-queue-person")).toHaveCount(2);
+  await expect(left).toContainText("Aliyev Alijon");
+  await expect(left).toContainText("Jumanov Alijon");
+  await expect(left).toContainText("2026-10-26");
   await expect(page.getByRole("button", { name: "Bemorni chaqirish" })).toBeDisabled();
-  await warning.getByRole("button", { name: "Qabulni davom ettirish" }).click();
+
+  // Resume is the existing navigation-only action, not a queue mutation.
+  await left.getByRole("button", { name: "Bemor amallari: Aliyev Alijon" }).click();
+  await left.getByRole("menuitem", { name: "Qabulni davom ettirish" }).click();
   await expect(page.getByLabel("Qabul sanasi")).toHaveValue("2026-10-26");
   await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toBeVisible();
   expect(actions).toEqual([]);
-  await page.getByLabel("Qabul sanasi").fill("2026-10-27");
-  await page.getByLabel("Qabul sanasi").dispatchEvent("change");
-  page.on("dialog", (dialog) => dialog.accept());
-  await warning.getByRole("button", { name: "Qabulni yakunlash" }).click();
-  await expect(warning).not.toContainText("Aliyev Alijon");
-  await expect(warning).toContainText("Jumanov Alijon");
-  await expect(page.getByRole("button", { name: "Bemorni chaqirish" })).toBeDisabled();
-  await warning.getByRole("button", { name: "O‘tkazib yuborish" }).click();
-  await expect(warning).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Bemorni chaqirish" })).toBeEnabled();
-  expect(actions).toEqual([
-    { id: "ticket-old-active", action: "complete" },
-    { id: "ticket-old-called", action: "skip" },
-  ]);
 });
 
-test("old queue resolution never mutates without confirmation or missing grant", async ({ page }) => {
+test("UI: skip/cancel use preview-only modal and never change patient status", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-27T07:00:00Z"));
   const actions: Array<{ id: string; action: string }> = [];
   const grants = { ...allServerGrants };
@@ -301,14 +296,22 @@ test("old queue resolution never mutates without confirmation or missing grant",
     local_date: "2026-10-26", branch_id: "branch-1", branch_name: "Asosiy filial",
   };
   await setup(page, false, grants, [], [], [], false, [], [old], [], actions);
-  const warning = page.getByRole("region", { name: "Eski kundan qolgan navbatlar" });
-  // Design-only visibility: missing permission must disable, not hide, the action.
-  await expect(warning.getByRole("button", { name: "Navbatni bekor qilish" })).toBeVisible();
-  await expect(warning.getByRole("button", { name: "Navbatni bekor qilish" })).toBeDisabled();
-  page.on("dialog", (dialog) => dialog.dismiss());
-  await warning.getByRole("button", { name: "O‘tkazib yuborish" }).click();
-  await expect(warning).toContainText("Aliyev Alijon");
+  await page.locator(".dw-queue-tabs").getByRole("button", { name: /Yakunlanmagan/ }).click();
+  await page.getByRole("button", { name: "Bemor amallari: Aliyev Alijon" }).click();
+  await expect(page.getByRole("menuitem", { name: "O‘tkazib yuborish" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Navbatni bekor qilish" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Navbatni bekor qilish" }).click();
+  const dialog = page.getByRole("dialog", { name: "Navbatni bekor qilish" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("faqat veryostka");
+  await expect(dialog.getByRole("button", { name: /Tasdiqlash/ })).toBeDisabled();
+  await dialog.getByLabel("Bemorni boshqa kunga qayta yozish (ixtiyoriy)").check();
+  await expect(dialog.getByLabel("Yangi sana")).toBeVisible();
+  await expect(dialog.getByLabel("So‘ralgan vaqt")).toBeVisible();
+  await dialog.getByRole("button", { name: "Yopish" }).click();
+  await expect(dialog).toHaveCount(0);
   expect(actions).toEqual([]);
+  await expect(page.locator(".dw-queue")).toContainText("Chaqirildi");
 });
 
 test("signed-in doctor shows own real queue and not demo patient data", async ({ page }) => {
@@ -354,7 +357,7 @@ test("call button always calls oldest waiting ticket, never selected patient, an
   const button = page.getByRole("button", { name: "Bemorni chaqirish" });
   await expect(button).toBeEnabled();
   // Viewing the second patient must not change the next ticket to be called.
-  await page.getByRole("button", { name: /Jumanov Alijon/ }).click();
+  await page.getByRole("button", { name: "Jumanov Alijon · P-000009" }).click();
   await expect(page.locator(".dw-live-details")).toContainText("Jumanov Alijon");
   await button.click();
   await expect(page.getByRole("button", { name: "Keyingi bemor" })).toBeDisabled();
