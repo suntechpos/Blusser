@@ -267,6 +267,8 @@ test("old consultations are visible and cannot be silently bypassed; resume pres
   await expect(warning.locator(".dw-overdue-item")).toHaveCount(2);
   await expect(warning.locator(".dw-overdue-avatar")).toHaveText(["AA", "JA"]);
   await expect(warning.locator(".dw-overdue-state")).toHaveText(["Qabulda", "Chaqirildi"]);
+  // Both statuses share one fixed grid column regardless of row actions.
+  await expect(warning.locator(".dw-overdue-item")).toHaveCount(2);
   await expect(warning.locator(".dw-overdue-count")).toHaveText("2 ta");
   await expect(page.getByRole("button", { name: "Bemorni chaqirish" })).toBeDisabled();
   await warning.getByRole("button", { name: "Qabulni davom ettirish" }).click();
@@ -300,7 +302,9 @@ test("old queue resolution never mutates without confirmation or missing grant",
   };
   await setup(page, false, grants, [], [], [], false, [], [old], [], actions);
   const warning = page.getByRole("region", { name: "Eski kundan qolgan navbatlar" });
-  await expect(warning.getByRole("button", { name: "Navbatni bekor qilish" })).toHaveCount(0);
+  // Design-only visibility: missing permission must disable, not hide, the action.
+  await expect(warning.getByRole("button", { name: "Navbatni bekor qilish" })).toBeVisible();
+  await expect(warning.getByRole("button", { name: "Navbatni bekor qilish" })).toBeDisabled();
   page.on("dialog", (dialog) => dialog.dismiss());
   await warning.getByRole("button", { name: "O‘tkazib yuborish" }).click();
   await expect(warning).toContainText("Aliyev Alijon");
