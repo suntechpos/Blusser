@@ -41,6 +41,7 @@ const actionNotice = ref("");
 const optionsLoading = ref(false);
 const optionsError = ref("");
 const rebookingSlots = ref<RebookingSlot[]>([]);
+const busyRebookingSlots = ref<RebookingSlot[]>([]);
 const rebookingTimezone = ref("");
 let optionsSequence = 0;
 
@@ -365,6 +366,7 @@ function closeActionPreview() {
   ++optionsSequence;
   actionPreview.value = null;
   rebookingSlots.value = [];
+  busyRebookingSlots.value = [];
   optionsError.value = "";
 }
 async function loadRebookingOptions() {
@@ -372,6 +374,7 @@ async function loadRebookingOptions() {
   const preview = actionPreview.value;
   previewTime.value = "";
   rebookingSlots.value = [];
+  busyRebookingSlots.value = [];
   optionsError.value = "";
   optionsLoading.value = false;
   if (!preview || !previewReschedule.value || !canRebook.value ||
@@ -380,12 +383,13 @@ async function loadRebookingOptions() {
   optionsLoading.value = true;
   try {
     const response = await clinicRequest<{
-      local_date: string; timezone: string; slots: RebookingSlot[];
+      local_date: string; timezone: string; slots: RebookingSlot[]; busy_slots?: RebookingSlot[];
     }>("queue-tickets/" + encodeURIComponent(preview.row.id) + "/rebooking-options", {
       params: { action: preview.action, local_date: localDate },
     });
     if (request !== optionsSequence) return;
     rebookingSlots.value = response.data.slots;
+    busyRebookingSlots.value = response.data.busy_slots ?? [];
     rebookingTimezone.value = response.data.timezone;
   } catch (cause) {
     if (request === optionsSequence) optionsError.value = errorText(cause);
@@ -400,6 +404,7 @@ watch([doctorId, branchId, date, () => session.epoch], () => {
   ++optionsSequence;
   actionPreview.value = null;
   rebookingSlots.value = [];
+  busyRebookingSlots.value = [];
   optionsError.value = "";
   actionNotice.value = "";
 });
@@ -794,6 +799,9 @@ function genderLabel(gender: string | null) {
             <select v-model="previewTime" aria-label="Bo‘sh vaqt"
               :disabled="actionSaving || optionsLoading || !rebookingSlots.length">
               <option value="">Vaqtni tanlang</option>
+              <option v-for="slot in busyRebookingSlots" :key="'busy-' + slotKey(slot)" :value="'busy-' + slotKey(slot)" disabled>
+                {{ rebookingTime(slot) }} — Band
+              </option>
               <option v-for="slot in rebookingSlots" :key="slotKey(slot)" :value="slotKey(slot)">
                 {{ rebookingTime(slot) }}
               </option>
@@ -801,8 +809,14 @@ function genderLabel(gender: string | null) {
           </label>
           <p v-if="optionsLoading" role="status">Bo‘sh vaqtlar yuklanmoqda...</p>
           <p v-else-if="optionsError" class="dw-action-error" role="alert">{{ optionsError }}</p>
+          <p v-else-if="previewDate && busyRebookingSlots.length && !rebookingSlots.length" role="status">
+            Bu sanadagi barcha mavjud vaqtlar band. Boshqa sanani tanlang.
+          </p>
           <p v-else-if="previewDate && !rebookingSlots.length" role="status">
-            Ushbu sanada shifokor uchun bo‘sh vaqt topilmadi.
+            Ushbu sanada shifokor uchun bo‘sh vaqt topilmadi. Boshqa sanani tanlang.
+          </p>
+          <p v-else-if="busyRebookingSlots.length" role="status">
+            Band vaqtlar «Band» deb belgilangan va tanlanmaydi. Tavsiya: {{ rebookingTime(rebookingSlots[0]!) }} yoki ro‘yxatdagi boshqa bo‘sh vaqtni tanlang.
           </p>
           <p v-else>Vaqtlar shifokorning haqiqiy jadvalidan, klinika vaqt mintaqasida ko‘rsatiladi.</p>
         </div>
