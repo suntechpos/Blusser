@@ -11091,7 +11091,7 @@
         "x-required-permissions": [
           "workspace.view"
         ],
-        "description": "Session-derived signed-in doctor and its associated patients; manager can explicitly select a doctor. Enforced by PostgreSQL; read-only.",
+        "description": "Session-derived signed-in doctor and its patients; manager can explicitly select a doctor. The authorized `overdue` array includes only earlier-day called/in_progress tickets, filtered by doctor and branch visibility. An inaccessible unfinished ticket may still block calls through `has_active_patient` without disclosing patient identity. Read-only, no automatic completion.",
         "security": [
           {
             "cookieAuth": []
@@ -11125,7 +11125,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Authorized doctor, branch, date, scheduled appointments and queue tickets.",
+            "description": "Authorized doctor, branch, selected date, tickets and overdue tickets from earlier local clinic days.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -11138,7 +11138,139 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "manager",
+                    "doctors",
+                    "doctor",
+                    "branch",
+                    "date",
+                    "scheduled",
+                    "tickets",
+                    "overdue"
+                  ],
+                  "properties": {
+                    "manager": {
+                      "type": "boolean"
+                    },
+                    "doctors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "doctor": {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "branch": {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "date": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scheduled": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "tickets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "has_active_patient": {
+                      "type": "boolean"
+                    },
+                    "has_called_today": {
+                      "type": "boolean"
+                    },
+                    "overdue": {
+                      "type": "array",
+                      "description": "Authorized unfinished called or in-progress tickets from before each branch's current local date. The server does not automatically finish these.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "visit_id",
+                          "patient_id",
+                          "name",
+                          "status",
+                          "version",
+                          "local_date",
+                          "branch_id",
+                          "branch_name"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "visit_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "patient_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "patient_number": {
+                            "type": "string"
+                          },
+                          "service": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "called",
+                              "in_progress"
+                            ]
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "local_date": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "branch_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "branch_name": {
+                            "type": "string"
+                          },
+                          "appointment_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "number": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }

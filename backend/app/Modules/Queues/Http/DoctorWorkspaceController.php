@@ -32,6 +32,20 @@ final class DoctorWorkspaceController
 
                 $feed = json_decode($value, true, flags: JSON_THROW_ON_ERROR);
 
+                // Cross-day active visits are not part of the selected day's
+                // patient list. Show only authorized, doctor-scoped overdue
+                // tickets; unresolved inaccessible tickets still block call
+                // through the existing has_active_patient boolean.
+                if (($feed['doctor']['id'] ?? null) && ($feed['branch']['id'] ?? null)) {
+                    $overdue = DB::selectOne(
+                        'SELECT governance.doctor_workspace_overdue(?::uuid, ?::uuid) AS value',
+                        [$feed['doctor']['id'], $feed['branch']['id']],
+                    )->value;
+                    $feed['overdue'] = json_decode($overdue, true, flags: JSON_THROW_ON_ERROR);
+                } else {
+                    $feed['overdue'] = [];
+                }
+
                 // The security-definer feed already restricts tickets to this doctor
                 // and branch. Fetch service IDs with normal visit RLS, without exposing
                 // other patients, to resolve real schedule availability for queue start.
