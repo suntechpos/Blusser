@@ -28,7 +28,7 @@ final class Appointments
                     'SELECT governance.appointment_doctor_rebooking_options(?::uuid,?::date) AS value',
                     [$appointment, $localDate],
                 )->value;
-            } catch (\\Illuminate\\Database\\QueryException $exception) {
+            } catch (\Illuminate\Database\QueryException $exception) {
                 $code = $exception->errorInfo[0] ?? null;
                 if ($code === '42501') abort(403);
                 if ($code === 'P0002') abort(404);
