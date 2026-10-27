@@ -23,9 +23,19 @@ async function setup(
   starts: Array<{ id: string; body: Record<string, unknown> }> = [],
   failOwnSlot = false,
   branchList: Array<{ id: string; name: string; active: boolean; timezone: string }> = [],
+  overdueItems: Array<typeof patient & {
+    version: number; status: "called" | "in_progress";
+    local_date: string; branch_id: string; branch_name: string;
+  }> = [],
+  todayItems: Array<typeof patient & { version: number }> = [],
+  overdueActions: Array<{ id: string; action: string }> = [],
 ) {
   const requests: string[] = [];
   const queue = rows.map((row) => ({ ...row, version: row.version ?? 1, called_at: row.called_at ?? null }));
+  // Separate mock of the server-authorized overdue projection. Today's rows
+  // remain independent so an old patient can block the next day's FIFO call.
+  const overdue = overdueItems.map((row) => ({ ...row }));
+  const today = todayItems.map((row) => ({ ...row }));
   const clinicalNotes = new Map<string, {
     id: string; visit_id: string; patient_id: string;
     complaints: string; anamnesis: string; examination: string;
@@ -174,6 +184,23 @@ async function setup(
       ticket.called_at = "2026-10-26T07:00:00Z";
       return route.fulfill({ json: { ticket: { id: ticket.id, status: ticket.status, version: ticket.version } } });
     }
+    const overdueMutation = path.match(/^\/api\/v1\/clinic\/queue-tickets\/([^/]+)\/(complete|skip|cancel)$/);
+    if (overdueMutation) {
+      const ticket = overdue.find((row) => row.id === overdueMutation[1]);
+      const action = overdueMutation[2]!;
+      const version = route.request().postDataJSON()?.expected_version;
+      const permission = "queues." + action;
+      if (!grants[permission]) return route.fulfill({ status: 403, json: { message: "Denied" } });
+      if (!ticket || version !== ticket.version ||
+        (ticket.status === "called" && !["skip", "cancel"].includes(action)) ||
+        (ticket.status === "in_progress" && action !== "complete")) {
+        return route.fulfill({ status: 409, json: { message: "Conflict" } });
+      }
+      overdueActions.push({ id: ticket.id, action });
+      ticket.status = action === "complete" ? "completed" : action === "skip" ? "skipped" : "cancelled" as any;
+      ticket.version++;
+      return route.fulfill({ json: { ticket: { id: ticket.id, status: ticket.status, version: ticket.version } } });
+    }
     if (path === "/api/v1/clinic/doctor-workspace") {
       requests.push(url.search);
       const other = url.searchParams.get("doctor_id") === "doctor-biloldin";
@@ -190,12 +217,15 @@ async function setup(
           branches: [{ id: "branch-1", name: "Asosiy filial", timezone: "Asia/Tashkent" }] },
         branch: { id: "branch-1", name: "Asosiy filial", timezone: "Asia/Tashkent" },
         date,
-        tickets: date === "2026-10-26" ? queue.map((item) => ({
+        tickets: (date === "2026-10-26" ? [...queue, ...overdue] :
+          date === "2026-10-27" ? today : []).map((item) => ({
           ...item,
           ...(other ? { id: "ticket-biloldin", name: "Boshqa shifokor bemori" } : {}),
-        })) : [],
+        })),
+        overdue: other ? [] : overdue.filter((item) => item.status === "called" || item.status === "in_progress"),
         has_called_today: queue.some((item) => !!item.called_at),
-        has_active_patient: queue.some((item) => item.status === "called" || item.status === "in_progress"),
+        has_active_patient: [...queue, ...overdue, ...today].some(
+          (item) => item.status === "called" || item.status === "in_progress"),
         scheduled: [],
       }});
     }
@@ -207,6 +237,68 @@ async function setup(
   return requests;
 }
 test.use({ viewport: { width: 1672, height: 941 }, locale: "uz-UZ" });
+
+test("old consultations are visible and cannot be silently bypassed; resume preserves clinical view", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-27T07:00:00Z"));
+  const actions: Array<{ id: string; action: string }> = [];
+  const old = {
+    ...patient, id: "ticket-old-active", visit_id: "visit-old-active",
+    name: "Aliyev Alijon", version: 3, status: "in_progress" as const,
+    local_date: "2026-10-26", branch_id: "branch-1", branch_name: "Asosiy filial",
+  };
+  const oldCalled = {
+    ...patient, id: "ticket-old-called", visit_id: "visit-old-called",
+    name: "Jumanov Alijon", version: 2, status: "called" as const,
+    local_date: "2026-10-26", branch_id: "branch-1", branch_name: "Asosiy filial",
+  };
+  const waitingToday = { ...patient, id: "ticket-today", visit_id: "visit-today",
+    name: "Bugungi bemor", version: 1, created_at: "2026-10-27T06:00:00Z" };
+  await setup(page, false, allServerGrants, [], [], [], false, [],
+    [old, oldCalled], [waitingToday], actions);
+  await page.getByLabel("Qabul sanasi").fill("2026-10-27");
+  await page.getByLabel("Qabul sanasi").dispatchEvent("change");
+  const warning = page.getByRole("region", { name: "Eski kundan qolgan navbatlar" });
+  await expect(warning).toContainText("Aliyev Alijon");
+  await expect(warning).toContainText("Jumanov Alijon");
+  await expect(warning).toContainText("2026-10-26");
+  await expect(page.getByRole("button", { name: "Bemorni chaqirish" })).toBeDisabled();
+  await warning.getByRole("button", { name: "Qabulni davom ettirish" }).click();
+  await expect(page.getByLabel("Qabul sanasi")).toHaveValue("2026-10-26");
+  await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toBeVisible();
+  expect(actions).toEqual([]);
+  await page.getByLabel("Qabul sanasi").fill("2026-10-27");
+  await page.getByLabel("Qabul sanasi").dispatchEvent("change");
+  page.on("dialog", (dialog) => dialog.accept());
+  await warning.getByRole("button", { name: "Qabulni yakunlash" }).click();
+  await expect(warning).not.toContainText("Aliyev Alijon");
+  await expect(warning).toContainText("Jumanov Alijon");
+  await expect(page.getByRole("button", { name: "Bemorni chaqirish" })).toBeDisabled();
+  await warning.getByRole("button", { name: "O‘tkazib yuborish" }).click();
+  await expect(warning).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Bemorni chaqirish" })).toBeEnabled();
+  expect(actions).toEqual([
+    { id: "ticket-old-active", action: "complete" },
+    { id: "ticket-old-called", action: "skip" },
+  ]);
+});
+
+test("old queue resolution never mutates without confirmation or missing grant", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-27T07:00:00Z"));
+  const actions: Array<{ id: string; action: string }> = [];
+  const grants = { ...allServerGrants };
+  delete grants["queues.cancel"];
+  const old = {
+    ...patient, id: "ticket-old-called", status: "called" as const, version: 2,
+    local_date: "2026-10-26", branch_id: "branch-1", branch_name: "Asosiy filial",
+  };
+  await setup(page, false, grants, [], [], [], false, [], [old], [], actions);
+  const warning = page.getByRole("region", { name: "Eski kundan qolgan navbatlar" });
+  await expect(warning.getByRole("button", { name: "Navbatni bekor qilish" })).toHaveCount(0);
+  page.on("dialog", (dialog) => dialog.dismiss());
+  await warning.getByRole("button", { name: "O‘tkazib yuborish" }).click();
+  await expect(warning).toContainText("Aliyev Alijon");
+  expect(actions).toEqual([]);
+});
 
 test("signed-in doctor shows own real queue and not demo patient data", async ({ page }) => {
   const requests = await setup(page);
