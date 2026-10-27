@@ -262,6 +262,12 @@ test("old consultations are visible and cannot be silently bypassed; resume pres
   await expect(warning).toContainText("Aliyev Alijon");
   await expect(warning).toContainText("Jumanov Alijon");
   await expect(warning).toContainText("2026-10-26");
+  // Approved UI: compact card-style patient rows, avatars, clear status chips
+  // and semantic action buttons without changing queue authorization.
+  await expect(warning.locator(".dw-overdue-item")).toHaveCount(2);
+  await expect(warning.locator(".dw-overdue-avatar")).toHaveText(["AA", "JA"]);
+  await expect(warning.locator(".dw-overdue-state")).toHaveText(["Qabulda", "Chaqirildi"]);
+  await expect(warning.locator(".dw-overdue-count")).toHaveText("2 ta");
   await expect(page.getByRole("button", { name: "Bemorni chaqirish" })).toBeDisabled();
   await warning.getByRole("button", { name: "Qabulni davom ettirish" }).click();
   await expect(page.getByLabel("Qabul sanasi")).toHaveValue("2026-10-26");
