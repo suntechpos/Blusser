@@ -608,7 +608,7 @@ function genderLabel(gender: string | null) {
                   {{ statusText(row) }}
                 </span>
               </button>
-              <button v-if="row.status === 'in_progress' || actionAllowed(row, 'skip') || actionAllowed(row, 'cancel')" type="button" class="dw-queue-menu-trigger"
+              <button v-if="row.source === 'ticket' && ['waiting', 'called', 'skipped', 'in_progress'].includes(row.status)" type="button" class="dw-queue-menu-trigger" data-permission="workspace.view"
                 :aria-label="'Bemor amallari: ' + row.name"
                 :aria-expanded="openMenuKey === row.key" aria-haspopup="menu"
                 @click="toggleRowMenu(row.key)">
@@ -621,13 +621,14 @@ function genderLabel(gender: string | null) {
                   <Play :size="17" /> Qabulni davom ettirish
                 </button>
                 <template v-else>
-                  <button v-if="actionAllowed(row, 'skip')" type="button" role="menuitem" data-permission="queues.skip" @click="showActionPreview(row, 'skip')">
+                  <button v-if="row.status !== 'skipped'" type="button" role="menuitem" data-permission="workspace.view" :disabled="!actionAllowed(row, 'skip')" @click="showActionPreview(row, 'skip')">
                     <FastForward :size="17" /> O‘tkazib yuborish
                   </button>
-                  <button v-if="actionAllowed(row, 'cancel')" type="button" role="menuitem" class="dw-menu-danger" data-permission="queues.cancel"
+                  <button type="button" role="menuitem" class="dw-menu-danger" data-permission="workspace.view" :disabled="!actionAllowed(row, 'cancel')"
                     @click="showActionPreview(row, 'cancel')">
                     <Ban :size="17" /> Navbatni bekor qilish
                   </button>
+                  <p v-if="(row.status !== 'skipped' && !actionAllowed(row, 'skip')) || !actionAllowed(row, 'cancel')" class="dw-menu-permission">Ba’zi amallar uchun ruxsat yetishmaydi. Klinikangiz administratoriga murojaat qiling.</p>
                 </template>
               </div>
             </div>
@@ -893,6 +894,8 @@ function genderLabel(gender: string | null) {
 .dw-queue-popup button:hover { background: #edf5ff; color: #0768ee; }
 .dw-queue-popup button.dw-menu-danger { color: #bd3340; }
 .dw-queue-popup button.dw-menu-danger:hover { background: #fff0f2; }
+.dw-queue-popup button:disabled { opacity: .48; cursor: not-allowed; }
+.dw-menu-permission { margin: 5px 10px 8px; color: #775d37; font-size: 12px; line-height: 1.4; }
 /* Modal is visually complete, but intentionally has no write action. */
 .dw-preview-backdrop {
   position: fixed; inset: 0; z-index: 90;

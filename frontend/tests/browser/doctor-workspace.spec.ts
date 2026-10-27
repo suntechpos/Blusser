@@ -299,7 +299,8 @@ test("queue mutation menus respect each action grant without sending unauthorize
   await page.locator(".dw-queue-tabs").getByRole("button", { name: /Yakunlanmagan/ }).click();
   await page.getByRole("button", { name: "Bemor amallari: Aliyev Alijon" }).click();
   await expect(page.getByRole("menuitem", { name: "O‘tkazib yuborish" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Navbatni bekor qilish" })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Navbatni bekor qilish" })).toBeDisabled();
+  await expect(page.getByText("Ba’zi amallar uchun ruxsat yetishmaydi.", { exact: false })).toBeVisible();
   await page.getByRole("menuitem", { name: "O‘tkazib yuborish" }).click();
   const dialog = page.getByRole("dialog", { name: "O‘tkazib yuborish" });
   await expect(dialog).toBeVisible();
@@ -308,6 +309,19 @@ test("queue mutation menus respect each action grant without sending unauthorize
   await expect(dialog).toHaveCount(0);
   expect(actions).toEqual([]);
   await expect(page.locator(".dw-queue")).toContainText("Chaqirildi");
+});
+
+test("waiting ticket keeps action menu visible when both permissions are missing", async ({ page }) => {
+  const grants = { ...allServerGrants };
+  delete grants["queues.skip"];
+  delete grants["queues.cancel"];
+  const actions: Array<{ id: string; action: string }> = [];
+  await setup(page, false, grants, [patient], [], [], false, [], [], [], actions);
+  await page.getByRole("button", { name: "Bemor amallari: Aliyev Alijon" }).click();
+  await expect(page.getByRole("menuitem", { name: "O‘tkazib yuborish" })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Navbatni bekor qilish" })).toBeDisabled();
+  await expect(page.getByText("Ba’zi amallar uchun ruxsat yetishmaydi.", { exact: false })).toBeVisible();
+  expect(actions).toEqual([]);
 });
 
 test("signed-in doctor shows own real queue and not demo patient data", async ({ page }) => {
