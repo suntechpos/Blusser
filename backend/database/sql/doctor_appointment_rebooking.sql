@@ -31,7 +31,7 @@ BEGIN
    SELECT DISTINCT w.room_id,option_slot.lo,option_slot.hi,
       EXISTS(SELECT 1 FROM public.resource_reservations rr
        WHERE rr.tenant_id=tid AND rr.active AND (rr.doctor_id=did OR rr.room_id=w.room_id)
-       AND rr.appointment_id IS DISTINCT FROM appointment_id
+       AND rr.appointment_id IS DISTINCT FROM $1
        AND tstzrange(rr.starts_at,rr.ends_at,'[)')&&tstzrange(option_slot.lo,option_slot.hi,'[)')) AS occupied
    FROM (
      SELECT sr.room_id,sr.local_start,sr.local_end,coalesce(ds.duration_minutes,sr.slot_minutes) AS duration
