@@ -275,7 +275,7 @@ const anotherConsultation = computed(() => feed.value?.tickets.some((ticket) =>
 ) ?? false);
 const startAllowed = computed(() =>
   selected.value?.source === "ticket" && selected.value.status === "called" &&
-  !startPermissionMessage.value && !anotherConsultation.value &&
+  !hasHistoricScope(selected.value) && !startPermissionMessage.value && !anotherConsultation.value &&
   date.value === clinicToday.value && !loading.value && !starting.value,
 );
 async function startConsultation() {
@@ -617,7 +617,7 @@ function genderLabel(gender: string | null) {
               <div><dt>Holati</dt><dd>{{ statusText(selected) }}</dd></div>
             </dl>
           </details>
-            <div v-if="selected.source === 'ticket' && selected.status === 'called'" class="dw-start-block">
+            <div v-if="selected.source === 'ticket' && selected.status === 'called' && !hasHistoricScope(selected)" class="dw-start-block">
               <button type="button" class="dw-start-button" data-permission="workspace.view"
                 :disabled="!startAllowed" @click="startConsultation">
                 <Play :size="18" />
