@@ -386,3 +386,27 @@ test("when all slots are occupied, suggests the next free date without booking a
   await dialog.getByRole("button", { name: "Tasdiqlash" }).click();
   expect(fixture.commands[0]?.body.rebook).toEqual(freeTomorrow);
 });
+
+
+test("recommendation uses clinic 24-hour clock and a free slot after a busy time", async ({ page }) => {
+  const makeSlot = (start: string, end: string) => ({
+    ...slot, starts_at: "2030-01-07T" + start + ":00Z",
+    ends_at: "2030-01-07T" + end + ":00Z",
+  });
+  const fixture = await setup(page, {
+    availability: async (route, date) => route.fulfill({
+      json: { local_date: date, timezone: "Asia/Tashkent",
+        slots: [makeSlot("04:00", "04:30"), makeSlot("05:30", "06:00"), makeSlot("08:00", "08:30")],
+        busy_slots: [makeSlot("04:30", "05:00"), makeSlot("05:00", "05:30")] },
+    }),
+  });
+  const dialog = await openAction(page, "skip");
+  await dialog.getByLabel("Bemorni boshqa kunga qayta yozish (ixtiyoriy)").check();
+  await dialog.getByLabel("Yangi sana").fill("2030-01-07");
+  await expect(dialog).toContainText(/Tavsiya: 10:30.*11:00/);
+  await expect(dialog).not.toContainText("Tavsiya: 01:00");
+  const times = dialog.getByLabel("Bo‘sh vaqt", { exact: true });
+  await expect(times.getByRole("option", { name: /13:00.*13:30/ })).toHaveCount(1);
+  await expect(times.getByRole("option", { name: /09:30.*10:00.*Band/ })).toBeDisabled();
+  expect(fixture.commands).toHaveLength(0);
+});

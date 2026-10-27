@@ -345,6 +345,16 @@ const chronologicalRebookingSlots = computed(() => [
 ].sort((a, b) => a.slot.starts_at.localeCompare(b.slot.starts_at)
   || a.slot.ends_at.localeCompare(b.slot.ends_at)
   || a.slot.room_id.localeCompare(b.slot.room_id)));
+const recommendedRebookingSlot = computed(() => {
+  const available = [...rebookingSlots.value].sort((a, b) =>
+    a.starts_at.localeCompare(b.starts_at));
+  const firstBusy = [...busyRebookingSlots.value].sort((a, b) =>
+    a.starts_at.localeCompare(b.starts_at))[0];
+  if (!firstBusy) return available[0] ?? null;
+  // Offer the first actually free appointment after the occupied interval.
+  return available.find(slot => Date.parse(slot.starts_at) >= Date.parse(firstBusy.ends_at))
+    ?? available[0] ?? null;
+});
 const chosenRebookingSlot = computed(() => rebookingSlots.value.find(
   (slot) => slotKey(slot) === previewTime.value,
 ));
@@ -352,9 +362,9 @@ function slotKey(slot: RebookingSlot) {
   return slot.room_id + "|" + slot.starts_at + "|" + slot.ends_at;
 }
 function rebookingTime(slot: RebookingSlot) {
-  const format = new Intl.DateTimeFormat("uz-UZ", {
+  const format = new Intl.DateTimeFormat("en-GB", {
     timeZone: rebookingTimezone.value || timezone.value,
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    hour: "2-digit", minute: "2-digit", hour12: false,
   });
   return format.format(new Date(slot.starts_at)) + "–" + format.format(new Date(slot.ends_at));
 }
@@ -859,7 +869,7 @@ function genderLabel(gender: string | null) {
             Ushbu sanada shifokor uchun bo‘sh vaqt topilmadi. Boshqa sanani tanlang.
           </p>
           <p v-else-if="busyRebookingSlots.length" role="status">
-            Band vaqtlar «Band» deb belgilangan va tanlanmaydi. Tavsiya: {{ rebookingTime(rebookingSlots[0]!) }} yoki ro‘yxatdagi boshqa bo‘sh vaqtni tanlang.
+            Band vaqtlar «Band» deb belgilangan va tanlanmaydi. Tavsiya: {{ recommendedRebookingSlot ? rebookingTime(recommendedRebookingSlot) : '' }} yoki ro‘yxatdagi boshqa bo‘sh vaqtni tanlang.
           </p>
           <p v-else>Vaqtlar shifokorning haqiqiy jadvalidan, klinika vaqt mintaqasida ko‘rsatiladi.</p>
           <p v-if="nextAvailableSuggestion?.date === previewDate" role="status">
