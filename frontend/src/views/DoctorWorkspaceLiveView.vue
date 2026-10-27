@@ -986,7 +986,7 @@ function genderLabel(gender: string | null) {
             </select>
           </label>
           <p v-if="appointmentLoading">Vaqtlar tekshirilmoqda...</p>
-          <p v-else-if="appointmentDate && !appointmentSlots.length">Bu sanada bo‘sh vaqt yo‘q. Boshqa sanani tanlang.</p>
+          <p v-else-if="appointmentDate && !appointmentError && !appointmentSlots.length">Bu sanada bo‘sh vaqt yo‘q. Boshqa sanani tanlang.</p>
         </div>
         <div class="dw-preview-footer">
           <button type="button" class="dw-preview-dismiss" @click="closeAppointmentPreview">Yopish</button>
