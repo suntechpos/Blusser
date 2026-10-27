@@ -20,12 +20,29 @@ const loading = ref(true);
 const calling = ref(false);
 const overdueError = ref("");
 const openMenuKey = ref("");
-const actionPreview = ref<{ name: string; action: "skip" | "cancel" } | null>(null);
+interface RebookingSlot {
+  room_id: string;
+  starts_at: string;
+  ends_at: string;
+}
+const actionPreview = ref<{
+  name: string;
+  row: QueueDisplayRow;
+  action: "skip" | "cancel";
+} | null>(null);
 const previewReason = ref("");
 const previewComment = ref("");
 const previewReschedule = ref(false);
 const previewDate = ref("");
 const previewTime = ref("");
+const actionSaving = ref(false);
+const actionError = ref("");
+const actionNotice = ref("");
+const optionsLoading = ref(false);
+const optionsError = ref("");
+const rebookingSlots = ref<RebookingSlot[]>([]);
+const rebookingTimezone = ref("");
+let optionsSequence = 0;
 
 const starting = ref(false);
 const startError = ref("");
@@ -308,17 +325,136 @@ function hasHistoricScope(row: QueueDisplayRow) {
 function toggleRowMenu(key: string) {
   openMenuKey.value = openMenuKey.value === key ? "" : key;
 }
+function actionAllowed(row: QueueDisplayRow, action: "skip" | "cancel") {
+  if (row.source !== "ticket" || !can("queues." + action) ||
+      !can("queues.view") || !can("visits.view")) return false;
+  if (row.appointment_id && (!can("appointments.view") ||
+      (action === "cancel" && !can("appointments.cancel")))) return false;
+  return (action === "skip" ? ["waiting", "called"] : ["waiting", "called", "skipped"])
+    .includes(row.status);
+}
+const canRebook = computed(() => can("appointments.create") &&
+  can("appointments.view") && can("patients.view"));
+const chosenRebookingSlot = computed(() => rebookingSlots.value.find(
+  (slot) => slotKey(slot) === previewTime.value,
+));
+function slotKey(slot: RebookingSlot) {
+  return slot.room_id + "|" + slot.starts_at + "|" + slot.ends_at;
+}
+function rebookingTime(slot: RebookingSlot) {
+  const format = new Intl.DateTimeFormat("uz-UZ", {
+    timeZone: rebookingTimezone.value || timezone.value,
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  });
+  return format.format(new Date(slot.starts_at)) + "–" + format.format(new Date(slot.ends_at));
+}
 function showActionPreview(row: QueueDisplayRow, action: "skip" | "cancel") {
+  if (!actionAllowed(row, action) || actionSaving.value) return;
   openMenuKey.value = "";
-  actionPreview.value = { name: row.name, action };
+  actionPreview.value = { name: row.name, row: { ...row }, action };
   previewReason.value = "";
   previewComment.value = "";
   previewReschedule.value = false;
   previewDate.value = "";
   previewTime.value = "";
+  actionError.value = "";
+  actionNotice.value = "";
 }
 function closeActionPreview() {
+  if (actionSaving.value) return;
+  ++optionsSequence;
   actionPreview.value = null;
+  rebookingSlots.value = [];
+  optionsError.value = "";
+}
+async function loadRebookingOptions() {
+  const request = ++optionsSequence;
+  const preview = actionPreview.value;
+  previewTime.value = "";
+  rebookingSlots.value = [];
+  optionsError.value = "";
+  optionsLoading.value = false;
+  if (!preview || !previewReschedule.value || !canRebook.value ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(previewDate.value)) return;
+  const localDate = previewDate.value;
+  optionsLoading.value = true;
+  try {
+    const response = await clinicRequest<{
+      local_date: string; timezone: string; slots: RebookingSlot[];
+    }>("queue-tickets/" + encodeURIComponent(preview.row.id) + "/rebooking-options", {
+      params: { action: preview.action, local_date: localDate },
+    });
+    if (request !== optionsSequence) return;
+    rebookingSlots.value = response.data.slots;
+    rebookingTimezone.value = response.data.timezone;
+  } catch (cause) {
+    if (request === optionsSequence) optionsError.value = errorText(cause);
+  } finally {
+    if (request === optionsSequence) optionsLoading.value = false;
+  }
+}
+watch([actionPreview, previewReschedule, previewDate], () => void loadRebookingOptions());
+watch([doctorId, branchId, date, () => session.epoch], () => {
+  // A tenant/doctor/date switch always discards the previous patient's modal,
+  // including when an in-flight command is cancelled by the context gate.
+  ++optionsSequence;
+  actionPreview.value = null;
+  rebookingSlots.value = [];
+  optionsError.value = "";
+  actionNotice.value = "";
+});
+async function submitQueueAction() {
+  const preview = actionPreview.value;
+  if (!preview || actionSaving.value) return;
+  actionError.value = "";
+  if (!previewReason.value.trim()) {
+    actionError.value = "Sababni tanlang.";
+    return;
+  }
+  if (!actionAllowed(preview.row, preview.action)) {
+    actionError.value = "Bu navbat amali uchun ruxsat yo‘q yoki holati mos emas.";
+    return;
+  }
+  if (!Number.isInteger(preview.row.version) || (preview.row.version ?? 0) < 1) {
+    actionError.value = "Navbat versiyasi topilmadi. Modalni yoping va navbatni yangilang.";
+    return;
+  }
+  const rebook = previewReschedule.value ? chosenRebookingSlot.value : undefined;
+  if (previewReschedule.value && (!canRebook.value || !rebook || optionsLoading.value)) {
+    actionError.value = "Yangi sana va mavjud bo‘sh vaqtni tanlang.";
+    return;
+  }
+  actionSaving.value = true;
+  try {
+    const response = await clinicRequest<{
+      rebooked_appointment: { id: string; starts_at: string } | null;
+    }>("queue-tickets/" + encodeURIComponent(preview.row.id) + "/" + preview.action, {
+      method: "POST",
+      body: {
+        expected_version: preview.row.version,
+        reason_code: previewReason.value.trim(),
+        ...(previewComment.value.trim() ? { note: previewComment.value.trim() } : {}),
+        ...(rebook ? { rebook } : {}),
+      },
+    });
+    const actionText = preview.action === "skip"
+      ? "Navbat o‘tkazib yuborildi." : "Navbat bekor qilindi.";
+    const booked = response.data.rebooked_appointment;
+    actionNotice.value = actionText + (booked
+      ? " Bemor qayta yozildi: " + new Intl.DateTimeFormat("uz-UZ", {
+        timeZone: rebookingTimezone.value || timezone.value,
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+        hourCycle: "h23",
+      }).format(new Date(booked.starts_at)) + "."
+      : " Bemor qayta yozilmadi.");
+    actionPreview.value = null;
+    ++optionsSequence;
+    await load();
+  } catch (cause) {
+    actionError.value = errorText(cause);
+  } finally {
+    actionSaving.value = false;
+  }
 }
 function resumeRow(row: QueueDisplayRow) {
   openMenuKey.value = "";
@@ -364,7 +500,7 @@ function statusText(row: DisplayRow) {
   return ({
     scheduled: "Yozilgan", checked_in: "Kelgan", waiting: "Kutmoqda",
     called: "Chaqirildi", in_progress: "Qabulda",
-    completed: "Yakunlangan", skipped: "O‘tkazib yuborilgan",
+    completed: "Yakunlangan", skipped: "O‘tkazib yuborilgan", cancelled: "Bekor qilingan",
   } as Record<string, string>)[row.status] || row.status;
 }
 function initials(name: string) {
@@ -424,6 +560,7 @@ function genderLabel(gender: string | null) {
     </header>
 
     <p v-if="error" class="dw-notice" role="alert">{{ error }}</p>
+    <p v-if="actionNotice" class="dw-notice" role="status">{{ actionNotice }}</p>
     <section v-if="feed?.doctor && overdueTickets.length" class="dw-overdue" aria-label="Eski kundan qolgan navbatlar">
       <span class="dw-overdue-alert-icon" aria-hidden="true"><AlertTriangle :size="20" /></span>
       <div class="dw-overdue-heading">
@@ -471,7 +608,7 @@ function genderLabel(gender: string | null) {
                   {{ statusText(row) }}
                 </span>
               </button>
-              <button v-if="!completed(row)" type="button" class="dw-queue-menu-trigger"
+              <button v-if="row.source === 'ticket' && ['waiting', 'called', 'skipped', 'in_progress'].includes(row.status)" type="button" class="dw-queue-menu-trigger" data-permission="workspace.view"
                 :aria-label="'Bemor amallari: ' + row.name"
                 :aria-expanded="openMenuKey === row.key" aria-haspopup="menu"
                 @click="toggleRowMenu(row.key)">
@@ -484,13 +621,14 @@ function genderLabel(gender: string | null) {
                   <Play :size="17" /> Qabulni davom ettirish
                 </button>
                 <template v-else>
-                  <button type="button" role="menuitem" @click="showActionPreview(row, 'skip')">
+                  <button v-if="row.status !== 'skipped'" type="button" role="menuitem" data-permission="workspace.view" :disabled="!actionAllowed(row, 'skip')" @click="showActionPreview(row, 'skip')">
                     <FastForward :size="17" /> O‘tkazib yuborish
                   </button>
-                  <button type="button" role="menuitem" class="dw-menu-danger"
+                  <button type="button" role="menuitem" class="dw-menu-danger" data-permission="workspace.view" :disabled="!actionAllowed(row, 'cancel')"
                     @click="showActionPreview(row, 'cancel')">
                     <Ban :size="17" /> Navbatni bekor qilish
                   </button>
+                  <p v-if="(row.status !== 'skipped' && !actionAllowed(row, 'skip')) || !actionAllowed(row, 'cancel')" class="dw-menu-permission">Ba’zi amallar uchun ruxsat yetishmaydi. Klinikangiz administratoriga murojaat qiling.</p>
                 </template>
               </div>
             </div>
@@ -622,14 +760,14 @@ function genderLabel(gender: string | null) {
             <h2>{{ actionPreview.action === 'skip' ? 'O‘tkazib yuborish' : 'Navbatni bekor qilish' }}</h2>
             <p>{{ actionPreview.name }}</p>
           </div>
-          <button type="button" class="dw-preview-close" aria-label="Modalni yopish" @click="closeActionPreview">×</button>
+          <button type="button" class="dw-preview-close" data-permission="workspace.view" aria-label="Modalni yopish" :disabled="actionSaving" @click="closeActionPreview">×</button>
         </div>
         <p class="dw-preview-hint">
-          Bu faqat veryostka namoyishi. Navbat holati va bronlar o‘zgarmaydi.
-          Amallar va bo‘sh vaqtlarni tekshirish backendga keyin ulanadi.
+          Sababni tanlang. Bemorni boshqa sana va vaqtga qayta yozish ixtiyoriy.
         </p>
-        <label class="dw-preview-field">Sabab
-          <select v-model="previewReason">
+        <p v-if="actionError" class="dw-action-error" role="alert">{{ actionError }}</p>
+        <label class="dw-preview-field">Sabab *
+          <select v-model="previewReason" aria-label="Sabab" required :disabled="actionSaving">
             <option value="">Sababni tanlang</option>
             <option value="patient_late">Bemor kechikdi</option>
             <option value="patient_absent">Bemor kelmadi</option>
@@ -638,26 +776,42 @@ function genderLabel(gender: string | null) {
           </select>
         </label>
         <label class="dw-preview-field">Izoh (ixtiyoriy)
-          <textarea v-model="previewComment" rows="3" maxlength="200" placeholder="Qisqa izoh..."></textarea>
+          <textarea v-model="previewComment" aria-label="Izoh (ixtiyoriy)" rows="3" maxlength="2000"
+            :disabled="actionSaving" placeholder="Qisqa izoh..."></textarea>
         </label>
         <label class="dw-preview-switch">
-          <input v-model="previewReschedule" type="checkbox" />
+          <input v-model="previewReschedule" type="checkbox" :disabled="actionSaving || !canRebook" />
           Bemorni boshqa kunga qayta yozish (ixtiyoriy)
         </label>
+        <p v-if="!canRebook" class="dw-action-helper">
+          Qayta yozish uchun qabul yaratish, qabullar va bemorlarni ko‘rish ruxsatlari kerak.
+        </p>
         <div v-if="previewReschedule" class="dw-preview-datetime">
           <label class="dw-preview-field">Yangi sana
-            <input v-model="previewDate" type="date" />
+            <input v-model="previewDate" type="date" aria-label="Yangi sana" :min="clinicToday" :disabled="actionSaving" />
           </label>
-          <label class="dw-preview-field">So‘ralgan vaqt
-            <input v-model="previewTime" type="time" />
+          <label class="dw-preview-field">Bo‘sh vaqt
+            <select v-model="previewTime" aria-label="Bo‘sh vaqt"
+              :disabled="actionSaving || optionsLoading || !rebookingSlots.length">
+              <option value="">Vaqtni tanlang</option>
+              <option v-for="slot in rebookingSlots" :key="slotKey(slot)" :value="slotKey(slot)">
+                {{ rebookingTime(slot) }}
+              </option>
+            </select>
           </label>
-          <p>Tanlangan vaqtning bo‘sh yoki bandligi hozir tekshirilmaydi.
-            Bron yaratish funksiyasi keyingi bosqichda ulanadi.</p>
+          <p v-if="optionsLoading" role="status">Bo‘sh vaqtlar yuklanmoqda...</p>
+          <p v-else-if="optionsError" class="dw-action-error" role="alert">{{ optionsError }}</p>
+          <p v-else-if="previewDate && !rebookingSlots.length" role="status">
+            Ushbu sanada shifokor uchun bo‘sh vaqt topilmadi.
+          </p>
+          <p v-else>Vaqtlar shifokorning haqiqiy jadvalidan, klinika vaqt mintaqasida ko‘rsatiladi.</p>
         </div>
         <div class="dw-preview-footer">
-          <button type="button" class="dw-preview-dismiss" @click="closeActionPreview">Yopish</button>
-          <button type="button" class="dw-preview-disabled" disabled>
-            Tasdiqlash (API keyin ulanadi)
+          <button type="button" class="dw-preview-dismiss" :disabled="actionSaving" @click="closeActionPreview">Yopish</button>
+          <button type="button" class="dw-preview-confirm" :data-permission="'queues.' + actionPreview.action" :disabled="actionSaving || !previewReason ||
+            (previewReschedule && (!chosenRebookingSlot || optionsLoading || !canRebook))"
+            @click="submitQueueAction">
+            {{ actionSaving ? 'Saqlanmoqda...' : 'Tasdiqlash' }}
           </button>
         </div>
       </section>
@@ -740,6 +894,8 @@ function genderLabel(gender: string | null) {
 .dw-queue-popup button:hover { background: #edf5ff; color: #0768ee; }
 .dw-queue-popup button.dw-menu-danger { color: #bd3340; }
 .dw-queue-popup button.dw-menu-danger:hover { background: #fff0f2; }
+.dw-queue-popup button:disabled { opacity: .48; cursor: not-allowed; }
+.dw-menu-permission { margin: 5px 10px 8px; color: #775d37; font-size: 12px; line-height: 1.4; }
 /* Modal is visually complete, but intentionally has no write action. */
 .dw-preview-backdrop {
   position: fixed; inset: 0; z-index: 90;
@@ -790,10 +946,13 @@ function genderLabel(gender: string | null) {
   border: 1px solid #d7e4f6; background: #f6f9ff;
   color: #335680; cursor: pointer;
 }
-.dw-preview-disabled {
-  border: 1px solid #a9cbfa; background: #b9d6ff;
-  color: white; cursor: not-allowed;
+.dw-preview-confirm {
+  border: 1px solid #1673ff; background: #1673ff; color: white; cursor: pointer;
 }
+.dw-preview-confirm:disabled { opacity: .5; cursor: not-allowed; }
+.dw-action-error { color: #b4233b; font-size: 13px; line-height: 1.5; }
+.dw-preview-datetime > .dw-action-error { color: #b4233b; }
+.dw-action-helper { color: #6b83a3; font-size: 12px; line-height: 1.5; }
 .dw-live-history-preview { padding: 20px; }
 .dw-live-history-preview .dw-start-button { margin-top: 14px; }
 @media (max-width: 1100px) {

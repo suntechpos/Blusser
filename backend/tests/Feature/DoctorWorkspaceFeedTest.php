@@ -77,7 +77,7 @@ final class DoctorWorkspaceFeedTest extends FoundationTestCase
         // Resolution must use the existing authorized queue transition; a
         // feed-only flag cannot release the global single-patient guard.
         app(Queues::class)->command($this->actor($a['user']), $a['tenant'], 'skip',
-            $ticketId, ['expected_version' => 2], (string) Str::uuid());
+            $ticketId, ['expected_version' => 2, 'reason_code' => 'patient_unavailable'], (string) Str::uuid());
         $this->assertSame([], $this->overdue($a, $doctor['id']));
         $this->assertFalse($this->feed($a)['has_active_patient']);
         $this->assertSame('skipped', DB::connection('migration')->table('queue_tickets')

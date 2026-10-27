@@ -286,7 +286,7 @@ test("UI: prior-day warning is compact and unfinished tickets live in one queue 
   expect(actions).toEqual([]);
 });
 
-test("UI: skip/cancel use preview-only modal and never change patient status", async ({ page }) => {
+test("queue mutation menus respect each action grant without sending unauthorized requests", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-27T07:00:00Z"));
   const actions: Array<{ id: string; action: string }> = [];
   const grants = { ...allServerGrants };
@@ -299,19 +299,29 @@ test("UI: skip/cancel use preview-only modal and never change patient status", a
   await page.locator(".dw-queue-tabs").getByRole("button", { name: /Yakunlanmagan/ }).click();
   await page.getByRole("button", { name: "Bemor amallari: Aliyev Alijon" }).click();
   await expect(page.getByRole("menuitem", { name: "O‘tkazib yuborish" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Navbatni bekor qilish" })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Navbatni bekor qilish" }).click();
-  const dialog = page.getByRole("dialog", { name: "Navbatni bekor qilish" });
+  await expect(page.getByRole("menuitem", { name: "Navbatni bekor qilish" })).toBeDisabled();
+  await expect(page.getByText("Ba’zi amallar uchun ruxsat yetishmaydi.", { exact: false })).toBeVisible();
+  await page.getByRole("menuitem", { name: "O‘tkazib yuborish" }).click();
+  const dialog = page.getByRole("dialog", { name: "O‘tkazib yuborish" });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("faqat veryostka");
-  await expect(dialog.getByRole("button", { name: /Tasdiqlash/ })).toBeDisabled();
-  await dialog.getByLabel("Bemorni boshqa kunga qayta yozish (ixtiyoriy)").check();
-  await expect(dialog.getByLabel("Yangi sana")).toBeVisible();
-  await expect(dialog.getByLabel("So‘ralgan vaqt")).toBeVisible();
-  await dialog.getByRole("button", { name: "Yopish" }).click();
+  await expect(dialog.getByRole("button", { name: "Tasdiqlash", exact: true })).toBeDisabled();
+  await dialog.getByRole("button", { name: "Yopish", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   expect(actions).toEqual([]);
   await expect(page.locator(".dw-queue")).toContainText("Chaqirildi");
+});
+
+test("waiting ticket keeps action menu visible when both permissions are missing", async ({ page }) => {
+  const grants = { ...allServerGrants };
+  delete grants["queues.skip"];
+  delete grants["queues.cancel"];
+  const actions: Array<{ id: string; action: string }> = [];
+  await setup(page, false, grants, [patient], [], [], false, [], [], [], actions);
+  await page.getByRole("button", { name: "Bemor amallari: Aliyev Alijon" }).click();
+  await expect(page.getByRole("menuitem", { name: "O‘tkazib yuborish" })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Navbatni bekor qilish" })).toBeDisabled();
+  await expect(page.getByText("Ba’zi amallar uchun ruxsat yetishmaydi.", { exact: false })).toBeVisible();
+  expect(actions).toEqual([]);
 });
 
 test("signed-in doctor shows own real queue and not demo patient data", async ({ page }) => {

@@ -19,7 +19,7 @@ import {
 import {errorText} from "../services/api";
 import { session,can } from "../services/session";
 import { clone } from "../mocks/employees";
-import { useRolesStore, type ServerRole } from "../components/settings/store";
+import { useRolesStore, scopeContains, type ServerRole } from "../components/settings/store";
 import SettingsDialog from "../components/settings/SettingsDialog.vue";
 import "../components/settings/settings.css";
 import { receptionActions } from "../services/receptionAccess";
@@ -161,7 +161,7 @@ const scopeConflicts = computed(() => {
     ];
     for (const parent of parents) {
       const granted = selectedGrants.get(parent);
-      if (granted === "entire_clinic" || granted === scope) continue;
+      if (scopeContains(granted, scope)) continue;
       const current = granted ? scopeNames[granted] ?? granted : "yoqilmagan";
       conflicts.push(
         `«${labels.get(code) ?? code}» — ${scopeNames[scope] ?? scope}; ` +

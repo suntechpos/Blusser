@@ -282,12 +282,12 @@ final class QueuesApiTest extends FoundationTestCase
         $this->browser($jar, 'GET', $url.'/'.$id)->assertOk()->assertJsonPath('id', $id)->assertJsonPath('number', 1);
         $this->browser($jar, 'GET', '/api/v1/clinic/reception/overview')->assertOk()->assertJsonPath('counts.waiting', 1)->assertJsonPath('counts.arrived', 1);
         foreach ([['call', 1, 'called'], ['recall', 2, 'called'], ['skip', 3, 'skipped'], ['requeue', 4, 'waiting'], ['call', 5, 'called']] as [$action,$version,$state]) {
-            $this->browser($jar, 'POST', $url.'/'.$id.'/'.$action, ['expected_version' => $version], key: (string) Str::uuid())->assertOk()->assertJsonPath('ticket.status', $state)->assertJsonPath('ticket.version', $version + 1)->assertJsonPath('ticket.number', 1)->assertJsonPath('visit.status', $state === 'waiting' ? 'queued' : $state);
+            $this->browser($jar, 'POST', $url.'/'.$id.'/'.$action, ['expected_version' => $version, ...($action === 'skip' ? ['reason_code' => 'patient_unavailable'] : [])], key: (string) Str::uuid())->assertOk()->assertJsonPath('ticket.status', $state)->assertJsonPath('ticket.version', $version + 1)->assertJsonPath('ticket.number', 1)->assertJsonPath('visit.status', $state === 'waiting' ? 'queued' : $state);
         }
         $this->browser($jar, 'POST', $url.'/'.$id.'/start', $this->startData($a, 6), key: (string) Str::uuid())->assertOk()->assertJsonPath('visit.status', 'in_progress');
         $this->browser($jar, 'POST', $url.'/'.$id.'/complete', ['expected_version' => 7], key: (string) Str::uuid())->assertOk()->assertJsonPath('ticket.status', 'completed')->assertJsonPath('visit.status', 'completed');
         $att2 = $this->browser($jar, 'POST', $url, $this->walk($a), key: (string) Str::uuid())->assertCreated()->json();
-        $this->browser($jar, 'POST', $url.'/'.$att2['ticket']['id'].'/cancel', ['expected_version' => 1], key: (string) Str::uuid())->assertOk()->assertJsonPath('visit.status', 'cancelled');
+        $this->browser($jar, 'POST', $url.'/'.$att2['ticket']['id'].'/cancel', ['expected_version' => 1, 'reason_code' => 'patient_request'], key: (string) Str::uuid())->assertOk()->assertJsonPath('visit.status', 'cancelled');
         $this->assertFalse(DB::connection('migration')->table('resource_reservations')->first()->active);
         $this->browser($jar, 'POST', $url.'/'.$id.'/requeue', ['expected_version' => 8], key: (string) Str::uuid())->assertConflict();
         $this->browser($jar, 'POST', '/api/v1/auth/logout')->assertNoContent();
@@ -368,7 +368,7 @@ final class QueuesApiTest extends FoundationTestCase
         $id = $att['ticket']['id'];
         $db = DB::connection('migration');
         $reservation = $db->table('resource_reservations')->first()->id;
-        $this->queue($a, 'skip', $id, ['expected_version' => 1]);
+        $this->queue($a, 'skip', $id, ['expected_version' => 1, 'reason_code' => 'patient_unavailable']);
         $this->assertSame('checked_in', $db->table('appointments')->first()->status);
         $this->queue($a, 'requeue', $id, ['expected_version' => 2]);
         $this->queue($a, 'call', $id, ['expected_version' => 3]);
@@ -391,10 +391,10 @@ final class QueuesApiTest extends FoundationTestCase
         $att = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1]);
         $id = $att['ticket']['id'];
         $this->grant($a, 'appointments.cancel', null);
-        $this->denied(fn () => $this->queue($a, 'cancel', $id, ['expected_version' => 1]), 'forbidden');
+        $this->denied(fn () => $this->queue($a, 'cancel', $id, ['expected_version' => 1, 'reason_code' => 'patient_request']), 'forbidden');
         $this->assertSame('waiting', DB::connection('migration')->table('queue_tickets')->first()->status);
         DB::connection('migration')->table('role_permissions')->insert(['tenant_id' => $a['tenant'], 'role_id' => $a['role'], 'permission_id' => DB::connection('migration')->table('permissions')->where('code', 'appointments.cancel')->value('id'), 'scope' => 'entire_clinic']);
-        $result = $this->queue($a, 'cancel', $id, ['expected_version' => 1]);
+        $result = $this->queue($a, 'cancel', $id, ['expected_version' => 1, 'reason_code' => 'patient_request']);
         $this->assertSame('cancelled', $result['appointment']['status']);
         $this->assertSame('cancelled', $result['visit']['status']);
         $this->assertFalse(DB::connection('migration')->table('resource_reservations')->first()->active);
@@ -409,7 +409,7 @@ final class QueuesApiTest extends FoundationTestCase
         $this->queue($a, 'call', $id, ['expected_version' => 1], $key);
         $this->assertSame(2, $this->queue($a, 'call', $id, ['expected_version' => 1], $key)['ticket']['version']);
         $this->denied(fn () => $this->queue($a, 'call', $id, ['expected_version' => 2], $key), 'conflict');
-        $this->denied(fn () => $this->queue($a, 'skip', $id, ['expected_version' => 1]), 'conflict');
+        $this->denied(fn () => $this->queue($a, 'skip', $id, ['expected_version' => 1, 'reason_code' => 'patient_unavailable']), 'conflict');
         $this->grant($a, 'queues.call', null);
         $this->denied(fn () => $this->queue($a, 'call', $id, ['expected_version' => 1], $key), 'forbidden');
         $this->assertSame(1, DB::connection('migration')->table('operation_events')->where('action', 'call')->whereNotNull('ticket_id')->count());
@@ -626,7 +626,7 @@ WORKER;
         $r = $this->race($a, [$req, $req]);
         $this->assertSame([200, 200], array_column($r, 'status'));
         $this->assertSame(3, DB::connection('migration')->table('queue_tickets')->first()->version);
-        $req = ['action' => 'skip', 'id' => $id, 'data' => ['expected_version' => 3], 'key' => (string) Str::uuid()];
+        $req = ['action' => 'skip', 'id' => $id, 'data' => ['expected_version' => 3, 'reason_code' => 'patient_unavailable'], 'key' => (string) Str::uuid()];
         $r = $this->race($a, [$req, [...$req, 'action' => 'cancel', 'key' => (string) Str::uuid()]]);
         $codes = array_column($r, 'status');
         sort($codes);
@@ -663,7 +663,7 @@ WORKER;
             $permission = $db->table('permissions')->where('code', $code)->value('id');
             $this->grant($a, $code, null);
             $action = str_starts_with($code, 'queues.') && ! str_ends_with($code, '.view') ? substr($code, 7) : 'call';
-            $this->denied(fn () => $this->queue($a, $action, $id, $action === 'start' ? $this->startData($a, 1) : ['expected_version' => 1]), in_array($code, ['visits.view', 'queues.view']) ? 'not_found' : 'forbidden');
+            $this->denied(fn () => $this->queue($a, $action, $id, $action === 'start' ? $this->startData($a, 1) : ['expected_version' => 1, ...(in_array($action, ['skip', 'cancel'], true) ? ['reason_code' => 'patient_request'] : [])]), in_array($code, ['visits.view', 'queues.view']) ? 'not_found' : 'forbidden');
             $db->table('role_permissions')->insert(['tenant_id' => $a['tenant'], 'role_id' => $a['role'], 'permission_id' => $permission, 'scope' => 'entire_clinic']);
         }
         $this->assertSame(1, $db->table('queue_tickets')->first()->version);
@@ -831,12 +831,12 @@ WORKER;
         $this->queue($a, 'start', $id, $this->startData($a, 2));
         $this->queue($a, 'complete', $id, ['expected_version' => 3]);
         $cancelled = $this->queue($a)['ticket']['id'];
-        $this->queue($a, 'cancel', $cancelled, ['expected_version' => 1]);
+        $this->queue($a, 'cancel', $cancelled, ['expected_version' => 1, 'reason_code' => 'patient_request']);
         $db = DB::connection('migration');
         $events = $db->table('operation_events')->count();
         foreach ([[$id, 4], [$cancelled, 2]] as [$ticket,$version]) {
             foreach (['call', 'recall', 'start', 'complete', 'skip', 'requeue', 'cancel'] as $action) {
-                $this->denied(fn () => $this->queue($a, $action, $ticket, $action === 'start' ? $this->startData($a, $version) : ['expected_version' => $version]), 'conflict');
+                $this->denied(fn () => $this->queue($a, $action, $ticket, $action === 'start' ? $this->startData($a, $version) : ['expected_version' => $version, ...(in_array($action, ['skip', 'cancel'], true) ? ['reason_code' => 'patient_request'] : [])]), 'conflict');
             }
         }
         $this->assertSame($events, $db->table('operation_events')->count());
@@ -849,7 +849,7 @@ WORKER;
         $appointment = $this->command($a);
         $att = $this->command($a, 'check_in', $appointment['id'], ['expected_version' => 1]);
         $id = $att['ticket']['id'];
-        $this->queue($a, 'skip', $id, ['expected_version' => 1]);
+        $this->queue($a, 'skip', $id, ['expected_version' => 1, 'reason_code' => 'patient_unavailable']);
         $db = DB::connection('migration');
         // Owner-only test fixture simulates elapsed time, not a runtime mutation capability.
         $db->transaction(function () use ($db, $appointment) {

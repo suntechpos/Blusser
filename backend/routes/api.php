@@ -8,8 +8,8 @@ use App\Modules\Platform\Http\ClinicController as PlatformController;
 use App\Modules\Platform\Http\HealthController;
 use App\Modules\Queues\Http\DoctorWorkspaceController;
 use App\Modules\Queues\Http\QueueController;
-use App\Modules\Queues\Http\VisitDiagnosisController;
 use App\Modules\Queues\Http\VisitClinicalNoteController;
+use App\Modules\Queues\Http\VisitDiagnosisController;
 use App\Modules\Scheduling\Http\EmployeeWorkController;
 use App\Modules\Scheduling\Http\SchedulingController;
 use App\Modules\Services\Http\ServiceCatalogController;
@@ -66,6 +66,7 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                 Route::post('queue-tickets', [QueueController::class, 'store']);
                 Route::get('queue-tickets/{ticket}', [QueueController::class, 'show'])->whereUuid('ticket');
                 Route::get('queue-tickets/{ticket}/own-start-slot', [QueueController::class, 'ownStartSlot'])->whereUuid('ticket');
+                Route::get('queue-tickets/{ticket}/rebooking-options', [QueueController::class, 'rebookingOptions'])->whereUuid('ticket');
                 foreach (['call', 'recall', 'start', 'complete', 'skip', 'cancel', 'requeue'] as $operation) {
                     Route::post('queue-tickets/{ticket}/'.$operation, [QueueController::class, 'mutate'])->whereUuid('ticket')->defaults('operation', $operation);
                 }

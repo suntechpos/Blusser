@@ -22,6 +22,13 @@ export interface ServerRole extends RoleDraft {
   grants: { code: string; scope: string }[];
   active: boolean;
 }
+/** A child permission may be narrower than its parent view. */
+export function scopeContains(parent: string | undefined, child: string): boolean {
+  const scopes = ["own", "assigned_branches", "entire_clinic"];
+  const parentRank = parent ? scopes.indexOf(parent) : -1;
+  const childRank = scopes.indexOf(child);
+  return childRank >= 0 && parentRank >= childRank;
+}
 interface ServerPermission {
   code: string;
   label: string;
