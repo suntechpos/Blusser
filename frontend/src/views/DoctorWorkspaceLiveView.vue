@@ -441,14 +441,18 @@ function genderLabel(gender: string | null) {
               </button>
             </template>
             <template v-else>
-              <button v-if="canResolveOverdue(item, 'skip')" type="button"
-                class="dw-overdue-action is-subtle" :disabled="loading || !!resolvingOverdueId"
+              <button type="button"
+                class="dw-overdue-action is-subtle"
+                :disabled="loading || !!resolvingOverdueId || !canResolveOverdue(item, 'skip')"
+                :title="canResolveOverdue(item, 'skip') ? 'Navbatni o‘tkazib yuborish' : 'Navbatni o‘tkazib yuborish uchun ruxsat kerak'"
                 @click="resolveOverdue(item, 'skip')">
                 <FastForward :size="16" aria-hidden="true" />
                 {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "O‘tkazib yuborish" }}
               </button>
-              <button v-if="canResolveOverdue(item, 'cancel')" type="button"
-                class="dw-overdue-action is-danger" :disabled="loading || !!resolvingOverdueId"
+              <button type="button"
+                class="dw-overdue-action is-danger"
+                :disabled="loading || !!resolvingOverdueId || !canResolveOverdue(item, 'cancel')"
+                :title="canResolveOverdue(item, 'cancel') ? 'Navbatni bekor qilish' : 'Navbatni bekor qilish uchun ruxsat kerak'"
                 @click="resolveOverdue(item, 'cancel')">
                 <Ban :size="16" aria-hidden="true" />
                 {{ resolvingOverdueId === item.id ? "Bajarilmoqda..." : "Navbatni bekor qilish" }}
@@ -456,8 +460,8 @@ function genderLabel(gender: string | null) {
             </template>
             <span v-if="item.status === 'called' &&
                 !canResolveOverdue(item, 'skip') && !canResolveOverdue(item, 'cancel')"
-              class="dw-overdue-permission" title="Navbatni yopish ruxsatini administratordan so‘rang">
-              Yopish ruxsati kerak
+              class="dw-overdue-permission" title="Navbat amallarini faollashtirish uchun ruxsat kerak">
+              Ruxsat kerak
             </span>
             <span v-if="item.status === 'in_progress' && !canResolveOverdue(item, 'complete')"
               class="dw-overdue-permission" title="Navbatni yakunlash ruxsatini administratordan so‘rang">
@@ -628,7 +632,7 @@ function genderLabel(gender: string | null) {
 .dw-overdue-list { display: grid; gap: 7px; }
 .dw-overdue-item {
   display: grid;
-  grid-template-columns: 44px minmax(160px, 1fr) auto minmax(105px, .38fr) minmax(180px, auto);
+  grid-template-columns: 44px minmax(150px, 1fr) 112px 138px minmax(310px, 365px);
   align-items: center; gap: 12px; min-height: 72px; padding: 10px 13px;
   background: #fff; border: 1px solid #f0e5d5; border-radius: 10px;
   box-shadow: 0 1px 3px rgb(33 67 117 / 3%);
@@ -649,7 +653,7 @@ function genderLabel(gender: string | null) {
 }
 .dw-overdue-state {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  width: max-content; border-radius: 8px; padding: 7px 10px;
+  width: max-content; justify-self: start; border-radius: 8px; padding: 7px 10px;
   font-size: 12px; font-weight: 650; white-space: nowrap;
 }
 .dw-overdue-state.is-active { color: #c22635; background: #fff0f2; }
@@ -687,7 +691,7 @@ function genderLabel(gender: string | null) {
 }
 .dw-overdue-action.is-danger:hover:not(:disabled) { background: #ffe6e9; }
 .dw-overdue-action:focus-visible { outline: 2px solid #146dff; outline-offset: 2px; }
-.dw-overdue-action:disabled { opacity: .55; cursor: not-allowed; }
+.dw-overdue-action:disabled { opacity: .66; cursor: not-allowed; }
 .dw-overdue-permission {
   font-size: 11px; color: #937657; text-align: right;
   max-width: 120px; line-height: 1.4;
@@ -697,7 +701,7 @@ function genderLabel(gender: string | null) {
   background: #fff0f0; color: #b42318; font-size: 13px;
 }
 @media (max-width: 1400px) {
-  .dw-overdue-item { grid-template-columns: 42px minmax(170px, 1fr) auto minmax(170px, auto); }
+  .dw-overdue-item { grid-template-columns: 42px minmax(150px, 1fr) 112px minmax(310px, 365px); }
   .dw-overdue-time { display: none; }
 }
 @media (max-width: 1000px) {
