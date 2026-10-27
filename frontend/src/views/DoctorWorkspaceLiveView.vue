@@ -339,6 +339,12 @@ function actionAllowed(row: QueueDisplayRow, action: "skip" | "cancel") {
 }
 const canRebook = computed(() => can("appointments.create") &&
   can("appointments.view") && can("patients.view"));
+const chronologicalRebookingSlots = computed(() => [
+  ...rebookingSlots.value.map(slot => ({ slot, busy: false })),
+  ...busyRebookingSlots.value.map(slot => ({ slot, busy: true })),
+].sort((a, b) => a.slot.starts_at.localeCompare(b.slot.starts_at)
+  || a.slot.ends_at.localeCompare(b.slot.ends_at)
+  || a.slot.room_id.localeCompare(b.slot.room_id)));
 const chosenRebookingSlot = computed(() => rebookingSlots.value.find(
   (slot) => slotKey(slot) === previewTime.value,
 ));
@@ -838,11 +844,9 @@ function genderLabel(gender: string | null) {
             <select v-model="previewTime" aria-label="Bo‘sh vaqt"
               :disabled="actionSaving || optionsLoading || !rebookingSlots.length">
               <option value="">Vaqtni tanlang</option>
-              <option v-for="slot in busyRebookingSlots" :key="'busy-' + slotKey(slot)" :value="'busy-' + slotKey(slot)" disabled>
-                {{ rebookingTime(slot) }} — Band
-              </option>
-              <option v-for="slot in rebookingSlots" :key="slotKey(slot)" :value="slotKey(slot)">
-                {{ rebookingTime(slot) }}
+              <option v-for="entry in chronologicalRebookingSlots" :key="(entry.busy ? 'busy-' : 'free-') + slotKey(entry.slot)"
+                :value="slotKey(entry.slot)" :disabled="entry.busy">
+                {{ rebookingTime(entry.slot) }}{{ entry.busy ? ' — Band' : '' }}
               </option>
             </select>
           </label>
