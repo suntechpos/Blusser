@@ -14,6 +14,7 @@ import type { Prescription } from "../../mocks/doctorWorkspace";
 import RealReferralDetailsDialog from "./RealReferralDetailsDialog.vue";
 import { visitReferrals, type VisitReferral } from "../../services/visitReferrals";
 import { errorText } from "../../services/api";
+import { can } from "../../services/session";
 import type { Encounter } from "../../mocks/doctorWorkspace";
 import type { WorkspacePatientRow, WorkspaceDoctor, WorkspaceBranch } from "../../services/doctorWorkspace";
 
@@ -246,7 +247,7 @@ watch(() => props.patient.visit_id, () => {
           Qoralamani saqlash
         </button>
         <button type="button" class="e-button primary dw-small"
-          :disabled="patient.status !== 'in_progress' || finishBusy"
+          :disabled="patient.status !== 'in_progress' || finishBusy || !can('queues.complete')"
           @click="finishOpen = true">
           Qabulni yakunlash
         </button>
