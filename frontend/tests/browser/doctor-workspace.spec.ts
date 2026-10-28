@@ -261,9 +261,11 @@ test("UI: prior-day warning is compact and unfinished tickets live in one queue 
   await expect(banner).toContainText("2 ta yakunlanmagan qabul");
   await expect(banner.locator(".dw-overdue-item")).toHaveCount(0);
   const left = page.locator(".dw-queue");
-  await expect(left.locator(".dw-queue-tabs button")).toHaveCount(3);
+  await expect(left.locator(".dw-queue-tabs button")).toHaveCount(4);
+  await expect(left.locator(".dw-queue-tabs")).toHaveCSS("overflow-x", "auto");
+  await expect(left.locator(".dw-queue-tabs button").first()).toContainText("Barchasi");
   const waiting = left.getByRole("button", { name: /Kutilmoqda/ });
-  const unresolved = left.getByRole("button", { name: /Yakunlanmagan/ });
+  const unresolved = left.getByRole("button", { name: /Qabulda/ });
   const completed = left.getByRole("button", { name: /^Yakunlangan/ });
   await expect(waiting).toContainText("1");
   await expect(unresolved).toContainText("2");
@@ -309,7 +311,7 @@ test("queue mutation menus respect each action grant without sending unauthorize
     local_date: "2026-10-26", branch_id: "branch-1", branch_name: "Asosiy filial",
   };
   await setup(page, false, grants, [], [], [], false, [], [old], [], actions);
-  await page.locator(".dw-queue-tabs").getByRole("button", { name: /Yakunlanmagan/ }).click();
+  await page.locator(".dw-queue-tabs").getByRole("button", { name: /Qabulda/ }).click();
   await page.getByRole("button", { name: "Bemor amallari: Aliyev Alijon" }).click();
   await expect(page.getByRole("menuitem", { name: "O‘tkazib yuborish" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Navbatni bekor qilish" })).toBeDisabled();
