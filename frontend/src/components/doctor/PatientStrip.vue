@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { CalendarDays, UserRound } from "lucide-vue-next";
-import { DOCTOR, type Encounter } from "../../mocks/doctorWorkspace";
+import { type Encounter } from "../../mocks/doctorWorkspace";
 import { dateLabel } from "../../mocks/employees";
-defineProps<{ encounter: Encounter; context?: boolean }>();
+defineProps<{ encounter: Encounter; context?: boolean; doctorName?: string }>();
 </script>
 <template>
   <div class="dw-modal-patient">
@@ -19,7 +19,7 @@ defineProps<{ encounter: Encounter; context?: boolean }>();
     <template v-if="context"
       ><div class="dw-strip-context">
         <UserRound :size="23" /><span
-          >Shifokor:<b>{{ DOCTOR.name }}</b></span
+          >Shifokor:<b>{{ doctorName || "Ma’lumot kiritilmagan" }}</b></span
         >
       </div>
       <div class="dw-strip-context">
