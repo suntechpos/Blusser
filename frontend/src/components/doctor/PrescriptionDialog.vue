@@ -6,15 +6,17 @@ import PatientStrip from "./PatientStrip.vue";
 import {
   blankMedicine,
   prescriptionErrors,
-  MEDICINE_NAMES,
   type Prescription,
   type Encounter,
 } from "../../mocks/doctorWorkspace";
 const props = defineProps<{
   encounter: Encounter;
   prescription?: Prescription;
+  saving?: boolean;
+  error?: string;
 }>();
 const emit = defineEmits<{ close: []; save: [Prescription] }>();
+
 const medicines = ref(
   props.prescription
     ? structuredClone(props.prescription.medicines.map((x) => ({ ...x })))
@@ -31,7 +33,7 @@ const dirty = computed(
     JSON.stringify({ medicines: medicines.value, note: note.value }),
 );
 const errors = ref<Record<string, string>[]>([]);
-const busy = ref(false);
+
 async function add() {
   medicines.value.push(blankMedicine());
   await nextTick();
@@ -48,9 +50,8 @@ function save() {
     errors.value.some((e) => Object.keys(e).length)
   )
     return;
-  busy.value = true;
   emit("save", {
-    id: props.prescription?.id || `RX-${Date.now()}`,
+    id: props.prescription?.id || "",
     date: props.encounter.date,
     medicines: medicines.value.map((m) => ({ ...m })),
     note: note.value,
@@ -131,7 +132,6 @@ const fields = [
                 v-model="m.name"
                 class="dw-medicine-name"
                 :aria-label="`${i + 1}-dori nomi`"
-                list="dw-drug-names"
                 placeholder="Dori nomini qidiring yoki yozing..."
               /><small v-if="errors[i]?.name" class="dw-error">{{
                 errors[i]?.name
@@ -170,11 +170,7 @@ const fields = [
             >
           </div>
         </section>
-        <datalist id="dw-drug-names">
-          <option v-for="n in MEDICINE_NAMES" :key="n">
-            {{ n }}
-          </option></datalist
-        ><datalist id="dw-frequency">
+        <datalist id="dw-frequency">
           <option>Kuniga 1 marta</option>
           <option>Kuniga 2 marta</option>
         </datalist>
@@ -194,12 +190,11 @@ const fields = [
     </div>
     <template #footer="{ close }"
       ><footer>
-        <span class="dw-footnote"
-          ><Link :size="17" />{{ medicines.length }} ta dori · Bitta lokal
-          retsept</span
+        <span v-if="error" role="alert" class="dw-error">{{ error }}</span><span class="dw-footnote"
+          ><Link :size="17" />{{ medicines.length }} ta dori · Bitta qabulga bog‘langan retsept</span
         ><button class="e-button" @click="close" type="button">
           Bekor qilish</button
-        ><button form="dw-rx-form" class="e-button primary" :disabled="busy">
+        ><button form="dw-rx-form" class="e-button primary" :disabled="saving">
           Retseptni saqlash
         </button>
       </footer></template
