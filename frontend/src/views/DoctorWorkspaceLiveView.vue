@@ -666,14 +666,14 @@ const allQueueRows = computed<QueueDisplayRow[]>(() => {
   return [...rows.value, ...unresolvedRows.value.filter(row => !seen.has(row.key))];
 });
 const activeQueueRows = computed(() => allQueueRows.value.filter(row =>
-  row.status === "in_progress" || row.status === "called",
+  row.status === "in_progress",
 ));
 const filteredRows = computed<QueueDisplayRow[]>(() => {
   const source = queueTab.value === "all" ? allQueueRows.value
     : queueTab.value === "active" ? activeQueueRows.value
     : rows.value.filter(row => queueTab.value === "completed"
       ? completed(row) : !completed(row) && row.status !== "in_progress"
-        && row.status !== "called" && !overdueIds.value.has(row.id));
+        && !overdueIds.value.has(row.id));
   const search = query.value.trim().toLocaleLowerCase();
   return source.filter((row) => !search ||
     [row.name, row.patient_number, String(row.number ?? ""), row.service]
@@ -681,7 +681,7 @@ const filteredRows = computed<QueueDisplayRow[]>(() => {
 });
 const waitingCount = computed(() => rows.value.filter(
   (row) => !completed(row) && row.status !== "in_progress"
-    && row.status !== "called" && !overdueIds.value.has(row.id),
+    && !overdueIds.value.has(row.id),
 ).length);
 const completedCount = computed(() => rows.value.filter(completed).length);
 const allCount = computed(() => allQueueRows.value.length);
