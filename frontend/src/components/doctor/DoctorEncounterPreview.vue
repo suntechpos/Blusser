@@ -5,6 +5,7 @@ import HistoryPanel from "./HistoryPanel.vue";
 import RecordsPanel from "./RecordsPanel.vue";
 import DiagnosisEditor from "./DiagnosisEditor.vue";
 import ClinicalNotesEditor from "./ClinicalNotesEditor.vue";
+import RecommendationsEditor from "./RecommendationsEditor.vue";
 import type { Encounter } from "../../mocks/doctorWorkspace";
 import type { WorkspacePatientRow, WorkspaceDoctor, WorkspaceBranch } from "../../services/doctorWorkspace";
 
@@ -81,18 +82,14 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
       </div>
       <p class="dw-preview-notice" role="status">
         Shikoyatlar, anamnez, ko‘rik natijalari va tashxis serverga alohida saqlanadi.
-        Tavsiyalar, retsept va yo‘llanmalar keyingi bosqichda ulanadi.
+        Tavsiyalar alohida saqlanadi; retsept va yo‘llanmalar keyingi bosqichda ulanadi.
       </p>
       <ClinicalNotesEditor v-if="patient.visit_id" :key="patient.visit_id"
         :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
       <DiagnosisEditor v-if="patient.visit_id" :key="patient.visit_id"
         :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
-      <fieldset disabled aria-label="Keyingi taskda ulanadigan tavsiyalar" class="dw-readonly-fields">
-        <label class="dw-field">
-          Tavsiyalar
-          <textarea aria-label="Tavsiyalar" placeholder="Tavsiyalarni kiriting..." rows="2" />
-        </label>
-      </fieldset>
+      <RecommendationsEditor v-if="patient.visit_id" :key="patient.visit_id"
+        :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
       <div class="dw-current-actions" aria-label="Keyingi tasklarda ulanadigan amallar">
         <button type="button" class="e-button dw-small" disabled title="Yo‘llanmalar API keyingi taskda ulanadi">
           <Plus :size="20" /> Yo‘llanma
@@ -109,7 +106,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         </button>
       </div>
       <p class="dw-footnote"><LockKeyhole :size="17" />
-        Ko‘rik yozuvlari va tashxis alohida saqlanadi. Tavsiyalar hamda qolgan amallar keyingi tasklarda ulanadi.
+        Ko‘rik yozuvlari, tashxis va tavsiyalar alohida saqlanadi. Retsept va yo‘llanmalar keyingi tasklarda ulanadi.
       </p>
     </article>
 
