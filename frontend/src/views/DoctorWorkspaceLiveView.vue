@@ -674,10 +674,23 @@ const waitingCount = computed(() => rows.value.filter(
   (row) => !completed(row) && !overdueIds.value.has(row.id),
 ).length);
 const completedCount = computed(() => rows.value.filter(completed).length);
-const selected = computed(() => filteredRows.value.find((r) => r.key === selectedKey.value) || filteredRows.value[0] || null);
+const selected = computed<QueueDisplayRow | null>(() => {
+  const visible = filteredRows.value.find(row => row.key === selectedKey.value);
+  if (visible) return visible;
+  // Preserve the clinical workspace across queue-tab changes. A started
+  // consultation may be from a previous date and therefore absent from the
+  // current tab's patient list.
+  const active = [...unresolvedRows.value, ...rows.value].find(
+    row => row.key === selectedKey.value && row.status === "in_progress",
+  );
+  return active ?? filteredRows.value[0] ?? null;
+});
 function setTab(tab: "waiting" | "unresolved" | "completed") {
+  const activeSelection = [...unresolvedRows.value, ...rows.value].some(
+    row => row.key === selectedKey.value && row.status === "in_progress",
+  );
   queueTab.value = tab;
-  selectedKey.value = "";
+  if (!activeSelection) selectedKey.value = "";
   openMenuKey.value = "";
 }
 const timezone = computed(() => feed.value?.branch?.timezone || "Asia/Tashkent");
