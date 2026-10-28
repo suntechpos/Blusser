@@ -8,11 +8,13 @@ import ClinicalNotesEditor from "./ClinicalNotesEditor.vue";
 import RecommendationsEditor from "./RecommendationsEditor.vue";
 import ReferralDialog from "./ReferralDialog.vue";
 import PrescriptionDialog from "./PrescriptionDialog.vue";
+import FinishDialog from "./FinishDialog.vue";
 import { listPrescriptions, savePrescription, type VisitPrescription } from "../../services/visitPrescriptions";
 import type { Prescription } from "../../mocks/doctorWorkspace";
 import RealReferralDetailsDialog from "./RealReferralDetailsDialog.vue";
 import { visitReferrals, type VisitReferral } from "../../services/visitReferrals";
 import { errorText } from "../../services/api";
+import { can } from "../../services/session";
 import type { Encounter } from "../../mocks/doctorWorkspace";
 import type { WorkspacePatientRow, WorkspaceDoctor, WorkspaceBranch } from "../../services/doctorWorkspace";
 
@@ -21,7 +23,11 @@ const props = defineProps<{
   doctor: WorkspaceDoctor;
   branch: WorkspaceBranch;
   date: string;
+  finishBusy?: boolean;
+  finishError?: string;
 }>();
+const emit = defineEmits<{ finish: [] }>();
+const finishOpen = ref(false);
 
 const tabs = [
   "Bugungi qabul",
@@ -153,6 +159,7 @@ watch(() => props.patient.visit_id, () => {
   tab.value = "Bugungi qabul";
   referralOpen.value = false;
   rxOpen.value = false;
+  finishOpen.value = false;
   rxSelected.value = null;
   rxRows.value = [];
   rxError.value = "";
@@ -239,7 +246,9 @@ watch(() => props.patient.visit_id, () => {
         <button type="button" class="e-button dw-small" disabled title="Tibbiy yozuvlar hali serverga ulanmagan">
           Qoralamani saqlash
         </button>
-        <button type="button" class="e-button primary dw-small" disabled title="Qabulni yakunlash Task #03">
+        <button type="button" class="e-button primary dw-small"
+          :disabled="patient.status !== 'in_progress' || finishBusy || !can('queues.complete')"
+          @click="finishOpen = true">
           Qabulni yakunlash
         </button>
       </div>
@@ -248,6 +257,10 @@ watch(() => props.patient.visit_id, () => {
       </p>
     </article>
 
+    <FinishDialog v-if="finishOpen && patient.visit_id"
+      :patient-name="patient.name" :patient-number="patient.patient_number"
+      :doctor-name="doctor.name" :busy="!!finishBusy" :error="finishError || ''"
+      @close="finishOpen = false" @finish="emit('finish')" />
     <PrescriptionDialog v-if="rxOpen && patient.visit_id" :key="(rxSelected?.id || 'new') + patient.visit_id"
       :encounter="encounter" :doctor-name="doctor.name" :read-only="rxReadOnly"
       :prescription="rxSelected ? { id: rxSelected.id, date: encounter.date, medicines: rxSelected.medicines, note: rxSelected.note } : undefined"

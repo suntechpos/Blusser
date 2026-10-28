@@ -189,6 +189,41 @@ const suggestionError = ref("");
 const rebookingTimezone = ref("");
 let optionsSequence = 0;
 
+const finishing = ref(false);
+const finishError = ref("");
+let finishPendingKey = "";
+let finishPendingTicket = "";
+async function completeConsultation() {
+  const ticket = selected.value;
+  if (finishing.value || !ticket || ticket.source !== "ticket" ||
+    ticket.status !== "in_progress" || !can("queues.complete") ||
+    !can("queues.view") || !can("visits.view")) return;
+  if (!Number.isInteger(ticket.version) || (ticket.version ?? 0) < 1) {
+    finishError.value = "Navbat versiyasi mavjud emas. Sahifani yangilang."; return;
+  }
+  // Keep the same key for retries when the server may have committed but the response was lost.
+  if (finishPendingTicket !== ticket.id || !finishPendingKey) {
+    finishPendingTicket = ticket.id;
+    finishPendingKey = crypto.randomUUID();
+  }
+  finishing.value = true;
+  finishError.value = "";
+  const key = ticket.key;
+  try {
+    await clinicRequest("queue-tickets/" + encodeURIComponent(ticket.id) + "/complete", {
+      method: "POST",
+      headers: { "Idempotency-Key": finishPendingKey },
+      body: { expected_version: ticket.version },
+    });
+    finishPendingKey = "";
+    finishPendingTicket = "";
+    queueTab.value = "completed";
+    await load(key);
+  } catch (cause) {
+    const message = errorText(cause);
+    try { await load(key); } finally { finishError.value = message; }
+  } finally { finishing.value = false; }
+}
 const starting = ref(false);
 const startError = ref("");
 const startErrorFor = ref("");
@@ -1007,6 +1042,8 @@ function genderLabel(gender: string | null) {
               && feed?.doctor && feed?.branch"
             :key="selected.visit_id || selected.id"
             :patient="selected" :doctor="feed.doctor" :branch="feed.branch" :date="date"
+            :finish-busy="finishing" :finish-error="finishError"
+            @finish="completeConsultation"
           />
         </template>
         <article v-else class="dw-card dw-live-empty">

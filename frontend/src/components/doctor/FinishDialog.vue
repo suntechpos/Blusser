@@ -1,133 +1,46 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { CheckCircle2, Clock3, Info } from "lucide-vue-next";
+import { CheckCircle2, Info, UserRound } from "lucide-vue-next";
 import WorkspaceDialog from "./WorkspaceDialog.vue";
-import PatientStrip from "./PatientStrip.vue";
-import {
-  type Encounter,
-  type Draft,
-  type Prescription,
-  type ResultRow,
-  type Referral,
-  SERVICES,
-} from "../../mocks/doctorWorkspace";
-const props = defineProps<{
-  encounter: Encounter;
-  draft: Draft;
-  prescriptions: Prescription[];
-  results: ResultRow[];
-  referrals: Referral[];
+defineProps<{
+  patientName: string;
+  patientNumber: string;
+  doctorName: string;
+  busy: boolean;
+  error: string;
 }>();
-const emit = defineEmits<{
-  close: [];
-  finish: ["completed" | "awaiting_results"];
-}>();
-const fields = computed(() => [
-  { label: "Shikoyatlar", value: props.draft.complaints },
-  { label: "Ko‘rik natijalari", value: props.draft.examination },
-  { label: "Tashxis", value: props.draft.diagnosis },
-  { label: "Tavsiyalar", value: props.draft.recommendations },
-]);
-const pending = computed(() =>
-  props.referrals
-    .filter(
-      (r) =>
-        !props.results.some(
-          (x) => x.referral === r.id && x.status === "Tayyor",
-        ),
-    )
-    .map((r) => ({
-      name: SERVICES.find((s) => s.id === r.service)?.name,
-      status:
-        props.results.find((x) => x.referral === r.id)?.status ||
-        "Natija kutilmoqda",
-    })),
-);
-const allPending = computed(() => [
-  ...pending.value,
-  ...props.results
-    .filter(
-      (r) =>
-        r.encounter === props.encounter.id &&
-        r.status !== "Tayyor" &&
-        !props.referrals.some((f) => f.id === r.referral),
-    )
-    .map((r) => ({ name: r.name, status: r.status })),
-]);
-const busy = ref(false);
-function finish(status: "completed" | "awaiting_results") {
-  if (
-    busy.value ||
-    (status === "completed" && fields.value.some((f) => !f.value.trim()))
-  )
-    return;
-  busy.value = true;
-  emit("finish", status);
-}
+const emit = defineEmits<{ close: []; finish: [] }>();
 </script>
 <template>
-  <WorkspaceDialog
-    class="dw-finish-modal"
-    title="Qabulni yakunlash"
-    subtitle="Yakunlashdan oldin qabul ma’lumotlarini tekshiring."
-    @close="emit('close')"
-    ><div class="dw-modal-body">
-      <PatientStrip :encounter="encounter" context />
-      <section class="dw-summary">
-        <h3>Qabul xulosasi</h3>
-        <div v-for="f in fields" :key="f.label">
-          <CheckCircle2
-            v-if="f.value.trim()"
-            class="dw-success"
-            :size="20"
-          /><Clock3 v-else :size="20" /><span>{{ f.label }}</span
-          ><b :class="f.value.trim() ? 'dw-success' : 'dw-error'">{{
-            f.value.trim() ? "Kiritilgan" : "Kiritish kerak"
-          }}</b>
-        </div>
-        <div>
-          <CheckCircle2 :size="20" /><span>Retsept</span
-          ><b
-            >{{ prescriptions.length }} ta retsept ·
-            {{ prescriptions.reduce((n, p) => n + p.medicines.length, 0) }} ta
-            dori</b
-          >
-        </div>
-      </section>
-      <section v-if="allPending.length" class="dw-pending">
-        <h3><Clock3 :size="20" />Natijasi kutilayotgan tekshiruvlar</h3>
-        <div v-for="(r, i) in allPending" :key="i">
-          <Clock3 :size="19" /><span>{{ r.name }}</span
-          ><span class="dw-badge yellow">{{ r.status }}</span>
-        </div>
-      </section>
-      <div v-if="allPending.length" class="dw-info">
-        <Info :size="20" />Natijalarni kutish uchun qabulni ochiq holatda
-        saqlashingiz mumkin.
+  <WorkspaceDialog class="dw-finish-modal"
+    title="Qabulni yakunlash" subtitle="Yakunlashdan oldin ma’lumotlarni tekshiring."
+    @close="!busy && emit('close')">
+    <div class="dw-modal-body dw-finish-content">
+      <div class="dw-finish-patient"><UserRound :size="26"/>
+        <div><strong>{{ patientName }}</strong><small>{{ patientNumber }} · Shifokor: {{ doctorName }}</small></div>
       </div>
-      <p class="dw-footnote">
-        <Clock3 :size="17" />Qabul yakunlansa, yozuvlar ko‘rish rejimiga o‘tadi.
-        Bu faqat lokal mock holat.
-      </p>
+      <div class="dw-finish-notice"><Info :size="20"/>
+        <span>Qabul yakunlangach navbat va tashrif «Yakunlangan» holatiga o‘tadi. Saqlangan klinik yozuvlar o‘zgartirilmaydi.</span>
+      </div>
+      <p>Saqlanmagan tibbiy yozuvlaringiz bo‘lsa, avval ularni alohida saqlang. Bu amal yozuvlarni avtomatik saqlamaydi.</p>
+      <p v-if="error" class="dw-finish-error" role="alert">{{ error }}</p>
     </div>
-    <template #footer
-      ><footer>
-        <button class="e-button" @click="emit('close')">Ortga qaytish</button
-        ><button
-          v-if="allPending.length"
-          class="e-button"
-          :disabled="busy"
-          @click="finish('awaiting_results')"
-        >
-          Natija kutishga qoldirish</button
-        ><button
-          class="e-button primary"
-          :disabled="busy || fields.some((f) => !f.value.trim())"
-          @click="finish('completed')"
-        >
-          Qabulni yakunlash
-        </button>
-      </footer></template
-    ></WorkspaceDialog
-  >
+    <template #footer><footer class="dw-finish-actions">
+      <button type="button" class="e-button" :disabled="busy" @click="emit('close')">Ortga qaytish</button>
+      <button type="button" class="e-button primary" :disabled="busy" @click="emit('finish')">
+        <CheckCircle2 :size="18"/>{{ busy ? "Yakunlanmoqda..." : "Qabulni yakunlash" }}
+      </button>
+    </footer></template>
+  </WorkspaceDialog>
 </template>
+<style scoped>
+.dw-finish-content{display:grid;gap:15px}
+.dw-finish-patient{display:flex;align-items:center;gap:14px;padding:17px;border:1px solid #d6e4fa;border-radius:10px;background:#f2f7ff}
+.dw-finish-patient svg{color:#176aff}
+.dw-finish-patient strong,.dw-finish-patient small{display:block}
+.dw-finish-patient small{margin-top:5px;color:#6c83a7}
+.dw-finish-notice{display:flex;gap:12px;padding:15px;border-radius:10px;background:#eaf4ff;color:#345c89}
+.dw-finish-notice svg{flex-shrink:0;color:#146cf5}
+.dw-finish-content>p{font-size:13px;color:#617b9d}
+.dw-finish-content .dw-finish-error{color:#b42318}
+.dw-finish-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px}
+</style>
