@@ -177,10 +177,10 @@ const fields = [
           <option>Kuniga 1 marta</option>
           <option>Kuniga 2 marta</option>
         </datalist>
-        <p v-if="!medicines.length" class="dw-error">
+        <p v-if="!medicines.length && !readOnly" class="dw-error">
           Kamida bitta to‘liq dori kiriting.
         </p>
-        <button class="e-button" type="button" @click="add">
+        <button v-if="!readOnly" class="e-button" type="button" @click="add">
           <Plus :size="19" />Dori qo‘shish</button
         ><label class="dw-field dw-rx-note"
           >Umumiy izoh<textarea
