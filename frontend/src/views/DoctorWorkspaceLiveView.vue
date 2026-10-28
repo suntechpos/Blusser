@@ -13,7 +13,7 @@ const feed = ref<DoctorWorkspaceFeed | null>(null);
 const date = ref("");
 const doctorId = ref("");
 const branchId = ref("");
-const queueTab = ref<"waiting" | "unresolved" | "completed">("waiting");
+const queueTab = ref<"all" | "waiting" | "active" | "completed">("waiting");
 const query = ref("");
 const selectedKey = ref("");
 const loading = ref(true);
@@ -354,7 +354,7 @@ const overdueTickets = computed(() => feed.value?.overdue ?? []);
 async function continueOverdue(row: { id: string; local_date: string; branch_id: string }) {
   // Navigation alone: no queue status or medical record mutation.
   if (loading.value) return;
-  queueTab.value = "unresolved";
+  queueTab.value = "active";
   query.value = "";
   openMenuKey.value = "";
   overdueError.value = "";
@@ -661,19 +661,31 @@ function resumeRow(row: QueueDisplayRow) {
   }
 }
 
+const allQueueRows = computed<QueueDisplayRow[]>(() => {
+  const seen = new Set(rows.value.map(row => row.key));
+  return [...rows.value, ...unresolvedRows.value.filter(row => !seen.has(row.key))];
+});
+const activeQueueRows = computed(() => allQueueRows.value.filter(row =>
+  row.status === "in_progress",
+));
 const filteredRows = computed<QueueDisplayRow[]>(() => {
-  const source = queueTab.value === "unresolved" ? unresolvedRows.value
-    : rows.value.filter((row) => queueTab.value === "completed"
-      ? completed(row) : !completed(row) && !overdueIds.value.has(row.id));
+  const source = queueTab.value === "all" ? allQueueRows.value
+    : queueTab.value === "active" ? activeQueueRows.value
+    : rows.value.filter(row => queueTab.value === "completed"
+      ? completed(row) : !completed(row) && row.status !== "in_progress"
+        && !overdueIds.value.has(row.id));
   const search = query.value.trim().toLocaleLowerCase();
   return source.filter((row) => !search ||
     [row.name, row.patient_number, String(row.number ?? ""), row.service]
       .some((item) => item?.toLocaleLowerCase().includes(search)));
 });
 const waitingCount = computed(() => rows.value.filter(
-  (row) => !completed(row) && !overdueIds.value.has(row.id),
+  (row) => !completed(row) && row.status !== "in_progress"
+    && !overdueIds.value.has(row.id),
 ).length);
 const completedCount = computed(() => rows.value.filter(completed).length);
+const allCount = computed(() => allQueueRows.value.length);
+const activeCount = computed(() => activeQueueRows.value.length);
 // The doctor has one active clinical encounter. Keep it in the details panel
 // independently of which queue tab is showing on the left. A prior-day visit
 // comes from the already authorized overdue projection.
@@ -681,7 +693,7 @@ const inProgressEncounter = computed<QueueDisplayRow | null>(() =>
   [...unresolvedRows.value, ...rows.value].find(row => row.status === "in_progress") ?? null,
 );
 const selected = computed<QueueDisplayRow | null>(() => {
-  if (queueTab.value === "waiting" && inProgressEncounter.value) {
+  if ((queueTab.value === "waiting" || queueTab.value === "all") && inProgressEncounter.value) {
     return inProgressEncounter.value;
   }
   const visible = filteredRows.value.find(row => row.key === selectedKey.value);
@@ -691,7 +703,7 @@ const selected = computed<QueueDisplayRow | null>(() => {
   );
   return selectedActive ?? filteredRows.value[0] ?? null;
 });
-function setTab(tab: "waiting" | "unresolved" | "completed") {
+function setTab(tab: "all" | "waiting" | "active" | "completed", event?: Event) {
   queueTab.value = tab;
   if (inProgressEncounter.value) {
     selectedKey.value = inProgressEncounter.value.key;
@@ -699,6 +711,8 @@ function setTab(tab: "waiting" | "unresolved" | "completed") {
     selectedKey.value = "";
   }
   openMenuKey.value = "";
+  const button = event?.currentTarget;
+  if (button instanceof HTMLElement) button.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
 }
 const timezone = computed(() => feed.value?.branch?.timezone || "Asia/Tashkent");
 function visitTime(row: DisplayRow) {
@@ -790,14 +804,17 @@ function genderLabel(gender: string | null) {
     <div class="dw-workspace">
       <aside class="dw-card dw-queue">
         <h2>Bugungi navbat</h2>
-        <div class="dw-queue-tabs">
-          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'waiting' }" @click="setTab('waiting')">
-            Kutilmoqda <b>{{ waitingCount }}</b>
+        <div class="dw-queue-tabs dw-queue-tabs-scroll" role="group" aria-label="Navbat filtrlari">
+          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'all' }" @click="setTab('all', $event)">
+            Barchasi <b>{{ allCount }}</b>
           </button>
-          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'unresolved' }" @click="setTab('unresolved')">
-            Yakunlanmagan <b>{{ unresolvedCount }}</b>
+          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'waiting' }" @click="setTab('waiting', $event)">
+            Kutmoqda <b>{{ waitingCount }}</b>
           </button>
-          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'completed' }" @click="setTab('completed')">
+          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'active' }" @click="setTab('active', $event)">
+            Qabulda <b>{{ activeCount }}</b>
+          </button>
+          <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'completed' }" @click="setTab('completed', $event)">
             Yakunlangan <b>{{ completedCount }}</b>
           </button>
         </div>
@@ -860,7 +877,7 @@ function genderLabel(gender: string | null) {
             </div>
             <p v-if="!filteredRows.length && !error" class="dw-empty">
               {{ query.trim() ? "Qidiruv bo‘yicha bemor topilmadi." :
-                queueTab === "unresolved" ? "Oldingi kundan qolgan ochiq navbat yo‘q." :
+                queueTab === "active" ? "Qabuldagi bemor yo‘q." :
                 queueTab === "completed" ? "Yakunlangan qabul topilmadi." :
                 "Ushbu sanada kutayotgan bemorlar yo‘q." }}
             </p>
@@ -1117,6 +1134,18 @@ function genderLabel(gender: string | null) {
 </template>
 
 <style scoped>
+.dw-ui .dw-queue-tabs-scroll {
+  display: flex; flex-wrap: nowrap; justify-content: flex-start;
+  overflow-x: auto; overflow-y: hidden; width: 100%; max-width: 100%;
+  overscroll-behavior-inline: contain; scroll-snap-type: x proximity;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.dw-ui .dw-queue-tabs-scroll::-webkit-scrollbar { display: none; }
+.dw-ui .dw-queue-tabs-scroll > button {
+  flex: 0 0 auto; min-width: max-content; white-space: nowrap;
+  scroll-snap-align: nearest; padding-inline: 10px;
+}
+
 
 
 /* Compact prior-day warning; patient rows now belong to the left tab. */
