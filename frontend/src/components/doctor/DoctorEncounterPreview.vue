@@ -32,6 +32,7 @@ const tabs = [
 const tab = ref<(typeof tabs)[number]>("Bugungi qabul");
 const referralOpen = ref(false);
 const rxOpen = ref(false);
+const rxReadOnly = ref(false);
 const rxSaving = ref(false);
 const rxError = ref("");
 const rxRows = ref<VisitPrescription[]>([]);
@@ -80,7 +81,8 @@ function printRx(record: VisitPrescription) {
   <tbody>${rows}</tbody></table><p><b>Izoh:</b> ${clean(record.note)}</p></body></html>`);
   popup.document.close(); popup.focus(); popup.print();
 }
-function editRx(record: VisitPrescription) {
+function editRx(record: VisitPrescription, readOnly = false) {
+  rxReadOnly.value = readOnly;
   rxSelected.value = record;
   rxError.value = "";
   rxOpen.value = true;
@@ -214,8 +216,8 @@ watch(() => props.patient.visit_id, () => {
           <div><strong>Retsept — {{ rx.medicines.length }} ta dori</strong>
             <p>{{ rx.medicines.map(m => m.name).join(", ") }}</p></div>
           <div class="dw-rx-actions">
+            <button type="button" class="e-button dw-small" @click="editRx(rx, true)">Ko‘rish</button>
             <button type="button" class="e-button dw-small" :disabled="patient.status !== 'in_progress'" @click="editRx(rx)">Tahrirlash</button>
-            <button type="button" class="e-button dw-small" @click="printRx(rx)">Chop etish / PDF</button>
           </div>
         </div>
       </section>
@@ -226,7 +228,7 @@ watch(() => props.patient.visit_id, () => {
         </button>
         <button type="button" class="e-button dw-small"
           :disabled="patient.status !== 'in_progress' || !patient.visit_id"
-          @click="rxSelected = null; rxError = ''; rxOpen = true">
+          @click="rxSelected = null; rxReadOnly = false; rxError = ''; rxOpen = true">
           <Plus :size="20" /> Retsept
         </button>
         <span />
@@ -243,10 +245,10 @@ watch(() => props.patient.visit_id, () => {
     </article>
 
     <PrescriptionDialog v-if="rxOpen && patient.visit_id" :key="(rxSelected?.id || 'new') + patient.visit_id"
-      :encounter="encounter"
+      :encounter="encounter" :doctor-name="doctor.name" :read-only="rxReadOnly"
       :prescription="rxSelected ? { id: rxSelected.id, date: encounter.date, medicines: rxSelected.medicines, note: rxSelected.note } : undefined"
       :saving="rxSaving" :error="rxError"
-      @close="rxOpen = false" @save="submitRx" />
+      @close="rxOpen = false" @save="submitRx" @print="rxSelected && printRx(rxSelected)" />
     <RealReferralDetailsDialog v-if="selectedReferral" :referral="selectedReferral"
       :patient-name="patient.name" :patient-number="patient.patient_number"
       :doctor-name="doctor.name" @close="selectedReferral = null" />
