@@ -803,3 +803,36 @@ test("CEO explicitly selects a doctor; changing doctor clears previous patient",
   await expect(page.locator(".dw-queue")).not.toContainText("Aliyev Alijon");
   expect(requests.some(q => q.includes("doctor-biloldin"))).toBe(true);
 });
+
+test("keeps a booked patient when visit is on another day, without duplicating same-day ticket", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-26T07:00:00Z"));
+  await setup(page, false, allServerGrants, []);
+  const booked = (id: string, name: string) => ({
+    id, appointment_id: id, patient_id: id + "-patient",
+    patient_number: "P-" + id, name, dob: "1990-01-01", gender: "male",
+    phone: null, service: "Tish qo‘ydirish", starts_at: "2026-10-26T06:30:00Z",
+    status: "scheduled", version: 1,
+  });
+  const ticket = {
+    ...patient, id: "ticket-linked", name: "Booked Same-day",
+    appointment_id: "appointment-linked", status: "waiting", version: 1,
+  };
+  await page.route("**/api/v1/clinic/doctor-workspace*", async (route) => {
+    await route.fulfill({ json: {
+      manager: false, doctors: [], doctor: {
+        id: "doctor-nizomjon", name: "Nizomjon Mansurov", specialty: "Tish doktori",
+      }, branch: { id: "branch-1", name: "Asosiy filial", timezone: "Asia/Tashkent" },
+      date: "2026-10-26", has_active_patient: false, has_called_today: false,
+      overdue: [], tickets: [ticket],
+      scheduled: [
+        booked("appointment-across-day", "Booked Different-day"),
+        booked("appointment-linked", "Booked Same-day"),
+      ],
+    } });
+  });
+  await page.reload();
+  const list = page.locator(".dw-queue-list");
+  await expect(list.getByText("Booked Different-day")).toHaveCount(1);
+  await expect(list.getByText("Booked Same-day")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /Kutilmoqda 2/ })).toBeVisible();
+});
