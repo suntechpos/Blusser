@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, computed } from "vue";
-import { Plus, Trash2, Clock3, Link } from "lucide-vue-next";
+import { Plus, Trash2, Clock3, Link, Printer, FileText } from "lucide-vue-next";
 import WorkspaceDialog from "./WorkspaceDialog.vue";
 import PatientStrip from "./PatientStrip.vue";
 import {
@@ -14,8 +14,10 @@ const props = defineProps<{
   prescription?: Prescription;
   saving?: boolean;
   error?: string;
+  doctorName: string;
+  readOnly?: boolean;
 }>();
-const emit = defineEmits<{ close: []; save: [Prescription] }>();
+const emit = defineEmits<{ close: []; save: [Prescription]; print: [] }>();
 
 const medicines = ref(
   props.prescription
@@ -43,7 +45,7 @@ async function add() {
     ?.focus();
 }
 function save() {
-  if (props.saving) return;
+  if (props.saving || props.readOnly) return;
   errors.value = prescriptionErrors(medicines.value);
   if (
     !medicines.value.length ||
@@ -99,13 +101,13 @@ const fields = [
   <WorkspaceDialog
     class="dw-prescription-modal"
     :class="{ 'dw-multiple': medicines.length > 1 }"
-    title="Retsept yozish"
+     :title="readOnly ? 'Retseptni ko‘rish' : prescription ? 'Retseptni tahrirlash' : 'Retsept yozish'"
     subtitle="Dori vositalari va qabul qilish tartibini kiriting"
     :dirty="dirty"
     @close="emit('close')"
   >
     <div class="dw-modal-body">
-      <PatientStrip :encounter="encounter" context />
+      <PatientStrip :encounter="encounter" :doctor-name="doctorName" context />
       <div class="dw-allergy">
         <Clock3 :size="18" /><span
           ><b>Allergiya:</b>
@@ -113,6 +115,7 @@ const fields = [
         >
       </div>
       <form id="dw-rx-form" novalidate @submit.prevent="save">
+        <fieldset class="dw-rx-fields" :disabled="readOnly || saving">
         <section v-for="(m, i) in medicines" :key="i" class="dw-medicine">
           <header>
             <h3>{{ i + 1 }}-dori</h3>
@@ -186,6 +189,7 @@ const fields = [
             placeholder="Bemorga qo‘shimcha ko‘rsatmalar..."
           />
         </label>
+        </fieldset>
       </form>
     </div>
     <template #footer="{ close }"
@@ -194,10 +198,16 @@ const fields = [
           ><Link :size="17" />{{ medicines.length }} ta dori · Bitta qabulga bog‘langan retsept</span
         ><button class="e-button" @click="close" type="button">
           Bekor qilish</button
-        ><button form="dw-rx-form" class="e-button primary" :disabled="saving">
+        ><button v-if="prescription" type="button" class="e-button" @click="emit('print')"><Printer :size="17"/> Chop etish / PDF</button><button v-if="!readOnly" form="dw-rx-form" class="e-button primary" :disabled="saving">
           Retseptni saqlash
         </button>
       </footer></template
     ></WorkspaceDialog
   >
 </template>
+
+<style scoped>
+.dw-rx-fields{border:0;padding:0;margin:0;min-width:0}
+.dw-rx-fields:disabled .dw-medicine button{display:none}
+.dw-rx-fields:disabled input,.dw-rx-fields:disabled select,.dw-rx-fields:disabled textarea{opacity:1;color:#17345a;background:#f5f8fd}
+</style>
