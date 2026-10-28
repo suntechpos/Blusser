@@ -288,6 +288,11 @@ test("UI: prior-day warning is compact and unfinished tickets live in one queue 
   // The patient list changes, but the ongoing consultation remains in details.
   await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toBeVisible();
   await expect(page.locator(".dw-live-details")).toContainText("Aliyev Alijon");
+  // Repeated tab switches must not make the right-hand clinical encounter
+  // revert to the first booked patient.
+  await unresolved.click();
+  await waiting.click();
+  await expect(page.locator(".dw-live-details")).toContainText("Aliyev Alijon");
   await expect(page.getByLabel("Qabul sanasi")).toHaveValue("2026-10-27");
   await unresolved.click();
   await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toBeVisible();
