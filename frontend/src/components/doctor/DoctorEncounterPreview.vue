@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Clock3, LockKeyhole, Plus } from "lucide-vue-next";
+import { Clock3, LockKeyhole, Plus, FileText, Eye } from "lucide-vue-next";
 import HistoryPanel from "./HistoryPanel.vue";
 import RecordsPanel from "./RecordsPanel.vue";
 import DiagnosisEditor from "./DiagnosisEditor.vue";
@@ -128,11 +128,19 @@ watch(() => props.patient.visit_id, () => {
         <p v-if="referralsError" role="alert" class="dw-referrals-error">{{ referralsError }}</p>
         <p v-if="!referralsLoading && !referralsError && !referralRows.length">Hozircha yo‘llanma yo‘q.</p>
         <div v-for="referral in referralRows" :key="referral.id" class="dw-referral-item">
-          <strong>{{ referral.service_name }}</strong>
-          <small>{{ referral.location === 'internal' ? (referral.target_branch_name || 'Ichki yo‘llanma') : (referral.external_clinic || 'Tashqi klinika') }} · {{ referral.status === 'ordered' ? 'Buyurilgan' : referral.status }}</small>
-          <p v-if="referral.note">{{ referral.note }}</p>
+          <div class="dw-referral-symbol"><FileText :size="24" /></div>
+          <div class="dw-referral-summary">
+            <strong>{{ referral.service_name }}</strong>
+            <div class="dw-referral-meta">
+              <span>{{ referral.location === 'internal' ? (referral.target_branch_name || 'Ichki yo‘llanma') : (referral.external_clinic || 'Tashqi klinika') }}</span>
+              <span class="dw-referral-status">{{ referral.status === 'ordered' ? '● Buyurilgan' : referral.status }}</span>
+            </div>
+            <p v-if="referral.note">{{ referral.note }}</p>
+          </div>
           <div class="dw-referral-row-actions">
-            <button type="button" class="e-button dw-small" @click="selectedReferral = referral">Ko‘rish / Chop etish / PDF</button>
+            <button type="button" class="e-button dw-small" @click="selectedReferral = referral">
+              <Eye :size="17" /> Ko‘rish / Chop etish / PDF
+            </button>
           </div>
         </div>
       </div>
@@ -199,9 +207,15 @@ watch(() => props.patient.visit_id, () => {
 .dw-referral-results h3 { margin: 0; color: #173864; }
 .dw-referral-results > p { font-size: 13px; color: #6880a1; margin: 0; }
 .dw-referral-results .dw-referrals-error { color: #b42318; }
-.dw-referral-item { border: 1px solid #d5e2f7; border-radius: 9px; padding: 12px; }
+.dw-referral-item { border:1px solid #d5e2f7;border-radius:12px;padding:18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap; }
+.dw-referral-symbol{width:55px;height:55px;display:grid;place-items:center;flex-shrink:0;background:#eaf3ff;color:#0866eb;border-radius:12px}
+.dw-referral-summary{flex:1 1 240px;min-width:0}
+.dw-referral-meta{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:8px;color:#7084a6;font-size:13px}
+.dw-referral-status{background:#e4f8ee;color:#128755;border-radius:8px;padding:5px 10px;font-weight:600}
+.dw-referral-item .dw-referral-summary p{margin-top:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#647fa3}
+@media(max-width:640px){.dw-referral-item{align-items:flex-start;padding:13px}.dw-referral-row-actions{width:100%}.dw-referral-row-actions button{width:100%;justify-content:center}}
 .dw-referral-item strong, .dw-referral-item small { display: block; }
 .dw-referral-item small { color: #687f9f; margin-top: 5px; }
 .dw-referral-item p { margin: 6px 0 0; }
-.dw-referral-row-actions { display:flex; justify-content:flex-end; margin-top:10px; }
+.dw-referral-row-actions { display:flex; justify-content:flex-end; margin-top:0; }
 </style>
