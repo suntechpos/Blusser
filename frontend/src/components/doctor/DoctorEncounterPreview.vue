@@ -7,6 +7,9 @@ import DiagnosisEditor from "./DiagnosisEditor.vue";
 import ClinicalNotesEditor from "./ClinicalNotesEditor.vue";
 import RecommendationsEditor from "./RecommendationsEditor.vue";
 import ReferralDialog from "./ReferralDialog.vue";
+import PrescriptionDialog from "./PrescriptionDialog.vue";
+import { listPrescriptions, savePrescription, type VisitPrescription } from "../../services/visitPrescriptions";
+import type { Prescription } from "../../mocks/doctorWorkspace";
 import RealReferralDetailsDialog from "./RealReferralDetailsDialog.vue";
 import { visitReferrals, type VisitReferral } from "../../services/visitReferrals";
 import { errorText } from "../../services/api";
@@ -28,6 +31,38 @@ const tabs = [
 ] as const;
 const tab = ref<(typeof tabs)[number]>("Bugungi qabul");
 const referralOpen = ref(false);
+const rxOpen = ref(false);
+const rxSaving = ref(false);
+const rxError = ref("");
+const rxRows = ref<VisitPrescription[]>([]);
+const rxSelected = ref<VisitPrescription | null>(null);
+let rxSequence = 0;
+async function reloadRx() {
+  const id = props.patient.visit_id;
+  if (!id) return;
+  const sequence = ++rxSequence;
+  try {
+    const records = await listPrescriptions(id);
+    if (rxSequence === sequence && props.patient.visit_id === id) rxRows.value = records;
+  } catch (cause) {
+    if (rxSequence === sequence) rxError.value = errorText(cause);
+  }
+}
+async function submitRx(payload: Prescription) {
+  if (!props.patient.visit_id || rxSaving.value) return;
+  rxSaving.value = true; rxError.value = "";
+  try {
+    await savePrescription(props.patient.visit_id, payload.medicines, payload.note, rxSelected.value ?? undefined);
+    rxOpen.value = false; rxSelected.value = null;
+    await reloadRx();
+  } catch(cause) { rxError.value = errorText(cause); }
+  finally { rxSaving.value = false; }
+}
+function editRx(record: VisitPrescription) {
+  rxSelected.value = record;
+  rxError.value = "";
+  rxOpen.value = true;
+}
 const selectedReferral = ref<VisitReferral | null>(null);
 const referralRows = ref<VisitReferral[]>([]);
 const referralsError = ref("");
@@ -90,6 +125,11 @@ const startTime = computed(() => {
 watch(() => props.patient.visit_id, () => {
   tab.value = "Bugungi qabul";
   referralOpen.value = false;
+  rxOpen.value = false;
+  rxSelected.value = null;
+  rxRows.value = [];
+  rxError.value = "";
+  void reloadRx();
   selectedReferral.value = null;
   referralRows.value = [];
   void reloadReferrals();
@@ -144,12 +184,24 @@ watch(() => props.patient.visit_id, () => {
           </div>
         </div>
       </div>
+      <section class="dw-rx-results" aria-label="Saqlangan retseptlar">
+        <h3>Retseptlar</h3>
+        <p v-if="rxError && !rxOpen" role="alert">{{ rxError }}</p>
+        <p v-if="!rxRows.length">Retsept hali yozilmagan.</p>
+        <div v-for="rx in rxRows" :key="rx.id" class="dw-rx-row">
+          <div><strong>Retsept — {{ rx.medicines.length }} ta dori</strong>
+            <p>{{ rx.medicines.map(m => m.name).join(", ") }}</p></div>
+          <button type="button" class="e-button dw-small" @click="editRx(rx)">Ko‘rish / Tahrirlash</button>
+        </div>
+      </section>
       <div class="dw-current-actions" aria-label="Qabul amallari">
         <button type="button" class="e-button dw-small" :disabled="patient.status !== 'in_progress' || !patient.visit_id"
           @click="referralOpen = true">
           <Plus :size="20" /> Yo‘llanma
         </button>
-        <button type="button" class="e-button dw-small" disabled title="Retseptlar API keyingi taskda ulanadi">
+        <button type="button" class="e-button dw-small"
+          :disabled="patient.status !== 'in_progress' || !patient.visit_id"
+          @click="rxSelected = null; rxError = ''; rxOpen = true">
           <Plus :size="20" /> Retsept
         </button>
         <span />
@@ -161,10 +213,15 @@ watch(() => props.patient.visit_id, () => {
         </button>
       </div>
       <p class="dw-footnote"><LockKeyhole :size="17" />
-        Ko‘rik yozuvlari, tashxis, tavsiyalar va yo‘llanmalar alohida saqlanadi. Retsept keyingi taskda ulanadi.
+        Ko‘rik yozuvlari, tashxis, tavsiyalar va yo‘llanmalar alohida saqlanadi. Retsept ham alohida saqlanadi.
       </p>
     </article>
 
+    <PrescriptionDialog v-if="rxOpen && patient.visit_id" :key="(rxSelected?.id || 'new') + patient.visit_id"
+      :encounter="encounter"
+      :prescription="rxSelected ? { id: rxSelected.id, date: encounter.date, medicines: rxSelected.medicines, note: rxSelected.note } : undefined"
+      :saving="rxSaving" :error="rxError"
+      @close="rxOpen = false" @save="submitRx" />
     <RealReferralDetailsDialog v-if="selectedReferral" :referral="selectedReferral"
       :patient-name="patient.name" :patient-number="patient.patient_number"
       :doctor-name="doctor.name" @close="selectedReferral = null" />
@@ -218,4 +275,9 @@ watch(() => props.patient.visit_id, () => {
 .dw-referral-item small { color: #687f9f; margin-top: 5px; }
 .dw-referral-item p { margin: 6px 0 0; }
 .dw-referral-row-actions { display:flex; justify-content:flex-end; margin-top:0; }
+.dw-rx-results{display:grid;gap:10px;margin:22px 0}
+.dw-rx-results h3{margin:0;color:#173864}
+.dw-rx-results>p{font-size:13px;color:#6880a1}
+.dw-rx-row{border:1px solid #d5e2f7;border-radius:10px;padding:13px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.dw-rx-row p{margin:6px 0 0;color:#647fa3}
 </style>
