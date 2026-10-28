@@ -28,6 +28,11 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ finish: [] }>();
 const finishOpen = ref(false);
+const finishBlockedReason = computed(() => {
+  if (props.patient.status !== "in_progress") return "Faqat boshlangan qabulni yakunlash mumkin.";
+  if (!can("queues.complete")) return "Qabulni yakunlash uchun «Navbatni yakunlash» ruxsati kerak. Administrator xodim ruxsatlaridan bu amalni yoqishi lozim.";
+  return "";
+});
 
 const tabs = [
   "Bugungi qabul",
@@ -81,6 +86,7 @@ function printRx(record: VisitPrescription) {
 .dw-rx-card-content{flex:1;min-width:220px}
 .dw-rx-card-content small{display:flex;gap:6px;align-items:center;color:#6d84a7;margin-top:10px;flex-wrap:wrap}
 .dw-rx-actions .e-button{display:inline-flex;align-items:center;gap:7px;border-radius:9px}
+.dw-complete-blocked{font-size:13px;color:#9a631d;margin:9px 0 0;line-height:1.5}
 </style>
   </head><body><h1>Blusser — Retsept</h1>
   <p><b>Bemor:</b> ${clean(props.patient.name)} · ${clean(props.patient.patient_number)}</p>
@@ -247,11 +253,12 @@ watch(() => props.patient.visit_id, () => {
           Qoralamani saqlash
         </button>
         <button type="button" class="e-button primary dw-small"
-          :disabled="patient.status !== 'in_progress' || finishBusy || !can('queues.complete')"
+           :disabled="!!finishBlockedReason || finishBusy" :title="finishBlockedReason"
           @click="finishOpen = true">
           Qabulni yakunlash
         </button>
       </div>
+      <p v-if="finishBlockedReason" class="dw-complete-blocked" role="status">{{ finishBlockedReason }}</p>
       <p class="dw-footnote"><LockKeyhole :size="17" />
         Ko‘rik yozuvlari, tashxis, tavsiyalar va yo‘llanmalar alohida saqlanadi. Retsept ham alohida saqlanadi.
       </p>
