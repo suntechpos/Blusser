@@ -11,6 +11,7 @@ use App\Modules\Queues\Http\QueueController;
 use App\Modules\Queues\Http\VisitClinicalNoteController;
 use App\Modules\Queues\Http\VisitRecommendationController;
 use App\Modules\Queues\Http\VisitReferralController;
+use App\Modules\Queues\Http\VisitPrescriptionController;
 use App\Modules\Queues\Http\VisitDiagnosisController;
 use App\Modules\Scheduling\Http\EmployeeWorkController;
 use App\Modules\Scheduling\Http\SchedulingController;
@@ -67,6 +68,9 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                 Route::get('visits/{visit}/referrals', [VisitReferralController::class, 'index'])->whereUuid('visit');
                 Route::get('visits/{visit}/referral-options', [VisitReferralController::class, 'options'])->whereUuid('visit');
                 Route::post('visits/{visit}/referrals', [VisitReferralController::class, 'store'])->whereUuid('visit');
+                Route::get('visits/{visit}/prescriptions', [VisitPrescriptionController::class, 'index'])->whereUuid('visit');
+                Route::post('visits/{visit}/prescriptions', [VisitPrescriptionController::class, 'store'])->whereUuid('visit');
+                Route::put('visits/{visit}/prescriptions/{prescription}', [VisitPrescriptionController::class, 'update'])->whereUuid('visit')->whereUuid('prescription');
                 Route::get('visits/{visit}/diagnosis', [VisitDiagnosisController::class, 'show'])->whereUuid('visit');
                 Route::put('visits/{visit}/diagnosis', [VisitDiagnosisController::class, 'save'])->whereUuid('visit');
                 Route::get('queue-tickets', [QueueController::class, 'index']);
