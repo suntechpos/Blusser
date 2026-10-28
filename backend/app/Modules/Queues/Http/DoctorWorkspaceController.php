@@ -64,6 +64,51 @@ final class DoctorWorkspaceController
                     $feed['overdue'] = [];
                 }
 
+                // A consultation started on an earlier queue date can be completed
+                // today. Include it in today's completed tab even though its original
+                // queue local_date remains unchanged. Read through normal tenant RLS.
+                $feed['completed_today'] = [];
+                if (($feed['doctor']['id'] ?? null) && ($feed['branch']['id'] ?? null) && ($feed['date'] ?? null)) {
+                    $timezone = $feed['branch']['timezone'] ?? 'Asia/Tashkent';
+                    $day = $feed['date'];
+                    $alreadyVisible = array_column($feed['tickets'] ?? [], 'id');
+                    $recent = DB::table('queue_tickets as q')
+                        ->join('visits as v', function ($join) {
+                            $join->on('v.tenant_id', '=', 'q.tenant_id')
+                                ->on('v.id', '=', 'q.visit_id');
+                        })
+                        ->join('patients as p', function ($join) {
+                            $join->on('p.tenant_id', '=', 'v.tenant_id')
+                                ->on('p.id', '=', 'v.patient_id');
+                        })
+                        ->join('services as svc', function ($join) {
+                            $join->on('svc.tenant_id', '=', 'v.tenant_id')
+                                ->on('svc.id', '=', 'v.service_id');
+                        })
+                        ->whereRaw('q.tenant_id = public.context_tenant()')
+                        ->where('v.doctor_id', $feed['doctor']['id'])
+                        ->where('q.branch_id', $feed['branch']['id'])
+                        ->where('q.status', 'completed')
+                        ->whereRaw('(q.completed_at AT TIME ZONE ?)::date = ?::date', [$timezone, $day])
+                        ->whereNotIn('q.id', $alreadyVisible)
+                        ->whereRaw('governance.queue_visible(q.id)')
+                        ->whereRaw("governance.booking_visible('visits', v.id, 'visits.view')")
+                        ->where(function ($query) {
+                            $query->whereNull('v.appointment_id')
+                                ->orWhereRaw("governance.booking_visible('appointments', v.appointment_id, 'appointments.view')");
+                        })
+                        ->orderBy('q.completed_at')
+                        ->limit(100)
+                        ->get([
+                            'q.id', 'v.id as visit_id', 'p.id as patient_id',
+                            'p.patient_number', 'p.name', 'p.date_of_birth as dob',
+                            'p.gender', 'p.phone', 'svc.name as service',
+                            'q.number', 'q.kind', 'q.status', 'q.version',
+                            'v.appointment_id', 'q.created_at',
+                        ]);
+                    $feed['completed_today'] = $recent->toArray();
+                }
+
                 // The security-definer feed already restricts tickets to this doctor
                 // and branch. Fetch service IDs with normal visit RLS, without exposing
                 // other patients, to resolve real schedule availability for queue start.
