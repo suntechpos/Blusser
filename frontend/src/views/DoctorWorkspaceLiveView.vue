@@ -672,14 +672,16 @@ const filteredRows = computed<QueueDisplayRow[]>(() => {
   const source = queueTab.value === "all" ? allQueueRows.value
     : queueTab.value === "active" ? activeQueueRows.value
     : rows.value.filter(row => queueTab.value === "completed"
-      ? completed(row) : !completed(row) && !overdueIds.value.has(row.id));
+      ? completed(row) : !completed(row) && row.status !== "in_progress"
+        && row.status !== "called" && !overdueIds.value.has(row.id));
   const search = query.value.trim().toLocaleLowerCase();
   return source.filter((row) => !search ||
     [row.name, row.patient_number, String(row.number ?? ""), row.service]
       .some((item) => item?.toLocaleLowerCase().includes(search)));
 });
 const waitingCount = computed(() => rows.value.filter(
-  (row) => !completed(row) && !overdueIds.value.has(row.id),
+  (row) => !completed(row) && row.status !== "in_progress"
+    && row.status !== "called" && !overdueIds.value.has(row.id),
 ).length);
 const completedCount = computed(() => rows.value.filter(completed).length);
 const allCount = computed(() => allQueueRows.value.length);
@@ -875,7 +877,7 @@ function genderLabel(gender: string | null) {
             </div>
             <p v-if="!filteredRows.length && !error" class="dw-empty">
               {{ query.trim() ? "Qidiruv bo‘yicha bemor topilmadi." :
-                queueTab === "unresolved" ? "Oldingi kundan qolgan ochiq navbat yo‘q." :
+                queueTab === "active" ? "Qabuldagi bemor yo‘q." :
                 queueTab === "completed" ? "Yakunlangan qabul topilmadi." :
                 "Ushbu sanada kutayotgan bemorlar yo‘q." }}
             </p>
