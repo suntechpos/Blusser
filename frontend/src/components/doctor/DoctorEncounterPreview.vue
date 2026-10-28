@@ -6,6 +6,9 @@ import RecordsPanel from "./RecordsPanel.vue";
 import DiagnosisEditor from "./DiagnosisEditor.vue";
 import ClinicalNotesEditor from "./ClinicalNotesEditor.vue";
 import RecommendationsEditor from "./RecommendationsEditor.vue";
+import ReferralDialog from "./ReferralDialog.vue";
+import { visitReferrals, type VisitReferral } from "../../services/visitReferrals";
+import { errorText } from "../../services/api";
 import type { Encounter } from "../../mocks/doctorWorkspace";
 import type { WorkspacePatientRow, WorkspaceDoctor, WorkspaceBranch } from "../../services/doctorWorkspace";
 
@@ -23,6 +26,27 @@ const tabs = [
   "Hujjatlar",
 ] as const;
 const tab = ref<(typeof tabs)[number]>("Bugungi qabul");
+const referralOpen = ref(false);
+const referralRows = ref<VisitReferral[]>([]);
+const referralsError = ref("");
+const referralsLoading = ref(false);
+let referralSequence = 0;
+async function reloadReferrals() {
+  if (!props.patient.visit_id) return;
+  const currentVisit = props.patient.visit_id;
+  const request = ++referralSequence;
+  referralsLoading.value = true; referralsError.value = "";
+  try {
+    const result = await visitReferrals(currentVisit);
+    if (request !== referralSequence || props.patient.visit_id !== currentVisit) return;
+    referralRows.value = result;
+  } catch (cause) { if (request === referralSequence) referralsError.value = errorText(cause); }
+  finally { if (request === referralSequence) referralsLoading.value = false; }
+}
+function referralSaved() {
+  referralOpen.value = false;
+  void reloadReferrals();
+}
 
 // The adapter contains real, server-projected identifiers and demographics,
 // never the old createDoctorQueue()/createHistory()/createResults() fixtures.
@@ -61,7 +85,12 @@ const startTime = computed(() => {
     hour: "2-digit", minute: "2-digit", hourCycle: "h23",
   }).format(instant);
 });
-watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
+watch(() => props.patient.visit_id, () => {
+  tab.value = "Bugungi qabul";
+  referralOpen.value = false;
+  referralRows.value = [];
+  void reloadReferrals();
+}, { immediate: true });
 </script>
 
 <template>
@@ -82,7 +111,7 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
       </div>
       <p class="dw-preview-notice" role="status">
         Shikoyatlar, anamnez, ko‘rik natijalari va tashxis serverga alohida saqlanadi.
-        Tavsiyalar alohida saqlanadi; retsept va yo‘llanmalar keyingi bosqichda ulanadi.
+        Tavsiyalar va yo‘llanmalar alohida saqlanadi; retsept keyingi bosqichda ulanadi.
       </p>
       <ClinicalNotesEditor v-if="patient.visit_id" :key="patient.visit_id"
         :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
@@ -90,8 +119,20 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
       <RecommendationsEditor v-if="patient.visit_id" :key="patient.visit_id"
         :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
-      <div class="dw-current-actions" aria-label="Keyingi tasklarda ulanadigan amallar">
-        <button type="button" class="e-button dw-small" disabled title="Yo‘llanmalar API keyingi taskda ulanadi">
+      <div class="dw-referral-results" aria-label="Saqlangan yo‘llanmalar">
+        <h3>Yo‘llanmalar</h3>
+        <p v-if="referralsLoading" role="status">Yo‘llanmalar yuklanmoqda...</p>
+        <p v-if="referralsError" role="alert" class="dw-referrals-error">{{ referralsError }}</p>
+        <p v-if="!referralsLoading && !referralsError && !referralRows.length">Hozircha yo‘llanma yo‘q.</p>
+        <div v-for="referral in referralRows" :key="referral.id" class="dw-referral-item">
+          <strong>{{ referral.service_name }}</strong>
+          <small>{{ referral.location === 'internal' ? (referral.target_branch_name || 'Ichki yo‘llanma') : (referral.external_clinic || 'Tashqi klinika') }} · {{ referral.status === 'ordered' ? 'Buyurilgan' : referral.status }}</small>
+          <p v-if="referral.note">{{ referral.note }}</p>
+        </div>
+      </div>
+      <div class="dw-current-actions" aria-label="Qabul amallari">
+        <button type="button" class="e-button dw-small" :disabled="patient.status !== 'in_progress' || !patient.visit_id"
+          @click="referralOpen = true">
           <Plus :size="20" /> Yo‘llanma
         </button>
         <button type="button" class="e-button dw-small" disabled title="Retseptlar API keyingi taskda ulanadi">
@@ -106,10 +147,13 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
         </button>
       </div>
       <p class="dw-footnote"><LockKeyhole :size="17" />
-        Ko‘rik yozuvlari, tashxis va tavsiyalar alohida saqlanadi. Retsept va yo‘llanmalar keyingi tasklarda ulanadi.
+        Ko‘rik yozuvlari, tashxis, tavsiyalar va yo‘llanmalar alohida saqlanadi. Retsept keyingi taskda ulanadi.
       </p>
     </article>
 
+    <ReferralDialog v-if="referralOpen && patient.visit_id" :encounter="encounter"
+      :visit-id="patient.visit_id" :doctor-name="doctor.name"
+      @close="referralOpen = false" @saved="referralSaved" />
     <template v-if="tab === 'Tashriflar tarixi'">
       <p class="dw-preview-notice dw-preview-tab-notice" role="status">
         Tashriflar tarixi API hali ulanmagan. Quyida faqat eski veryostka ko‘rsatilgan.
@@ -142,4 +186,12 @@ watch(() => props.patient.visit_id, () => { tab.value = "Bugungi qabul"; });
 .dw-readonly-fields { min-width: 0; border: 0; padding: 0; margin: 0; }
 .dw-readonly-fields :disabled { cursor: not-allowed; opacity: .72; }
 .dw-current-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.dw-referral-results { margin: 18px 0; display: grid; gap: 10px; }
+.dw-referral-results h3 { margin: 0; color: #173864; }
+.dw-referral-results > p { font-size: 13px; color: #6880a1; margin: 0; }
+.dw-referral-results .dw-referrals-error { color: #b42318; }
+.dw-referral-item { border: 1px solid #d5e2f7; border-radius: 9px; padding: 12px; }
+.dw-referral-item strong, .dw-referral-item small { display: block; }
+.dw-referral-item small { color: #687f9f; margin-top: 5px; }
+.dw-referral-item p { margin: 6px 0 0; }
 </style>
