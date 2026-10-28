@@ -7,6 +7,7 @@ import DiagnosisEditor from "./DiagnosisEditor.vue";
 import ClinicalNotesEditor from "./ClinicalNotesEditor.vue";
 import RecommendationsEditor from "./RecommendationsEditor.vue";
 import ReferralDialog from "./ReferralDialog.vue";
+import RealReferralDetailsDialog from "./RealReferralDetailsDialog.vue";
 import { visitReferrals, type VisitReferral } from "../../services/visitReferrals";
 import { errorText } from "../../services/api";
 import type { Encounter } from "../../mocks/doctorWorkspace";
@@ -27,6 +28,7 @@ const tabs = [
 ] as const;
 const tab = ref<(typeof tabs)[number]>("Bugungi qabul");
 const referralOpen = ref(false);
+const selectedReferral = ref<VisitReferral | null>(null);
 const referralRows = ref<VisitReferral[]>([]);
 const referralsError = ref("");
 const referralsLoading = ref(false);
@@ -88,6 +90,7 @@ const startTime = computed(() => {
 watch(() => props.patient.visit_id, () => {
   tab.value = "Bugungi qabul";
   referralOpen.value = false;
+  selectedReferral.value = null;
   referralRows.value = [];
   void reloadReferrals();
 }, { immediate: true });
@@ -128,6 +131,9 @@ watch(() => props.patient.visit_id, () => {
           <strong>{{ referral.service_name }}</strong>
           <small>{{ referral.location === 'internal' ? (referral.target_branch_name || 'Ichki yo‘llanma') : (referral.external_clinic || 'Tashqi klinika') }} · {{ referral.status === 'ordered' ? 'Buyurilgan' : referral.status }}</small>
           <p v-if="referral.note">{{ referral.note }}</p>
+          <div class="dw-referral-row-actions">
+            <button type="button" class="e-button dw-small" @click="selectedReferral = referral">Ko‘rish / Chop etish / PDF</button>
+          </div>
         </div>
       </div>
       <div class="dw-current-actions" aria-label="Qabul amallari">
@@ -151,6 +157,9 @@ watch(() => props.patient.visit_id, () => {
       </p>
     </article>
 
+    <RealReferralDetailsDialog v-if="selectedReferral" :referral="selectedReferral"
+      :patient-name="patient.name" :patient-number="patient.patient_number"
+      :doctor-name="doctor.name" @close="selectedReferral = null" />
     <ReferralDialog v-if="referralOpen && patient.visit_id" :encounter="encounter"
       :visit-id="patient.visit_id" :doctor-name="doctor.name"
       @close="referralOpen = false" @saved="referralSaved" />
@@ -194,4 +203,5 @@ watch(() => props.patient.visit_id, () => {
 .dw-referral-item strong, .dw-referral-item small { display: block; }
 .dw-referral-item small { color: #687f9f; margin-top: 5px; }
 .dw-referral-item p { margin: 6px 0 0; }
+.dw-referral-row-actions { display:flex; justify-content:flex-end; margin-top:10px; }
 </style>
