@@ -273,8 +273,14 @@ type DisplayRow = WorkspacePatientRow & {
 const rows = computed<DisplayRow[]>(() => {
   const current = feed.value;
   if (!current) return [];
+  // A booking must remain visible even when its visit has a ticket for a
+  // different local day. On the same day the ticket is authoritative: show
+  // only the ticket to avoid duplicating a single patient's appointment.
+  const visibleTicketAppointments = new Set(current.tickets
+    .map(ticket => ticket.appointment_id).filter((id): id is string => !!id));
   return [
-    ...current.scheduled.map((r) => ({ ...r, source: "appointment" as const, key: "appointment:" + r.id })),
+    ...current.scheduled.filter(r => !visibleTicketAppointments.has(r.id))
+      .map((r) => ({ ...r, source: "appointment" as const, key: "appointment:" + r.id })),
     ...current.tickets.map((r) => ({ ...r, source: "ticket" as const, key: "ticket:" + r.id })),
   ].sort((a, b) => {
     const aTime = a.starts_at || a.created_at || "";
