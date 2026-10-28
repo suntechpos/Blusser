@@ -335,6 +335,8 @@ const rows = computed<DisplayRow[]>(() => {
     ...current.scheduled.filter(r => !visibleTicketAppointments.has(r.id))
       .map((r) => ({ ...r, source: "appointment" as const, key: "appointment:" + r.id })),
     ...current.tickets.map((r) => ({ ...r, source: "ticket" as const, key: "ticket:" + r.id })),
+    ...(current.completed_today ?? []).filter(r => !current.tickets.some(t => t.id === r.id))
+      .map((r) => ({ ...r, source: "ticket" as const, key: "ticket:" + r.id })),
   ].sort((a, b) => {
     const aTime = a.starts_at || a.created_at || "";
     const bTime = b.starts_at || b.created_at || "";

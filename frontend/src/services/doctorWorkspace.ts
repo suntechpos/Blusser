@@ -58,6 +58,7 @@ export interface DoctorWorkspaceFeed {
   date: string | null;
   scheduled: WorkspacePatientRow[];
   tickets: WorkspacePatientRow[];
+  completed_today?: WorkspacePatientRow[];
   has_called_today?: boolean;
   has_active_patient?: boolean;
   overdue?: OverdueDoctorTicket[];
