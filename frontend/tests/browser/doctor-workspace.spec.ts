@@ -281,7 +281,10 @@ test("UI: prior-day warning is compact and unfinished tickets live in one queue 
   // Resume is the existing navigation-only action, not a queue mutation.
   await left.getByRole("button", { name: "Bemor amallari: Aliyev Alijon" }).click();
   await left.getByRole("menuitem", { name: "Qabulni davom ettirish" }).click();
-  await expect(page.getByLabel("Qabul sanasi")).toHaveValue("2026-10-26");
+  await expect(page.getByLabel("Qabul sanasi")).toHaveValue("2026-10-27");
+  await waiting.click();
+  await expect(left).toContainText("Bugungi bemor");
+  await unresolved.click();
   await expect(page.getByRole("region", { name: "Boshlangan qabul interfeysi" })).toBeVisible();
   expect(actions).toEqual([]);
 });
