@@ -43,7 +43,7 @@ async function add() {
     ?.focus();
 }
 function save() {
-  if (busy.value) return;
+  if (props.saving) return;
   errors.value = prescriptionErrors(medicines.value);
   if (
     !medicines.value.length ||
