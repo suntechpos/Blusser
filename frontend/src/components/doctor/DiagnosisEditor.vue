@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Eye, Pencil, Printer } from "lucide-vue-next";
 import axios from "axios";
 import { can } from "../../services/session";
 import { errorText } from "../../services/api";
@@ -10,6 +11,7 @@ import {
 const props = defineProps<{ visitId: string; active: boolean }>();
 
 const diagnosisText = ref("");
+const mode = ref<"view" | "edit" | null>(null);
 const diagnosisType = ref<"preliminary" | "final">("preliminary");
 const icdCode = ref("");
 const record = ref<VisitDiagnosis | null>(null);
@@ -43,6 +45,7 @@ async function refresh() {
     const result = await getVisitDiagnosis(requestedVisit);
     if (generation !== request || props.visitId !== requestedVisit) return;
     record.value = result;
+    mode.value = result ? null : "edit";
     if (result) {
       diagnosisText.value = result.diagnosis_text;
       diagnosisType.value = result.diagnosis_type;
@@ -74,6 +77,7 @@ async function save() {
     });
     if (generation !== request || props.visitId !== requestedVisit) return;
     record.value = saved;
+    mode.value = null;
     icdCode.value = saved.icd_code || "";
     notice.value = "Tashxis serverga saqlandi.";
   } catch (cause) {
@@ -86,6 +90,27 @@ async function save() {
     if (generation === request) saving.value = false;
   }
 }
+function printDiagnosis() {
+  if (!record.value) return;
+  const clean = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c] || c);
+  const popup = window.open("", "_blank");
+  if (!popup) { failure.value = "Chop etish oynasi bloklangan."; return; }
+  popup.document.write(`<!doctype html><html lang="uz"><meta charset="utf-8"><title>Tashxis</title>
+  <style>body{font:16px Arial;margin:35px;color:#17345a}section{padding:20px;border:1px solid #d7e5fa;border-radius:10px}p{white-space:pre-wrap;overflow-wrap:anywhere}.dw-diagnosis-summary{display:flex;gap:16px;justify-content:space-between;align-items:center;border:1px solid #d7e5fa;background:#f7faff;border-radius:10px;padding:16px;flex-wrap:wrap}
+.dw-diagnosis-summary-body{display:grid;gap:7px;min-width:0;flex:1}
+.dw-diagnosis-summary-body strong{white-space:pre-wrap;overflow-wrap:anywhere}
+.dw-diagnosis-summary-body small{color:#6983a5}
+.dw-diagnosis-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+.dw-diagnosis-readonly{border:1px solid #d7e5fa;border-radius:12px;padding:17px;margin-top:10px}
+.dw-diagnosis-readonly p{white-space:pre-wrap;overflow-wrap:anywhere;color:#29496f}
+</style>
+  <h1>Blusser — Tashxis</h1><section><p><b>Raqam:</b> ${clean(record.value.number)}</p>
+  <p><b>Tashxis:</b> ${clean(record.value.diagnosis_text)}</p>
+  <p><b>Turi:</b> ${record.value.diagnosis_type === "final" ? "Yakuniy" : "Dastlabki"}</p>
+  <p><b>MKB-10:</b> ${clean(record.value.icd_code || "—")}</p></section></html>`);
+  popup.document.close(); popup.focus(); popup.print();
+}
 </script>
 
 <template>
@@ -95,6 +120,24 @@ async function save() {
       <span v-if="record" class="dw-diagnosis-id">{{ record.number }} · v{{ record.version }}</span>
       <span v-else-if="!loading" class="dw-diagnosis-id">Yangi tashxis</span>
     </div>
+    <div v-if="record && mode === null" class="dw-diagnosis-summary">
+      <div class="dw-diagnosis-summary-body">
+        <strong>{{ record.icd_code ? record.icd_code + ' — ' : '' }}{{ record.diagnosis_text }}</strong>
+        <small>{{ record.diagnosis_type === 'final' ? 'Yakuniy' : 'Dastlabki' }} · {{ record.number }}</small>
+      </div>
+      <div class="dw-diagnosis-toolbar">
+        <button type="button" class="e-button dw-small" @click="mode = 'view'"><Eye :size="17"/> Ko‘rish</button>
+        <button type="button" class="e-button dw-small" :disabled="!writable" @click="mode = 'edit'"><Pencil :size="17"/> Tahrirlash</button>
+      </div>
+    </div>
+    <div v-if="record && mode === 'view'" class="dw-diagnosis-readonly">
+      <h4>Tashxisni ko‘rish</h4>
+      <p>{{ record.diagnosis_text }}</p>
+      <p>Turi: {{ record.diagnosis_type === 'final' ? 'Yakuniy' : 'Dastlabki' }} · MKB-10: {{ record.icd_code || '—' }}</p>
+      <div class="dw-diagnosis-toolbar"><button type="button" class="e-button dw-small" @click="printDiagnosis"><Printer :size="17"/> Chop etish / PDF</button>
+        <button type="button" class="e-button primary dw-small" @click="mode = null">Yopish</button></div>
+    </div>
+    <template v-if="mode === 'edit'">
     <p class="dw-diagnosis-description">
       Shifokor tashxisni o‘zi yozadi. MKB-10 kodi ixtiyoriy;
       avvalgi bemor tashxisi avtomatik ko‘chirilmaydi.
@@ -141,6 +184,7 @@ async function save() {
       </div>
       <p v-if="failure" role="alert" class="dw-diagnosis-error">{{ failure }}</p>
     </form>
+    </template>
   </section>
 </template>
 

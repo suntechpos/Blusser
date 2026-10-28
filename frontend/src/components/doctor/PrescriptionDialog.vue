@@ -114,7 +114,22 @@ const fields = [
           {{ encounter.allergy || "Ma’lumot kiritilmagan" }}</span
         >
       </div>
-      <form id="dw-rx-form" novalidate @submit.prevent="save">
+      <div v-if="readOnly" class="dw-rx-view">
+        <h3>Dori vositalari</h3>
+        <div class="dw-rx-table-wrap">
+          <table class="dw-rx-table">
+            <thead><tr><th>№</th><th>Dori nomi</th><th>Shakli</th><th>Doza</th><th>Qabul tartibi</th><th>Davomiyligi</th><th>Ko‘rsatma</th></tr></thead>
+            <tbody><tr v-for="(m,i) in medicines" :key="i">
+              <td>{{ i+1 }}</td><td><strong>{{ m.name }}</strong><small>{{ m.strength }}</small></td>
+              <td>{{ m.form || '—' }}</td><td>{{ m.dose }} {{ m.unit }}</td>
+              <td>{{ m.frequency }}<small>{{ m.route }}</small></td><td>{{ m.duration }}</td>
+              <td>{{ m.instruction || '—' }}</td>
+            </tr></tbody>
+          </table>
+        </div>
+        <div class="dw-rx-view-note"><strong>Umumiy izoh</strong><p>{{ note || 'Izoh kiritilmagan' }}</p></div>
+      </div>
+      <form v-else id="dw-rx-form" novalidate @submit.prevent="save">
         <fieldset class="dw-rx-fields" :disabled="readOnly || saving">
         <section v-for="(m, i) in medicines" :key="i" class="dw-medicine">
           <header>
@@ -196,8 +211,7 @@ const fields = [
       ><footer>
         <span v-if="error" role="alert" class="dw-error">{{ error }}</span><span class="dw-footnote"
           ><Link :size="17" />{{ medicines.length }} ta dori · Bitta qabulga bog‘langan retsept</span
-        ><button class="e-button" @click="close" type="button">
-          Bekor qilish</button
+        ><button class="e-button" @click="close" type="button">{{ readOnly ? "Yopish" : "Bekor qilish" }}</button>
         ><button v-if="prescription" type="button" class="e-button" @click="emit('print')"><Printer :size="17"/> Chop etish / PDF</button><button v-if="!readOnly" form="dw-rx-form" class="e-button primary" :disabled="saving">
           Retseptni saqlash
         </button>
@@ -207,6 +221,15 @@ const fields = [
 </template>
 
 <style scoped>
+.dw-rx-view{display:grid;gap:12px;color:#17345a}
+.dw-rx-view h3{margin:0;font-size:16px}
+.dw-rx-table-wrap{max-width:100%;overflow-x:auto;border:1px solid #d8e4f6;border-radius:10px}
+.dw-rx-table{width:100%;border-collapse:collapse;min-width:720px;font-size:13px}
+.dw-rx-table th,.dw-rx-table td{padding:10px;text-align:left;border-bottom:1px solid #e1eaf7;vertical-align:top}
+.dw-rx-table th{background:#f1f6ff;color:#3d587b}
+.dw-rx-table small{display:block;color:#758aab;margin-top:4px}
+.dw-rx-view-note{background:#f4f8ff;border-radius:10px;padding:14px}
+.dw-rx-view-note p{white-space:pre-wrap;margin:8px 0 0}
 .dw-rx-fields{border:0;padding:0;margin:0;min-width:0}
 .dw-rx-fields:disabled .dw-medicine button{display:none}
 .dw-rx-fields:disabled input,.dw-rx-fields:disabled select,.dw-rx-fields:disabled textarea{opacity:1;color:#17345a;background:#f5f8fd}

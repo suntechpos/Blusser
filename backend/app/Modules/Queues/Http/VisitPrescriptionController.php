@@ -12,7 +12,7 @@ final class VisitPrescriptionController {
  public function store(Request $request) { return $this->write($request,null); }
  public function update(Request $request) { return $this->write($request,$request->route('prescription')); }
  private function write(Request $request,?string $id) {
-  $rules=['expected_version'=>'required|integer|min:0','note'=>'required|string|max:4000','medicines'=>'required|array|min:1|max:30',
+  $rules=['expected_version'=>'required|integer|min:0','note'=>'nullable|string|max:4000','medicines'=>'required|array|min:1|max:30',
    'medicines.*.name'=>'required|string|max:500','medicines.*.form'=>'present|string|max:500',
    'medicines.*.strength'=>'present|string|max:500','medicines.*.dose'=>'required|string|max:500',
    'medicines.*.unit'=>'required|string|max:500','medicines.*.route'=>'present|string|max:500',
@@ -21,6 +21,7 @@ final class VisitPrescriptionController {
   if(array_diff(array_keys($request->all()),['expected_version','note','medicines']))
    throw ValidationException::withMessages(['request'=>'Unknown fields.']);
   $data=validator($request->all(),$rules)->validate();
+  $data['note'] = $data['note'] ?? '';
   foreach($data['medicines'] as $item) {
    if(array_diff(array_keys($item),['name','form','strength','dose','unit','route','frequency','duration','instruction']))
     throw ValidationException::withMessages(['medicines'=>'Unknown medicine fields.']);
