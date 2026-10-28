@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { AlertTriangle, Ban, CalendarDays, ChevronDown, Ellipsis, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { AlertTriangle, Ban, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Ellipsis, FastForward, Megaphone, Play, RefreshCw, Search, Stethoscope, UserRound } from "lucide-vue-next";
 import { can, session } from "../services/session";
 import { clinicRequest, errorText } from "../services/api";
 import { getDoctorWorkspace, type DoctorWorkspaceFeed, type WorkspacePatientRow } from "../services/doctorWorkspace";
@@ -15,6 +15,19 @@ const doctorId = ref("");
 const branchId = ref("");
 const queueTab = ref<"all" | "waiting" | "active" | "completed">("waiting");
 const query = ref("");
+const tabsScroller = ref<HTMLElement | null>(null);
+const canScrollTabsLeft = ref(false);
+const canScrollTabsRight = ref(false);
+function updateTabArrows() {
+  const node = tabsScroller.value;
+  if (!node) return;
+  canScrollTabsLeft.value = node.scrollLeft > 2;
+  canScrollTabsRight.value = node.scrollLeft + node.clientWidth < node.scrollWidth - 2;
+}
+function scrollTabs(direction: -1 | 1) {
+  tabsScroller.value?.scrollBy({ left: direction * 170, behavior: "smooth" });
+}
+
 const selectedKey = ref("");
 const loading = ref(true);
 const calling = ref(false);
@@ -264,7 +277,12 @@ watch(
     void load();
   },
 );
-onMounted(() => void load());
+onMounted(() => {
+  void load();
+  void nextTick(updateTabArrows);
+  window.addEventListener("resize", updateTabArrows);
+});
+onUnmounted(() => window.removeEventListener("resize", updateTabArrows));
 
 type DisplayRow = WorkspacePatientRow & {
   key: string;
@@ -713,6 +731,7 @@ function setTab(tab: "all" | "waiting" | "active" | "completed", event?: Event) 
   openMenuKey.value = "";
   const button = event?.currentTarget;
   if (button instanceof HTMLElement) button.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+  window.requestAnimationFrame(updateTabArrows);
 }
 const timezone = computed(() => feed.value?.branch?.timezone || "Asia/Tashkent");
 function visitTime(row: DisplayRow) {
@@ -804,7 +823,9 @@ function genderLabel(gender: string | null) {
     <div class="dw-workspace">
       <aside class="dw-card dw-queue">
         <h2>Bugungi navbat</h2>
-        <div class="dw-queue-tabs dw-queue-tabs-scroll" role="group" aria-label="Navbat filtrlari">
+        <div class="dw-tabs-shell">
+          <button v-if="canScrollTabsLeft" type="button" class="dw-tabs-arrow" aria-label="Tablarni chapga surish" @click="scrollTabs(-1)"><ChevronLeft :size="18" /></button>
+          <div ref="tabsScroller" class="dw-queue-tabs dw-queue-tabs-scroll" role="group" aria-label="Navbat filtrlari" @scroll.passive="updateTabArrows">
           <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'all' }" @click="setTab('all', $event)">
             Barchasi <b>{{ allCount }}</b>
           </button>
@@ -817,6 +838,8 @@ function genderLabel(gender: string | null) {
           <button type="button" data-permission="workspace.view" :class="{ selected: queueTab === 'completed' }" @click="setTab('completed', $event)">
             Yakunlangan <b>{{ completedCount }}</b>
           </button>
+          </div>
+          <button v-if="canScrollTabsRight" type="button" class="dw-tabs-arrow" aria-label="Tablarni o‘ngga surish" @click="scrollTabs(1)"><ChevronRight :size="18" /></button>
         </div>
         <label class="dw-search">
           <Search :size="19" />
@@ -1134,8 +1157,14 @@ function genderLabel(gender: string | null) {
 </template>
 
 <style scoped>
+.dw-tabs-shell { display: flex; align-items: center; min-width: 0; width: 100%; }
+.dw-tabs-arrow {
+  flex: 0 0 25px; display: grid; place-items: center; height: 33px;
+  border: 0; background: #eef4ff; color: #2861ad; border-radius: 8px; cursor: pointer;
+}
+.dw-tabs-arrow:hover { background: #dfebff; }
 .dw-ui .dw-queue-tabs-scroll {
-  display: flex; flex-wrap: nowrap; justify-content: flex-start;
+  display: flex; flex-wrap: nowrap; justify-content: flex-start; gap: 16px; min-width: 0;
   overflow-x: auto; overflow-y: hidden; width: 100%; max-width: 100%;
   overscroll-behavior-inline: contain; scroll-snap-type: x proximity;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
@@ -1143,7 +1172,7 @@ function genderLabel(gender: string | null) {
 .dw-ui .dw-queue-tabs-scroll::-webkit-scrollbar { display: none; }
 .dw-ui .dw-queue-tabs-scroll > button {
   flex: 0 0 auto; min-width: max-content; white-space: nowrap;
-  scroll-snap-align: nearest; padding-inline: 10px;
+  scroll-snap-align: nearest; padding-inline: 6px; gap: 6px;
 }
 
 
