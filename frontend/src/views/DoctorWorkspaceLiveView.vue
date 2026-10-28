@@ -358,9 +358,9 @@ async function continueOverdue(row: { id: string; local_date: string; branch_id:
   query.value = "";
   openMenuKey.value = "";
   overdueError.value = "";
-  date.value = row.local_date;
-  branchId.value = row.branch_id;
-  await load("ticket:" + row.id);
+  // The overdue row is already in the authorized feed. Selecting it must not
+  // navigate the calendar away from the doctor's chosen day (or drop that day's patients).
+  selectedKey.value = "ticket:" + row.id;
 }
 
 // "Qabulni boshlash" is a separate, explicit action on the selected
@@ -457,8 +457,10 @@ const overdueIds = computed(() => new Set(overdueTickets.value.map((item) => ite
 const unresolvedCount = computed(() => unresolvedRows.value.length);
 const completed = (row: DisplayRow) => row.status === "completed";
 function hasHistoricScope(row: QueueDisplayRow) {
+  // An already-started consultation may be resumed without changing the
+  // calendar. Other historic entries remain read-only in this date view.
   return !!row.historicDate && (row.historicDate !== date.value ||
-    row.historicBranchId !== branchId.value);
+    row.historicBranchId !== branchId.value) && row.status !== "in_progress";
 }
 function toggleRowMenu(key: string) {
   openMenuKey.value = openMenuKey.value === key ? "" : key;
