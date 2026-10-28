@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Clock3, LockKeyhole, Plus, FileText, Eye } from "lucide-vue-next";
+import { Clock3, LockKeyhole, Plus, FileText, Eye, Pencil, CalendarDays } from "lucide-vue-next";
 import HistoryPanel from "./HistoryPanel.vue";
 import RecordsPanel from "./RecordsPanel.vue";
 import DiagnosisEditor from "./DiagnosisEditor.vue";
@@ -72,6 +72,9 @@ function printRx(record: VisitPrescription) {
   <style>body{font:14px Arial;margin:35px;color:#112b50}table{width:100%;border-collapse:collapse}
   td,th{border:1px solid #ccd7e8;padding:9px;text-align:left;vertical-align:top}
   th{background:#eff5ff}p{overflow-wrap:anywhere}@media print{body{margin:15mm}}.dw-rx-actions{display:flex;gap:8px;flex-wrap:wrap}
+.dw-rx-card-content{flex:1;min-width:220px}
+.dw-rx-card-content small{display:flex;gap:6px;align-items:center;color:#6d84a7;margin-top:10px;flex-wrap:wrap}
+.dw-rx-actions .e-button{display:inline-flex;align-items:center;gap:7px;border-radius:9px}
 </style>
   </head><body><h1>Blusser — Retsept</h1>
   <p><b>Bemor:</b> ${clean(props.patient.name)} · ${clean(props.patient.patient_number)}</p>
@@ -178,7 +181,7 @@ watch(() => props.patient.visit_id, () => {
       </div>
       <p class="dw-preview-notice" role="status">
         Shikoyatlar, anamnez, ko‘rik natijalari va tashxis serverga alohida saqlanadi.
-        Tavsiyalar va yo‘llanmalar alohida saqlanadi; retsept keyingi bosqichda ulanadi.
+        Tavsiyalar, yo‘llanmalar va retseptlar tashrifga alohida saqlanadi.
       </p>
       <ClinicalNotesEditor v-if="patient.visit_id" :key="patient.visit_id"
         :visit-id="patient.visit_id" :active="patient.status === 'in_progress'" />
@@ -213,11 +216,12 @@ watch(() => props.patient.visit_id, () => {
         <p v-if="rxError && !rxOpen" role="alert">{{ rxError }}</p>
         <p v-if="!rxRows.length">Retsept hali yozilmagan.</p>
         <div v-for="rx in rxRows" :key="rx.id" class="dw-rx-row">
-          <div><strong>Retsept — {{ rx.medicines.length }} ta dori</strong>
-            <p>{{ rx.medicines.map(m => m.name).join(", ") }}</p></div>
+          <div class="dw-rx-card-content"><strong>Retsept — {{ rx.medicines.length }} ta dori</strong>
+            <p>{{ rx.medicines.map(m => m.name).join(", ") }}</p>
+            <small><CalendarDays :size="15" /> {{ new Date(rx.created_at).toLocaleDateString('uz-UZ') }} · {{ doctor.name }} · {{ branch.name }}</small></div>
           <div class="dw-rx-actions">
-            <button type="button" class="e-button dw-small" @click="editRx(rx, true)">Ko‘rish</button>
-            <button type="button" class="e-button dw-small" :disabled="patient.status !== 'in_progress'" @click="editRx(rx)">Tahrirlash</button>
+            <button type="button" class="e-button dw-small" @click="editRx(rx, true)"><Eye :size="16"/> Ko‘rish</button>
+            <button type="button" class="e-button dw-small" :disabled="patient.status !== 'in_progress'" @click="editRx(rx)"><Pencil :size="16"/> Tahrirlash</button>
           </div>
         </div>
       </section>
