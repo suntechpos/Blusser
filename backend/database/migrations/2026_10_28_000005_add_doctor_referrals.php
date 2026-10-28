@@ -123,6 +123,8 @@ BEGIN
  OR public.permission_scope('workspace.consult') IS NULL
  OR NOT governance.queue_scope('queues.view',v.doctor_id,v.branch_id)
  OR NOT governance.doctor_branch_live(v.doctor_id,v.branch_id)
+ OR (public.permission_scope('workspace.consult')='assigned_branches'
+   AND NOT public.branch_assigned(v.branch_id))
  OR NOT EXISTS(SELECT 1 FROM public.queue_tickets q WHERE (q.tenant_id,q.visit_id)=(tid,vid) AND q.status='in_progress')
  OR NOT EXISTS(SELECT 1 FROM public.doctor_profiles d JOIN public.tenant_memberships m
    ON (m.tenant_id,m.id)=(d.tenant_id,d.membership_id)
