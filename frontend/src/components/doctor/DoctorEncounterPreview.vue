@@ -58,6 +58,28 @@ async function submitRx(payload: Prescription) {
   } catch(cause) { rxError.value = errorText(cause); }
   finally { rxSaving.value = false; }
 }
+function printRx(record: VisitPrescription) {
+  const clean = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c] || c);
+  const rows = record.medicines.map((m, i) =>
+    `<tr><td>${i + 1}. ${clean(m.name)}</td><td>${clean(m.strength)} ${clean(m.form)}</td>
+    <td>${clean(m.dose)} ${clean(m.unit)}</td><td>${clean(m.route)}</td>
+    <td>${clean(m.frequency)}</td><td>${clean(m.duration)}</td><td>${clean(m.instruction)}</td></tr>`).join("");
+  const popup = window.open("", "_blank");
+  if (!popup) { rxError.value = "Chop etish oynasi bloklangan."; return; }
+  popup.document.write(`<!doctype html><html lang="uz"><head><meta charset="utf-8"><title>Retsept</title>
+  <style>body{font:14px Arial;margin:35px;color:#112b50}table{width:100%;border-collapse:collapse}
+  td,th{border:1px solid #ccd7e8;padding:9px;text-align:left;vertical-align:top}
+  th{background:#eff5ff}p{overflow-wrap:anywhere}@media print{body{margin:15mm}}.dw-rx-actions{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+  </head><body><h1>Blusser — Retsept</h1>
+  <p><b>Bemor:</b> ${clean(props.patient.name)} · ${clean(props.patient.patient_number)}</p>
+  <p><b>Shifokor:</b> ${clean(props.doctor.name)} · <b>Sana:</b> ${clean(props.date)}</p>
+  <table><thead><tr><th>Dori</th><th>Shakl/kuch</th><th>Doza</th><th>Yo‘l</th>
+  <th>Tezlik</th><th>Davomiylik</th><th>Ko‘rsatma</th></tr></thead>
+  <tbody>${rows}</tbody></table><p><b>Izoh:</b> ${clean(record.note)}</p></body></html>`);
+  popup.document.close(); popup.focus(); popup.print();
+}
 function editRx(record: VisitPrescription) {
   rxSelected.value = record;
   rxError.value = "";
@@ -191,7 +213,10 @@ watch(() => props.patient.visit_id, () => {
         <div v-for="rx in rxRows" :key="rx.id" class="dw-rx-row">
           <div><strong>Retsept — {{ rx.medicines.length }} ta dori</strong>
             <p>{{ rx.medicines.map(m => m.name).join(", ") }}</p></div>
-          <button type="button" class="e-button dw-small" @click="editRx(rx)">Ko‘rish / Tahrirlash</button>
+          <div class="dw-rx-actions">
+            <button type="button" class="e-button dw-small" :disabled="patient.status !== 'in_progress'" @click="editRx(rx)">Tahrirlash</button>
+            <button type="button" class="e-button dw-small" @click="printRx(rx)">Chop etish / PDF</button>
+          </div>
         </div>
       </section>
       <div class="dw-current-actions" aria-label="Qabul amallari">
