@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import axios from "axios";
+import { CalendarDays, UserRound, Stethoscope, Clock3, Info } from "lucide-vue-next";
 import ReceptionDialog from "./ReceptionDialog.vue";
 import ReceptionPatientSearch from "./ReceptionPatientSearch.vue";
 import ReceptionPatientForm from "./ReceptionPatientForm.vue";
@@ -53,12 +54,14 @@ let catalogSequence = 0;
 const doctor = computed(() => doctors.value.find((d) => d.id === doctorId.value));
 const services = computed(() => doctor.value?.services ?? []);
 const selectedAppointment = computed(() => appointments.value.find((a) => a.id === appointmentId.value));
+const scheduledBookings = computed(() => appointments.value.filter(a => a.status === "scheduled"));
+const hasExistingBooking = computed(() => mode.value === "walk_in" && scheduledBookings.value.length > 0);
 const canSubmit = computed(() => {
   if (saving.value || completed.value || !branchId.value) return false;
   if (creating.value) return canReception("patient");
   if (!selected.value) return false;
   if (mode.value === "patient") return canReception("patient");
-  if (mode.value === "walk_in") return canReception("walkIn") && !!doctor.value && !!serviceId.value;
+  if (mode.value === "walk_in") return !appointmentsLoading.value && !appointmentsError.value && !hasExistingBooking.value && canReception("walkIn") && !!doctor.value && !!serviceId.value;
   return canReception("checkIn") && selectedAppointment.value?.status === "scheduled";
 });
 
@@ -113,7 +116,7 @@ watch([() => selected.value?.id, branchId, mode, zone], async () => {
   appointmentId.value = "";
   appointmentsError.value = "";
   const patientId = selected.value?.id;
-  if (mode.value !== "scheduled" || !patientId || !branchId.value || !zone.value) return;
+  if (mode.value === "patient" || !patientId || !branchId.value || !zone.value) { appointmentsLoading.value = false; return; }
   appointmentsLoading.value = true;
   try {
     const rows: Appointment[] = [];
@@ -125,7 +128,11 @@ watch([() => selected.value?.id, branchId, mode, zone], async () => {
       rows.push(...result.data.data);
       if (rows.length >= result.data.meta.total || !result.data.data.length) break;
     }
-    if (alive && serial === appointmentsSequence) appointments.value = rows;
+    if (alive && serial === appointmentsSequence) {
+      appointments.value = rows;
+      const available = rows.filter(a => a.status === "scheduled");
+      if (available.length === 1) appointmentId.value = available[0]!.id;
+    }
   } catch (e) {
     if (alive && serial === appointmentsSequence) appointmentsError.value = bookingError(e);
   } finally {
@@ -301,7 +308,22 @@ async function submit() {
         </template>
 
         <template v-if="selected && mode === 'walk_in' && !creating">
-          <section class="rp-section">
+          <p v-if="appointmentsLoading" role="status">Bugungi qabullar tekshirilmoqda…</p>
+          <p v-else-if="appointmentsError" role="alert" class="rp-error">{{ appointmentsError }}</p>
+          <section v-else-if="hasExistingBooking" class="rp-existing-bookings">
+            <article v-for="a in scheduledBookings" :key="a.id" class="rp-existing-card">
+              <header><CalendarDays :size="23"/><strong>Bemor oldindan qabulga yozilgan</strong><span class="rp-existing-status">Yozilgan</span></header>
+              <div class="rp-existing-grid">
+                <div><UserRound :size="21"/><span><small>Shifokor</small><strong>{{ doctors.find(d => d.id === a.doctor_id)?.name ?? 'Ma’lumot mavjud emas' }}</strong></span></div>
+                <div><Stethoscope :size="21"/><span><small>Xizmat</small><strong>{{ doctors.find(d => d.id === a.doctor_id)?.services.find(v => v.id === a.service_id)?.name ?? 'Ma’lumot mavjud emas' }}</strong></span></div>
+                <div><CalendarDays :size="21"/><span><small>Belgilangan vaqt</small><strong>{{ localTime(a.starts_at, zone) }}</strong><small>{{ localDay(Date.parse(a.starts_at), zone) }}</small></span></div>
+              </div>
+              <div class="rp-existing-info"><Clock3 :size="20"/><span><strong>Bemorni mavjud bron orqali navbatga qo‘shing</strong><small>{{ Date.parse(a.starts_at) > Date.now() ? 'Bemor belgilangan vaqtdan oldin kelgan.' : 'Bemorning belgilangan qabul vaqti yetgan.' }}</small></span></div>
+            </article>
+            <p class="rp-existing-next"><Info :size="17"/> Hozircha mavjud bronni «Oldindan yozilgan» bo‘limidan tasdiqlang.</p>
+            <button type="button" class="rp-button" @click="mode = 'scheduled'">Oldindan yozilgan qabulga o‘tish</button>
+          </section>
+          <section v-else class="rp-section">
             <h3>Jonli navbatga qo‘shish</h3>
             <p v-if="catalogLoading" role="status">Shifokorlar yuklanmoqda…</p>
             <p v-if="catalogError" role="alert" class="rp-error">{{ catalogError }}</p>
@@ -338,3 +360,21 @@ async function submit() {
     </template>
   </ReceptionDialog>
 </template>
+
+<style scoped>
+.rp-existing-bookings{display:grid;gap:14px;margin-top:20px}
+.rp-existing-card{border:1px solid #cbdff9;background:#eef5ff;border-radius:12px;padding:18px;display:grid;gap:20px}
+.rp-existing-card header{display:flex;align-items:center;gap:10px;color:#122b54;flex-wrap:wrap}
+.rp-existing-card header svg,.rp-existing-grid svg{color:#1769dd;flex-shrink:0}
+.rp-existing-card header strong{flex:1;font-size:17px}
+.rp-existing-status{border-radius:9px;padding:7px 12px;background:#fff1d7;color:#925400;font-size:13px}
+.rp-existing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.rp-existing-grid>div{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.rp-existing-grid>div+div{border-left:1px solid #d0e0f7;padding-left:15px}
+.rp-existing-grid small,.rp-existing-info small{display:block;color:#526e96;margin-bottom:5px;font-size:13px}
+.rp-existing-grid strong{display:block;color:#102b51;overflow-wrap:anywhere}
+.rp-existing-info{display:flex;gap:12px;align-items:center;background:#e4f7ef;color:#146947;padding:13px;border-radius:9px}
+.rp-existing-info svg{flex-shrink:0}.rp-existing-info small{margin:5px 0 0}
+.rp-existing-next{display:flex;align-items:center;gap:7px;color:#526e96;font-size:13px;margin:0}
+@media(max-width:650px){.rp-existing-grid{grid-template-columns:1fr}.rp-existing-grid>div+div{border-left:0;padding-left:0}}
+</style>
