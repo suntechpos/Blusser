@@ -119,6 +119,11 @@ final class Patients
             $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['q']).'%';
             $query->where(fn ($q) => $q->where('name', 'ilike', $term)->orWhere('patient_number', 'ilike', $term)->orWhere('phone', 'ilike', $term)->orWhereRaw('id::text ILIKE ?', [$term]));
         }
+        if (! empty($filters['new_this_month'])) {
+            $zone = DB::connection('pgsql')->table('tenants')->whereRaw('id = public.context_tenant()')->value('timezone') ?? 'UTC';
+            $month = CarbonImmutable::now($zone)->startOfMonth();
+            $query->where('created_at', '>=', $month->utc())->where('created_at', '<', $month->addMonth()->utc());
+        }
         if (isset($filters['gender'])) {
             $query->where('gender', $filters['gender']);
         }
