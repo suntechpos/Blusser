@@ -24,13 +24,13 @@ import {
   type BookingPatient,
   type BookingAppointment,
 } from "../../services/receptionBooking";
-const props = defineProps<{ preset?: BookingPreset }>();
+const props = defineProps<{ preset?: BookingPreset; fixedPatient?: Patient }>();
 const emit = defineEmits<{
   close: [];
   saved: [appointment: BookingAppointment, date: string];
 }>();
 import type { Patient } from "../../services/operations";
-const mode = ref(can("patients.create") ? "new" : "existing");
+const mode = ref(props.fixedPatient ? "existing" : can("patients.create") ? "new" : "existing");
 const demographics = ref({
   lastName: "",
   firstName: "",
@@ -42,7 +42,7 @@ const demographics = ref({
 const createdPatient = ref<BookingPatient>();
 const patientPayload = ref<Record<string, unknown>>();
 const branches = computed(() => session.branches.filter((b) => b.active));
-const patient = ref<ReceptionPatient | null>(null),
+const patient = ref<ReceptionPatient | null>(props.fixedPatient ? patientChoice(props.fixedPatient) : null),
   doctors = ref<BookingDoctor[]>([]),
   zone = ref("");
 const draft = ref({
@@ -376,7 +376,7 @@ const summary = computed(() => chosenDoctor.value?.name);
       @submit.prevent="save"
     >
       <fieldset :disabled="saving" class="rp-booking-fields">
-        <div class="rp-segment" aria-label="Bemor turi">
+        <div v-if="!fixedPatient" class="rp-segment" aria-label="Bemor turi">
           <button
             type="button"
             :disabled="saving || !can('patients.create')"
@@ -471,10 +471,11 @@ const summary = computed(() => chosenDoctor.value?.name);
           saqlashda bemor takror yaratilmaydi.
         </p>
         <ReceptionPatientSearch
-          v-if="mode === 'existing'"
+          v-if="mode === 'existing' && !fixedPatient"
           v-model="patient"
           :lookup="findBookingPatients"
         />
+        <div v-if="fixedPatient" class="rp-section"><strong>{{fixedPatient.name}}</strong><p class="rp-hint">{{fixedPatient.patient_number}} · {{fixedPatient.phone || "—"}}</p></div>
         <p v-if="patientWarning" class="rp-error" role="alert">
           {{ patientWarning }}
         </p>
