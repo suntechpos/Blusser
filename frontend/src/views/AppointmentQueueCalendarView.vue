@@ -39,13 +39,14 @@ const visibleDoctors=computed(()=>doctors.value.filter(d=>(!doctorFilter.value||
 const mins=(s:string)=>Number(s.slice(0,2))*60+Number(s.slice(3,5));
 const roomName=(id:string)=>rooms.value.find(r=>r.id===id)?.number||"—";
 const doctorWindows=(id:string)=>(windows.value[id]||[]).filter(w=>!roomFilter.value||w.room_id===roomFilter.value);
-function localMinute(t:number){return mins(time(new Date(t).toISOString()))}
+const wallClock=computed(()=>zone.value?new Intl.DateTimeFormat("en-GB",{timeZone:zone.value,hour:"2-digit",minute:"2-digit",hourCycle:"h23"}):null);
+function localMinute(t:number){return wallClock.value?mins(wallClock.value.format(new Date(t))):0}
 function slotKey(s:BookingSlot){return [s.doctor_id,s.room_id,s.starts_at,s.ends_at].join("|")}
 function windowLabel(id:string){return doctorWindows(id).map(w=>w.local_start+"–"+w.local_end).join(", ")||"Ish jadvali yo‘q"}
 const filtered=computed(()=>appointments.value.filter(a=>(!doctorFilter.value||a.doctor_id===doctorFilter.value)&&(!serviceFilter.value||a.service_id===serviceFilter.value)&&(!status.value||a.status===status.value)&&(!query.value.trim()||[name(a.patient_id),patients.value[a.patient_id]?.phone,patients.value[a.patient_id]?.patient_number].some(s=>s?.toLowerCase().includes(query.value.trim().toLowerCase())))));
 const queueFiltered=computed(()=>tickets.value.filter(t=>(!doctorFilter.value||t.doctor_id===doctorFilter.value)&&(!query.value.trim()||[name(t.patient_id),String(t.number)].some(s=>s.toLowerCase().includes(query.value.trim().toLowerCase())))));
 const occupied=computed(()=>appointments.value.filter(a=>!["cancelled","no_show"].includes(a.status)));
-const slotCount=computed(()=>visibleDoctors.value.reduce((n,d)=>n+(free.value[d.id]||[]).filter(s=>!roomFilter.value||s.room_id===roomFilter.value).length,0));
+const slotCount=computed(()=>visibleDoctors.value.reduce((n,d)=>n+new Set((free.value[d.id]||[]).filter(s=>!roomFilter.value||s.room_id===roomFilter.value).map(s=>s.starts_at)).size,0));
 const activeDoctors=computed(()=>visibleDoctors.value.filter(d=>doctorWindows(d.id).length>0).length);
 let serial=0;
 onBeforeUnmount(()=>{serial++});
@@ -105,7 +106,7 @@ async function load(){
       try{
        const slots=await bookingAvailability(d.id,branch.value,service.id,date.value,zone.value);
        for(const slot of slots){
-        const key=slot.starts_at;
+        const key=slot.starts_at+"|"+slot.room_id;
         const prior=byStart.get(key);
         if(!prior||Date.parse(slot.ends_at)<Date.parse(prior.slot.ends_at))byStart.set(key,{slot,service:service.id});
        }
@@ -138,7 +139,9 @@ const bounds=computed(()=>{
 });
 const events=computed(()=>Object.fromEntries(visibleDoctors.value.map(d=>{
  const a=appointments.value.filter(a=>a.doctor_id===d.id&&(!roomFilter.value||a.room_id===roomFilter.value)&&!["cancelled","no_show"].includes(a.status)).map(a=>({key:a.id,start:a.starts_at,end:a.ends_at,appointment:a} as CalendarEvent));
- const f=(busyOnly.value?[]:(free.value[d.id]||[]).filter(s=>!roomFilter.value||s.room_id===roomFilter.value)).map((s,i)=>({key:"slot"+i,start:s.starts_at,end:s.ends_at,slot:s,serviceId:serviceFilter.value} as CalendarEvent));
+ const starts=new Map<string,BookingSlot>();
+ for(const slot of (free.value[d.id]||[]).filter(s=>!roomFilter.value||s.room_id===roomFilter.value))if(!starts.has(slot.starts_at))starts.set(slot.starts_at,slot);
+ const f=(busyOnly.value?[]:[...starts.values()].filter((slot,i,all)=>i===0||Date.parse(slot.starts_at)-Date.parse(all[i-1]!.starts_at)>=60000)).map((s,i)=>({key:"slot"+i,start:s.starts_at,end:s.ends_at,slot:s,serviceId:serviceFilter.value} as CalendarEvent));
  return [d.id,[...a,...f]];
 })));
 const displayRange=computed(()=>{
@@ -163,16 +166,16 @@ function cellState(id:string,t:number){
  const m=localMinute(t), end=localMinute(t+1799999)+1;
  const work=doctorWindows(id);
  const w=work.find(w=>m>=mins(w.local_start)&&end<=mins(w.local_end));
- if(!w)return "closed";
+ if(!w)return scheduleError.value?"unknown":"closed";
  if(w.breaks.some(b=>m<mins(b.local_end)&&end>mins(b.local_start)))return "break";
  return "work";
 }
 const roomSummary=computed(()=>rooms.value.filter(r=>r.active&&(!roomFilter.value||r.id===roomFilter.value)).map(r=>{
- const a=occupied.value.find(a=>a.room_id===r.id&&a.status==="in_progress");
- const waiting=occupied.value.find(a=>a.room_id===r.id&&a.status==="checked_in");
+ const a=date.value===localDay(Date.now(),zone.value)?occupied.value.find(a=>a.room_id===r.id&&a.status==="in_progress"):undefined;
+ const waiting=date.value===localDay(Date.now(),zone.value)?occupied.value.find(a=>a.room_id===r.id&&a.status==="checked_in"):undefined;
  return {room:r,appointment:a||waiting,state:r.availability!=="available"?"Yopiq":a?"Qabulda":waiting?"Kutmoqda":"Holat tasdiqlanmagan"};
 }));
-function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.max(0,(Date.parse(e.start)-r.start)/1800000*64)+"px",height:Math.max(14,(Math.min(Date.parse(e.end),r.end)-Math.max(Date.parse(e.start),r.start))/1800000*64-3)+"px"}}
+function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.max(0,(Date.parse(e.start)-r.start)/1800000*64)+"px",height:Math.max(2,(Math.min(Date.parse(e.end),r.end)-Math.max(Date.parse(e.start),r.start))/1800000*64-3)+"px"}}
 </script>
 <template>
 <section class="unified">
@@ -187,13 +190,13 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
  <template v-else>
  <p v-if="catalogError" role="alert">Shifokorlar katalogi: {{catalogError}}</p>
  <template v-if="tab==='calendar'">
- <p class="hint">Bo‘sh vaqtlar xizmat davomiyligiga bog‘liq. + bosilganda server tasdiqlagan xizmat va vaqt tanlanadi.</p>
+ <p class="hint">Bo‘sh vaqtlar — kamida bitta xizmat uchun server tasdiqlagan boshlanish vaqtlari. + bosilganda xizmatni o‘zgartirish mumkin.</p>
  <p v-if="scheduleError" role="alert">Ish jadvali: {{scheduleError}}</p><div class="calendar-extra"><select v-model="roomFilter" aria-label="Kabinet"><option value="">Barcha kabinetlar</option><option v-for="r in rooms" :key="r.id" :value="r.id">{{r.number}}</option></select><label><input type="checkbox" v-model="busyOnly"/> Faqat band vaqtlar</label></div><p v-if="!visibleDoctors.length" class="hint">Kalendar uchun shifokorlar katalogi mavjud emas. Qabullar tabida ruxsat berilgan bronlarni ko‘rishingiz mumkin.</p>
  <div v-else class="calendar-layout"><div class="calendar-scroll"><div class="calendar" :style="{gridTemplateColumns:'76px repeat('+visibleDoctors.length+', minmax(220px,1fr))'}">
  <div class="corner">Vaqt</div><div v-for="d in visibleDoctors" :key="d.id" class="doctor-head"><div class="doctor-identity"><span class="doctor-avatar">{{d.name.split(" ").slice(0,2).map(n=>n[0]).join("")}}</span><div><strong>{{d.name}}</strong><small>{{d.specialty_name||'—'}} · {{[...new Set(doctorWindows(d.id).map(w=>roomName(w.room_id)))].join(", ")||"—"}}</small><small>{{windowLabel(d.id)}}</small></div></div><small v-if="slotErrors[d.id]" class="warn">Bo‘sh vaqtlar yuklanmadi</small></div>
  <div class="times" :style="{height:height+'px'}"><div v-for="t in ticks" :key="t">{{time(new Date(t).toISOString())}}</div></div>
  <div v-for="d in visibleDoctors" :key="d.id" class="day-column" :style="{height:height+'px'}"><div v-for="t in ticks" :key="t" class="work-cell" :class="cellState(d.id,t)"><span v-if="cellState(d.id,t)==='break'">Tanaffus</span><span v-else-if="cellState(d.id,t)==='closed'">—</span></div><button v-for="e in events[d.id]" :key="e.key" class="event" :class="e.appointment?e.appointment.status:'free'" :style="position(e)" :disabled="!!e.slot&&!canReception('book')" @click="e.appointment?selected=e.appointment:e.slot&&openBooking(e.slot)"><template v-if="e.appointment"><strong>{{name(e.appointment.patient_id)}}</strong><small>{{time(e.start)}}–{{time(e.end)}} · {{label(e.appointment.status)}} · {{serviceName(e.appointment)}}</small></template><template v-else><Plus :size="15"/> {{time(e.start)}}–{{time(e.end)}}</template></button></div>
- </div></div><aside class="calendar-side"><h3>Tanlangan kundagi qabullar</h3><button v-for="a in occupied.slice(0,8)" :key="a.id" class="side-row" @click="selected=a"><span>{{time(a.starts_at)}}</span><div><strong>{{name(a.patient_id)}}</strong><small>{{doctorName(a.doctor_id)}} · {{serviceName(a)}}</small><small>{{label(a.status)}}</small></div></button><p v-if="!occupied.length" class="hint">Qabullar mavjud emas.</p><button v-if="occupied.length>8" @click="setTab('list')">Barchasini ko‘rish</button><div class="room-summary"><h3>Kabinetlar holati</h3><div v-for="r in roomSummary" :key="r.room.id" class="room-line"><div><strong>{{r.room.number}}</strong><small v-if="r.appointment">{{doctorName(r.appointment.doctor_id)}}</small></div><span>{{r.state}}</span></div><p v-if="!roomSummary.length" class="hint">Kabinet ma’lumotlari mavjud emas.</p></div></aside></div>
+ </div></div><aside class="calendar-side"><h3>Tanlangan kundagi qabullar</h3><button v-for="a in occupied.slice(0,8)" :key="a.id" class="side-row" @click="selected=a"><span>{{time(a.starts_at)}}</span><div><strong>{{name(a.patient_id)}}</strong><small>{{doctorName(a.doctor_id)}} · {{serviceName(a)}}</small><small>{{label(a.status)}}</small></div></button><p v-if="!occupied.length" class="hint">Qabullar mavjud emas.</p><button v-if="occupied.length>8" @click="setTab('list')">Barchasini ko‘rish</button><div class="room-summary"><h3>Kabinetlar holati</h3><p class="hint">Qabul yozuvlari asosida; jonli bandlik alohida tekshiriladi.</p><div v-for="r in roomSummary" :key="r.room.id" class="room-line"><div><strong>{{r.room.number}}</strong><small v-if="r.appointment">{{doctorName(r.appointment.doctor_id)}}</small></div><span>{{r.state}}</span></div><p v-if="!roomSummary.length" class="hint">Kabinet ma’lumotlari mavjud emas.</p></div></aside></div>
  <div class="legend"><span>🔵 Yozilgan</span><span>🟢 Yakunlangan</span><span>🟣 Qabulda</span><span>＋ Tasdiqlangan bo‘sh vaqt</span><span>Kulrang — ish vaqtidan tashqari yoki tanaffus</span></div>
  </template>
  <div v-else-if="tab==='list'" class="table-scroll"><table><thead><tr><th>Vaqt</th><th>Bemor</th><th>Shifokor</th><th>Xizmat</th><th>Holati</th><th>Amallar</th></tr></thead><tbody><tr v-for="a in filtered" :key="a.id"><td>{{time(a.starts_at)}}–{{time(a.ends_at)}}</td><td>{{name(a.patient_id)}}</td><td>{{doctorName(a.doctor_id)}}</td><td>{{serviceName(a)}}</td><td>{{label(a.status)}}</td><td><button @click="selected=a"><Eye :size="15"/> Ko‘rish</button></td></tr><tr v-if="!filtered.length"><td colspan="6">Qabullar mavjud emas.</td></tr></tbody></table></div>
