@@ -106,7 +106,12 @@ final class Scheduling
 
     public function projection(string $kind, string $id): array
     {
-        return json_decode(DB::selectOne('SELECT governance.scheduling_projection(?,?) AS value', [$kind, $id])->value, true, flags: JSON_THROW_ON_ERROR);
+        $result = json_decode(DB::selectOne('SELECT governance.scheduling_projection(?,?) AS value', [$kind, $id])->value, true, flags: JSON_THROW_ON_ERROR);
+        if ($kind === 'schedules') {
+            $result['active'] = (bool) DB::table('schedule_rules')->where('id', $id)->value('active');
+        }
+
+        return $result;
     }
 
     public function command(User $actor, string $tenant, string $kind, string $action, ?string $id, array $payload, string $key): array
