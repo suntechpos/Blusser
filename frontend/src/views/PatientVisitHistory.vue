@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
-import { Search, CalendarDays, Eye, ChevronLeft, ChevronRight, Users, CheckCircle2, Clock3, Download } from "lucide-vue-next";
-import { clinicRequest, errorText, downloadBlob } from "../services/api";
+import { Search, CalendarDays, Eye, ChevronLeft, ChevronRight, Users, CheckCircle2, Clock3 } from "lucide-vue-next";
+import { clinicRequest, errorText } from "../services/api";
 import { can, session } from "../services/session";
 import { bookingCatalog, type BookingDoctor } from "../services/receptionBooking";
 import { getVisitDiagnosis } from "../services/visitDiagnosis";
@@ -21,7 +21,7 @@ const counts=computed(()=>Object.fromEntries(groups.map(g=>[g.id,rows.value.filt
 function doctor(r:Row){return catalog.value[r.branch_id]?.find(d=>d.id===r.doctor_id)}
 function service(r:Row){return doctor(r)?.services.find(s=>s.id===r.service_id)?.name||"—"}
 function date(r:Row){return r.arrived_at||r.starts_at||""}
-function localDate(r:Row){const tz=session.branches.find(b=>b.id===r.branch_id)?.timezone;return date(r)&&tz?new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(date(r))):""}
+function localDate(r:Row){const tz=session.branches.find(b=>b.id===r.branch_id)?.timezone;if(!date(r)||!tz)return "";const p=new Intl.DateTimeFormat("en-GB",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(date(r)));return ["year","month","day"].map(k=>p.find(x=>x.type===k)?.value||"").join("-")}
 function displayDate(r:Row){const tz=session.branches.find(b=>b.id===r.branch_id)?.timezone;return date(r)&&tz?new Intl.DateTimeFormat("en-GB",{timeZone:tz,day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(new Date(date(r))).replaceAll("/","."):"—"}
 const doctorOptions=computed(()=>[...new Map(rows.value.map(r=>[r.doctor_id,doctor(r)?.name||r.doctor_id])).entries()]);
 const serviceOptions=computed(()=>[...new Map(rows.value.filter(r=>r.service_id).map(r=>[r.service_id!,service(r)])).entries()]);
@@ -58,19 +58,13 @@ async function load(){
  finally{if(request===seq)loading.value=false}
 }
 watch(()=>[props.patientId,props.revision,session.epoch],()=>void load(),{immediate:true});
-function exportCsv(){
- if(!can("appointments.export"))return;
- const cell=(v:unknown)=>{let s=String(v??"");if(/^[\s\u0000-\u001f]*[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'};
- const lines=[["ID","Sana","Xizmat","Shifokor","Holat"],...filtered.value.map(r=>[r.id,displayDate(r),service(r),doctor(r)?.name||"—",labels[r.status]||r.status])];
- downloadBlob(new Blob(["\uFEFF"+lines.map(r=>r.map(cell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"}),"tashriflar.csv");
-}
 </script>
 <template>
 <section class="history">
  <div class="history-metrics"><div v-for="(g,i) in groups.slice(0,4)" :key="g.id" class="history-panel metric"><span class="tile"><component :is="[Users,CheckCircle2,Clock3,CalendarDays][i]" :size="24"/></span><div><small>{{g.id==='all'?'Jami tashrif va qabullar':g.name}}</small><strong>{{loading||failure?'—':counts[g.id]}}</strong></div></div></div>
  <div class="history-panel content">
  <h2>Tashriflar tarixi</h2><p class="muted">Bemorning klinikadagi barcha tashriflari va qabullari.</p>
- <div class="filters"><label class="search"><Search :size="17"/><input v-model="query" placeholder="Shifokor, xizmat yoki tashxis bo‘yicha qidirish..."/></label><label>Sana dan <input type="date" v-model="from"/></label><label>gacha <input type="date" v-model="to"/></label><select v-model="doctorFilter" aria-label="Shifokor"><option value="">Shifokor</option><option v-for="[id,name] in doctorOptions" :key="id" :value="id">{{name}}</option></select><select v-model="serviceFilter" aria-label="Xizmat turi"><option value="">Xizmat turi</option><option v-for="[id,name] in serviceOptions" :key="id" :value="id">{{name}}</option></select><button v-if="can('appointments.export')" :disabled="loading||!!failure" @click="exportCsv"><Download :size="16"/> Eksport</button></div>
+ <div class="filters"><label class="search"><Search :size="17"/><input v-model="query" placeholder="Shifokor, xizmat yoki tashxis bo‘yicha qidirish..."/></label><label>Sana dan <input type="date" v-model="from"/></label><label>gacha <input type="date" v-model="to"/></label><select v-model="doctorFilter" aria-label="Shifokor"><option value="">Shifokor</option><option v-for="[id,name] in doctorOptions" :key="id" :value="id">{{name}}</option></select><select v-model="serviceFilter" aria-label="Xizmat turi"><option value="">Xizmat turi</option><option v-for="[id,name] in serviceOptions" :key="id" :value="id">{{name}}</option></select></div>
  <div class="chips"><button v-for="g in groups" :key="g.id" :class="{active:statusFilter===g.id}" @click="statusFilter=g.id">{{g.name}} <span>{{loading||failure?'—':counts[g.id]}}</span></button></div>
  <p v-if="loading" role="status">Tashriflar yuklanmoqda…</p><p v-else-if="failure" role="alert">{{failure}} <button @click="load">Qayta urinish</button></p>
  <template v-else><div class="table-wrap"><table><thead><tr><th>#</th><th>Tashrif ID</th><th>Sana va vaqt</th><th>Xizmat</th><th>Shifokor</th><th>Tashxis (qisqacha)</th><th>Holati</th><th>Amallar</th></tr></thead><tbody><tr v-for="(r,i) in visible" :key="r.kind+r.id"><td>{{(page-1)*size+i+1}}</td><td :title="r.id">{{r.id.slice(0,8)}}</td><td>{{displayDate(r)}}</td><td>{{service(r)}}</td><td><strong>{{doctor(r)?.name||'—'}}</strong><small>{{doctor(r)?.specialty_name}}</small></td><td class="diagnosis">{{diagnoses[r.id]||'—'}}</td><td><span class="status" :class="group(r)">{{labels[r.status]||r.status}}</span></td><td><button @click="selected=r"><Eye :size="15"/> Ko‘rish</button></td></tr><tr v-if="!visible.length"><td colspan="8" class="empty">Tashriflar topilmadi.</td></tr></tbody></table></div><footer><span>Jami: {{filtered.length}} ta</span><div><button :disabled="page<=1" @click="page--"><ChevronLeft :size="16"/></button><span>{{page}} / {{pages}}</span><button :disabled="page>=pages" @click="page++"><ChevronRight :size="16"/></button><select v-model.number="size"><option :value="10">10 / sahifa</option><option :value="20">20 / sahifa</option><option :value="50">50 / sahifa</option></select></div></footer></template>
