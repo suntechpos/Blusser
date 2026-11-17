@@ -107,10 +107,10 @@ final class PatientController
 
     private function filters(Request $request): array
     {
-        $this->allow($request->query(), ['page', 'per_page', 'q', 'branch_id', 'status', 'from', 'to', 'gender']);
+        $this->allow($request->query(), ['page', 'per_page', 'q', 'branch_id', 'status', 'from', 'to', 'gender', 'visit_range', 'new_this_month']);
 
         return $request->validate(['page' => 'sometimes|integer|min:1|max:100000', 'per_page' => 'sometimes|integer|min:1|max:100',
-            'gender' => 'sometimes|in:male,female,unspecified', 'q' => 'sometimes|string|max:100', 'branch_id' => 'sometimes|uuid', 'status' => 'sometimes|in:active,archived,all',
+            'visit_range' => 'sometimes|in:7,30,old,never', 'new_this_month' => 'sometimes|boolean', 'gender' => 'sometimes|in:male,female,unspecified', 'q' => 'sometimes|string|max:100', 'branch_id' => 'sometimes|uuid', 'status' => 'sometimes|in:active,archived,all',
             'from' => ['sometimes', 'date', 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/'],
             'to' => ['sometimes', 'date', 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/', ...($request->has('from') ? ['after:from'] : [])]]);
     }
