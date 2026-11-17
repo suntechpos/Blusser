@@ -142,6 +142,17 @@ final class Appointments
 
     private function projection(string $kind, string $id): array
     {
-        return json_decode(DB::selectOne('SELECT governance.booking_projection(?,?) AS value', [$kind, $id])->value, true, flags: JSON_THROW_ON_ERROR);
+        $result = json_decode(DB::selectOne('SELECT governance.booking_projection(?,?) AS value', [$kind, $id])->value, true, flags: JSON_THROW_ON_ERROR);
+        if ($kind === 'visits') {
+            // The visit is already authorized by the existing RLS projection.
+            // Additional lookups retain their own table-level RLS.
+            $visit = DB::table('visits')->whereRaw('tenant_id=public.context_tenant()')->where('id', $id)->first(['service_id', 'arrived_at']);
+            if ($visit) {
+                $result['service_id'] = $visit->service_id;
+                $result['arrived_at'] = CarbonImmutable::parse($visit->arrived_at)->utc()->toISOString();
+            }
+        }
+
+        return $result;
     }
 }
