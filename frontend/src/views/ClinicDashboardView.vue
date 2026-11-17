@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { session, selectClinic, can } from "../services/session";
 import { errorText } from "../services/api";
-import NavbatlarView from "./NavbatlarView.vue";
+import AppointmentQueueCalendarView from "./AppointmentQueueCalendarView.vue";
 import TabloBoshqaruviView from "./TabloBoshqaruviView.vue";
-import QabullarView from "./QabullarView.vue";
 import BemorlarView from "./BemorlarView.vue";
 import XodimlarView from "./XodimlarView.vue";
 import DepartmentsRoomsView from "./DepartmentsRoomsView.vue";
@@ -37,7 +36,6 @@ import {
   Stethoscope,
   Users,
   Wallet,
-  ClipboardList,
   ChartNoAxesColumnIncreasing,
   TriangleAlert,
   ArrowRight,
@@ -144,7 +142,6 @@ const allGroups = [
       { label: "Registratura", icon: BriefcaseMedical },
       { label: "Bemorlar", icon: Users },
       { label: "Qabullar", icon: CalendarDays },
-      { label: "Navbatlar", icon: ClipboardList },
       { label: "Tablo boshqaruvi", icon: Monitor },
     ],
   },
@@ -178,7 +175,7 @@ const allGroups = [
 ];
 const groups = computed(() =>
   allGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => allowedPage(i.label)) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => i.label === "Qabullar" ? allowedPage("Qabullar") || allowedPage("Navbatlar") : allowedPage(i.label)) }))
     .filter((g) => g.items.length),
 );
 
@@ -349,11 +346,11 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`);
             :key="item.label"
             type="button"
             class="clinic-nav-item"
-            :class="{ selected: activeItem === item.label }"
-            @click="navigate(item.label)"
+            :class="{ selected: activeItem === item.label || (item.label === 'Qabullar' && activeItem === 'Navbatlar') }"
+            @click="navigate(item.label === 'Qabullar' && !allowedPage('Qabullar') ? 'Navbatlar' : item.label)"
           >
             <component :is="item.icon" :size="20" :stroke-width="2" /><span>{{
-              item.label
+              item.label === "Qabullar" ? "Qabullar va navbatlar" : item.label
             }}</span>
           </button>
         </div>
@@ -476,7 +473,9 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`);
               activeItem !== 'Bemorlar' &&
               activeItem !== 'Xodimlar' &&
               activeItem !== 'Bo‘limlar va Xonalar' &&
-              activeItem !== 'Shifokor kabineti'
+              activeItem !== 'Shifokor kabineti' &&
+              activeItem !== 'Qabullar' &&
+              activeItem !== 'Navbatlar'
             "
             class="clinic-demo-note"
           >
@@ -773,14 +772,11 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`);
             v-access-surface="'workspace'"
             v-else-if="activeItem === 'Shifokor kabineti'"
           />
-          <QabullarView
-            v-access-surface="'appointments'"
-            v-else-if="activeItem === 'Qabullar'"
-          />
-          <NavbatlarView
-            v-access-surface="'queues'"
-            v-else-if="activeItem === 'Navbatlar'"
-            @open-tablo="activeItem = 'Tablo boshqaruvi'"
+          <AppointmentQueueCalendarView
+            v-else-if="activeItem === 'Qabullar' || activeItem === 'Navbatlar'"
+            :key="activeItem"
+            :initial-tab="activeItem === 'Navbatlar' ? 'queue' : 'calendar'"
+            @open-tablo="navigate('Tablo boshqaruvi')"
           />
           <TabloBoshqaruviView
             v-access-surface="'display'"
