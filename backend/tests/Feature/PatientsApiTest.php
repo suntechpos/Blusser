@@ -74,6 +74,21 @@ final class PatientsApiTest extends FoundationTestCase
         return $jar;
     }
 
+    public function test_list_summary_gender_and_new_patient_filters(): void
+    {
+        $fixture = $this->fixture();
+        $a = $fixture['a'];
+        $this->command($a, data: [...$this->data($a, 'Synthetic female'), 'gender' => 'female']);
+        $this->command($a, data: [...$this->data($a, 'Synthetic male'), 'gender' => 'male']);
+        $jar = $this->patientSession($a);
+        $this->browser($jar, 'GET', '/api/v1/clinic/patients?gender=female&new_this_month=1&status=all')
+            ->assertOk()->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('meta.summary.all', 2)
+            ->assertJsonPath('meta.summary.new', 2)
+            ->assertJsonPath('meta.summary.archived', 0)
+            ->assertJsonPath('data.0.gender', 'female');
+    }
+
     public function test_http_crud_idempotency_archive_restore_normalization_and_secret_free_audit(): void
     {
         $a = $this->fixture()['a'];
