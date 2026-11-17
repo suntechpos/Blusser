@@ -38,6 +38,7 @@ final class Patients
                 DB::connection('pgsql')->select('SELECT governance.patient_export_audit()');
             }
             $query = $this->query($filters);
+            $summary = $export ? null : $this->summary($filters);
             $total = (clone $query)->count();
             abort_if($export && $total > 10000, 422, 'Export limit exceeded.');
             $page = $filters['page'] ?? 1;
@@ -65,7 +66,7 @@ final class Patients
                     $row['last_visit'] = $stat?->last_visit ? CarbonImmutable::parse($stat->last_visit)->utc()->toISOString() : null;
                 }
                 return $row;
-            })->all(), 'meta' => ['page' => (int) $page, 'per_page' => (int) $size, 'total' => $total]];
+            })->all(), 'meta' => ['page' => (int) $page, 'per_page' => (int) $size, 'total' => $total, ...($summary === null ? [] : ['summary' => $summary])]];
         });
     }
 
@@ -83,6 +84,32 @@ final class Patients
     public function command(User $actor, string $tenant, string $action, ?string $id, array $data, string $key): array
     {
         return json_decode(app(Governance::class)->call('patient_command', [$action, $id, json_encode($data, JSON_THROW_ON_ERROR), $key], $actor, $tenant), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    private function summary(array $filters): array
+    {
+        $base = array_intersect_key($filters, ['branch_id' => true]);
+        $all = $this->query([...$base, 'status' => 'all'])->reorder();
+        $zone = DB::connection('pgsql')->table('tenants')->whereRaw('id = public.context_tenant()')->value('timezone') ?? 'UTC';
+        $now = CarbonImmutable::now($zone);
+        $start = $now->startOfDay()->utc();
+        $end = $now->startOfDay()->addDay()->utc();
+        $today = null;
+        if (app(Permissions::class)->scope('visits.view') !== null) {
+            $today = DB::connection('pgsql')->table('visits')
+                ->whereRaw('tenant_id = public.context_tenant()')
+                ->whereIn('patient_id', (clone $all)->select('id'))
+                ->when(isset($base['branch_id']), fn ($q) => $q->where('branch_id', $base['branch_id']))
+                ->where('arrived_at', '>=', $start)->where('arrived_at', '<', $end)
+                ->distinct()->count('patient_id');
+        }
+        return [
+            'all' => (clone $all)->count(),
+            'active' => (clone $all)->whereNull('archived_at')->count(),
+            'archived' => (clone $all)->whereNotNull('archived_at')->count(),
+            'new' => (clone $all)->where('created_at', '>=', $now->startOfMonth()->utc())->where('created_at', '<', $now->startOfMonth()->addMonth()->utc())->count(),
+            'today' => $today,
+        ];
     }
 
     private function query(array $filters): Builder
@@ -103,6 +130,20 @@ final class Patients
             $query->whereNotNull('archived_at');
         } elseif (($filters['status'] ?? null) !== 'all') {
             $query->whereNull('archived_at');
+        }
+        if (isset($filters['visit_range'])) {
+            abort_if(app(Permissions::class)->scope('visits.view') === null, 403);
+            $cutoff = CarbonImmutable::now()->subDays($filters['visit_range'] === '7' ? 7 : 30);
+            $visits = DB::connection('pgsql')->table('visits')->select('patient_id')
+                ->whereRaw('tenant_id = public.context_tenant()')
+                ->when(isset($filters['branch_id']), fn ($q) => $q->where('branch_id', $filters['branch_id']));
+            if ($filters['visit_range'] === 'old') {
+                $query->whereIn('id', clone $visits)->whereNotIn('id', $visits->where('arrived_at', '>=', $cutoff));
+            } elseif ($filters['visit_range'] === 'never') {
+                $query->whereNotIn('id', $visits);
+            } else {
+                $query->whereIn('id', $visits->where('arrived_at', '>=', $cutoff));
+            }
         }
         foreach (['from' => '>=', 'to' => '<'] as $key => $operator) {
             if (isset($filters[$key])) {
