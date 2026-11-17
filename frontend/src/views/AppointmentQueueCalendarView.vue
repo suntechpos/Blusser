@@ -263,7 +263,7 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
             <p v-if="scheduleError" role="alert">Ish jadvali: {{ scheduleError }}</p>
             <p v-if="!visibleDoctors.length" class="hint calendar-message">Kalendar uchun shifokorlar katalogi mavjud emas.</p>
             <div v-else class="calendar-scroll" role="region" aria-label="Kunlik qabullar kalendari" tabindex="0">
-              <div class="calendar" :style="{ gridTemplateColumns: '72px repeat(' + visibleDoctors.length + ', minmax(205px, 1fr))', minWidth: (72 + visibleDoctors.length * 205) + 'px' }">
+              <div class="calendar" :style="{ gridTemplateColumns: '72px repeat(' + visibleDoctors.length + ', minmax(210px, 1fr))', minWidth: (72 + visibleDoctors.length * 210) + 'px' }">
                 <div class="corner">Vaqt</div>
                 <div v-for="(d, i) in visibleDoctors" :key="d.id" class="doctor-head" :data-tone="i % 4">
                   <div class="doctor-identity">
@@ -372,6 +372,7 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
   color: var(--ink);
   font: 13px "Employees Inter", Inter, Arial, sans-serif;
 }
+.unified.calendar-page { height: auto; grid-template-rows: auto auto auto auto; }
 .unified :is(button, input, select), .detail button { font: inherit; box-sizing: border-box; }
 .unified button, .detail button { cursor: pointer; }
 .unified button:disabled { cursor: not-allowed; opacity: .48; }
@@ -390,19 +391,20 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
 .tabs button { display: inline-flex; justify-content: center; align-items: center; gap: 13px; height: 100%; flex: 1; padding: 0 20px; border: 0; border-bottom: 3px solid transparent; background: transparent; font-weight: 650; color: var(--ink); font-size: 15px; }
 .tabs button.active { color: var(--blue); border-bottom-color: var(--blue); background: #fcfdff; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.metric { display: flex; align-items: center; gap: 18px; padding: 15px 17px; min-height: 108px; box-sizing: border-box; }
-.tile { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 16px; background: #e3efff; color: var(--blue); flex-shrink: 0; }
+.metric { display: flex; align-items: center; gap: 16px; padding: 12px 16px; min-height: 96px; box-sizing: border-box; }
+.tile { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: #e3efff; color: var(--blue); flex-shrink: 0; }
 .metric:nth-child(2) .tile { background: #e0f8ec; color: #00a752; }
 .metric:nth-child(3) .tile { background: #fff1df; color: #e67e00; }
 .metric:nth-child(4) .tile { background: #f0e8ff; color: #7529dd; }
 .metric-body { min-width: 0; }
 .metric small, .metric strong, .metric-note { display: block; }
 .metric small { font-weight: 650; font-size: 12px; line-height: 1.3; }
-.metric strong { font-size: 33px; line-height: 1.1; margin: 4px 0; letter-spacing: -.7px; }
+.metric strong { font-size: 30px; line-height: 1.1; margin: 4px 0; letter-spacing: -.7px; }
 .metric-note { font-size: 12px; line-height: 1.3; color: var(--muted); }
 .calendar-layout { display: grid; grid-template-columns: minmax(0, 69fr) minmax(0, 31fr); align-items: start; gap: 16px; min-width: 0; min-height: 0; }
 .list-layout { min-width: 0; min-height: 0; }
 .content { display: flex; flex-direction: column; box-sizing: border-box; padding: 16px; min-height: 0; height: 100%; overflow: hidden; }
+.calendar-page .content { height: auto; overflow: visible; }
 .toolbar { margin-bottom: 12px; flex-shrink: 0; }
 .toolbar h2 { font-size: 23px; line-height: 1.2; letter-spacing: -.6px; margin: 0; font-weight: 750; }
 .toolbar-actions { gap: 7px; flex-shrink: 0; }
@@ -432,12 +434,12 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
 .busy-switch input:focus-visible + .switch-track { outline: 2px solid var(--blue); outline-offset: 2px; }
 .hint { color: var(--muted); font-size: 12px; margin: 8px 0; line-height: 1.5; }
 .calendar-message { padding: 22px 6px; }
-.calendar-scroll { flex: 1; min-height: 0; min-width: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid #e5ecf8; border-radius: 12px; scrollbar-width: thin; scrollbar-color: #cbd9ed #f5f8fd; }
+.calendar-scroll { flex: none; height: clamp(430px, 52vh, 620px); min-height: 430px; min-width: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid #e5ecf8; border-radius: 12px; scrollbar-width: thin; scrollbar-color: #cbd9ed #f5f8fd; }
 .calendar { display: grid; width: 100%; isolation: isolate; }
 .corner { position: sticky; top: 0; left: 0; z-index: 5; background: #f3f7ff; display: flex; align-items: center; padding-left: 17px; color: #48648d; font-size: 12px; border-right: 1px solid #e7eef9; border-bottom: 1px solid #e7eef9; }
-.doctor-head { position: sticky; top: 0; z-index: 4; background: #f3f7ff; border-right: 1px solid #e7eef9; border-bottom: 1px solid #e7eef9; min-width: 0; padding: 9px 10px; box-sizing: border-box; }
-.doctor-identity { display: flex; align-items: center; gap: 10px; min-height: 46px; }
-.doctor-avatar { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; background: #d9f0ff; color: #125780; font-size: 13px; font-weight: 700; }
+.doctor-head { position: sticky; top: 0; z-index: 4; background: #f3f7ff; border-right: 1px solid #e7eef9; border-bottom: 1px solid #e7eef9; min-width: 0; padding: 6px 9px; box-sizing: border-box; }
+.doctor-identity { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.doctor-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: #d9f0ff; color: #125780; font-size: 13px; font-weight: 700; }
 .doctor-head[data-tone="1"] .doctor-avatar { background: #d9f8e9; color: #007e49; }
 .doctor-head[data-tone="2"] .doctor-avatar { background: #e9e1ff; color: #6430ce; }
 .doctor-head[data-tone="3"] .doctor-avatar { background: #ffe9dc; color: #a75a27; }
@@ -471,24 +473,26 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
 .event.cancelled, .event.no_show, .status-pill.cancelled, .status-pill.no_show { background: #fde8ec; color: #dc3545; }
 .event .status-pill { padding: 3px 5px; font-size: 10px; line-height: 14px; }
 .status-pill.unknown, .status-pill.closed { background: #eef2f8; color: #71849f; }
-.calendar-side { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 16px; height: 100%; }
+.calendar-side { display: flex; flex-direction: column; min-width: 0; gap: 16px; }
 .side-card { box-sizing: border-box; padding: 16px; min-height: 0; display: flex; flex-direction: column; }
-.appointments-summary { flex: 0 1 294px; }
+.appointments-summary { flex: none; }
 .side-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-shrink: 0; }
-.side-heading h3 { font-size: 20px; font-weight: 750; line-height: 24px; letter-spacing: -.4px; margin: 0; }
+.side-heading h3 { font-size: 18px; font-weight: 750; line-height: 24px; letter-spacing: -.4px; margin: 0; }
 .unified .side-link { display: inline-flex; align-items: center; gap: 0; padding: 0; border: 0; background: none; color: var(--blue); font-size: 11px; flex-shrink: 0; white-space: nowrap; }
 .side-list, .room-list { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: #cbd9ed transparent; }
-.side-row { display: flex; align-items: center; width: 100%; min-height: 46px; text-align: left; gap: 9px; padding: 7px 0; border: 0; border-bottom: 1px solid #edf1f8; background: #fff; color: var(--ink); }
+.side-row { display: flex; align-items: center; width: 100%; min-height: 42px; text-align: left; gap: 9px; padding: 5px 0; border: 0; border-bottom: 1px solid #edf1f8; background: #fff; color: var(--ink); }
 .side-row:last-child, .room-line:last-child { border-bottom: 0; }
 .side-time { flex-shrink: 0; width: 41px; font-size: 12px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .side-patient, .room-info { flex: 1; min-width: 0; }
 .side-patient strong, .side-patient small, .room-info strong, .room-info small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-patient strong, .room-info strong { font-size: 12px; font-weight: 650; line-height: 16px; }
 .side-patient small, .room-info small { color: var(--muted); font-size: 10px; line-height: 15px; }
-.room-summary { flex: 0 1 auto; max-height: 270px; }
+.side-list { max-height: 368px; }
+.room-list { max-height: 324px; }
+.room-summary { flex: none; }
 .room-count { color: #7c93b5; font-size: 11px; }
-.room-line { display: flex; align-items: center; gap: 11px; min-height: 54px; padding: 6px 0; box-sizing: border-box; border-bottom: 1px solid #edf1f8; }
-.room-icon { width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; background: #edf2fa; color: #6480ad; }
+.room-line { display: flex; align-items: center; gap: 11px; min-height: 50px; padding: 5px 0; box-sizing: border-box; border-bottom: 1px solid #edf1f8; }
+.room-icon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center; background: #edf2fa; color: #6480ad; }
 .room-icon.in_progress { background: #eee5ff; color: #7028e4; }
 .room-icon.checked_in { background: #fff0dc; color: #d97706; }
 .table-scroll { overflow: auto; flex: 1; min-height: 0; border-radius: 10px; }
@@ -499,16 +503,8 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
 .detail { width: min(480px, 100%); padding: 24px; box-sizing: border-box; color: #102045; font: 14px "Employees Inter", Inter, Arial, sans-serif; }
 .detail p { overflow-wrap: anywhere; }
 .detail h2 { margin-top: 0; }
-@media (min-width: 1600px) { .unified { --shell-space: 132px; } .tile { width: 66px; height: 66px; } .metric small { font-size: 13px; } .metric-note { font-size: 13px; } .doctor-info strong, .event-body strong { font-size: 13px; } .event-body small { font-size: 12px; } .event .status-pill { font-size: 11px; } .side-patient strong, .room-info strong { font-size: 13px; } .side-patient small, .room-info small { font-size: 11px; } }
-@media (max-width: 1150px) { .unified { height: auto; } .calendar-layout { grid-template-columns: minmax(0, 1fr); } .calendar-scroll { flex: none; height: 440px; } .calendar-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; } .side-card { max-height: 300px; } .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1600px) { .unified { --shell-space: 132px; } .tile { width: 60px; height: 60px; } .metric small { font-size: 13px; } .metric-note { font-size: 13px; } .doctor-info strong, .event-body strong { font-size: 12px; } .event-body small { font-size: 11px; } .event .status-pill { font-size: 10px; } .side-patient strong, .room-info strong { font-size: 13px; } .side-patient small, .room-info small { font-size: 11px; } }
+@media (max-width: 1150px) { .unified { height: auto; } .calendar-layout { grid-template-columns: minmax(0, 1fr); } .calendar-scroll { flex: none; height: 440px; } .calendar-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; } .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .unified { gap: 12px; } .heading { align-items: flex-start; flex-wrap: wrap; } .heading h1 { font-size: 24px; } .heading p { max-width: 300px; } .tabs { width: 100%; } .tabs button { padding: 0 8px; font-size: 13px; gap: 8px; } .metric { gap: 12px; padding: 13px; } .tile { width: 44px; height: 44px; border-radius: 12px; } .tile svg { width: 25px; } .metric strong { font-size: 28px; } .metric small { font-size: 11px; } .metric-note { font-size: 10px; } .content { padding: 12px; } .toolbar { flex-wrap: wrap; } .toolbar h2 { font-size: 20px; } .toolbar-actions { width: 100%; justify-content: space-between; } .calendar-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .busy-switch { justify-self: start; grid-column: 1 / -1; } .calendar-side { grid-template-columns: minmax(0, 1fr); } .branch-filter { max-width: 140px; } .date-display { padding: 0 9px; font-size: 12px; gap: 6px; } .date-group .icon-button { width: 29px; } .today-button { padding: 0 8px; } }
 @media (prefers-reduced-motion: reduce) { .switch-track, .switch-track::after { transition: none; } }
-/* Keep the calendar in document flow; its own viewport owns scrolling. */
-.unified.calendar-page { height: auto; grid-template-rows: auto auto auto auto; }
-.calendar-page .content { height: auto; overflow: visible; }
-.calendar-page .calendar-scroll { flex: none; height: clamp(460px, 58vh, 700px); }
-.calendar-page .calendar-side { height: auto; }
-.calendar-page .appointments-summary { flex: none; max-height: 340px; }
-.calendar-page .room-summary { flex: none; max-height: 340px; }
-@media (max-width: 720px) { .calendar-page .calendar-scroll { height: 460px; } }
 </style>
