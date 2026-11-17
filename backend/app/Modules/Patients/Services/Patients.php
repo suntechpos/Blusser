@@ -46,7 +46,26 @@ final class Patients
 
             $links = DB::connection('pgsql')->table('patient_branches')->whereIn('patient_id', $rows->modelKeys())->orderBy('branch_id')->get()->groupBy('patient_id');
 
-            return ['data' => $rows->map(fn (Patient $p) => $this->present($p, ($links[$p->id] ?? collect())->pluck('branch_id')->all()))->all(), 'meta' => ['page' => (int) $page, 'per_page' => (int) $size, 'total' => $total]];
+            $stats = collect();
+            $canVisits = app(Permissions::class)->scope('visits.view') !== null;
+            if ($canVisits && ! $export) {
+                $stats = DB::connection('pgsql')->table('visits')
+                    ->whereRaw('tenant_id = public.context_tenant()')
+                    ->whereIn('patient_id', $rows->modelKeys())
+                    ->when(isset($filters['branch_id']), fn ($q) => $q->where('branch_id', $filters['branch_id']))
+                    ->selectRaw('patient_id, count(*) as visit_count, max(arrived_at) as last_visit')
+                    ->groupBy('patient_id')->get()->keyBy('patient_id');
+            }
+
+            return ['data' => $rows->map(function (Patient $p) use ($links, $stats, $canVisits, $export) {
+                $row = $this->present($p, ($links[$p->id] ?? collect())->pluck('branch_id')->all());
+                if ($canVisits && ! $export) {
+                    $stat = $stats->get($p->id);
+                    $row['visit_count'] = (int) ($stat?->visit_count ?? 0);
+                    $row['last_visit'] = $stat?->last_visit ? CarbonImmutable::parse($stat->last_visit)->utc()->toISOString() : null;
+                }
+                return $row;
+            })->all(), 'meta' => ['page' => (int) $page, 'per_page' => (int) $size, 'total' => $total]];
         });
     }
 
@@ -72,6 +91,9 @@ final class Patients
         if (isset($filters['q'])) {
             $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['q']).'%';
             $query->where(fn ($q) => $q->where('name', 'ilike', $term)->orWhere('patient_number', 'ilike', $term)->orWhere('phone', 'ilike', $term)->orWhereRaw('id::text ILIKE ?', [$term]));
+        }
+        if (isset($filters['gender'])) {
+            $query->where('gender', $filters['gender']);
         }
         if (isset($filters['branch_id'])) {
             // RLS on BOTH relations: an unknown/unassigned branch cannot reveal matches.
