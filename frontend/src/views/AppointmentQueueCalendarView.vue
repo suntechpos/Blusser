@@ -180,7 +180,7 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
 </script>
 
 <template>
-  <section class="unified">
+  <section class="unified" :class="{ 'calendar-page': tab === 'calendar' }">
     <header class="heading">
       <div>
         <h1>Qabullar va navbatlar</h1>
@@ -503,4 +503,12 @@ function position(e:CalendarEvent){const r=displayRange.value;return {top:Math.m
 @media (max-width: 1150px) { .unified { height: auto; } .calendar-layout { grid-template-columns: minmax(0, 1fr); } .calendar-scroll { flex: none; height: 440px; } .calendar-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; } .side-card { max-height: 300px; } .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .unified { gap: 12px; } .heading { align-items: flex-start; flex-wrap: wrap; } .heading h1 { font-size: 24px; } .heading p { max-width: 300px; } .tabs { width: 100%; } .tabs button { padding: 0 8px; font-size: 13px; gap: 8px; } .metric { gap: 12px; padding: 13px; } .tile { width: 44px; height: 44px; border-radius: 12px; } .tile svg { width: 25px; } .metric strong { font-size: 28px; } .metric small { font-size: 11px; } .metric-note { font-size: 10px; } .content { padding: 12px; } .toolbar { flex-wrap: wrap; } .toolbar h2 { font-size: 20px; } .toolbar-actions { width: 100%; justify-content: space-between; } .calendar-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .busy-switch { justify-self: start; grid-column: 1 / -1; } .calendar-side { grid-template-columns: minmax(0, 1fr); } .branch-filter { max-width: 140px; } .date-display { padding: 0 9px; font-size: 12px; gap: 6px; } .date-group .icon-button { width: 29px; } .today-button { padding: 0 8px; } }
 @media (prefers-reduced-motion: reduce) { .switch-track, .switch-track::after { transition: none; } }
+/* Keep the calendar in document flow; its own viewport owns scrolling. */
+.unified.calendar-page { height: auto; grid-template-rows: auto auto auto auto; }
+.calendar-page .content { height: auto; overflow: visible; }
+.calendar-page .calendar-scroll { flex: none; height: clamp(460px, 58vh, 700px); }
+.calendar-page .calendar-side { height: auto; }
+.calendar-page .appointments-summary { flex: none; max-height: 340px; }
+.calendar-page .room-summary { flex: none; max-height: 340px; }
+@media (max-width: 720px) { .calendar-page .calendar-scroll { height: 460px; } }
 </style>
