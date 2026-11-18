@@ -475,7 +475,8 @@ const areaB = computed(() => `0,140 ${lineB.value} 630,140`);
               activeItem !== 'Bo‘limlar va Xonalar' &&
               activeItem !== 'Shifokor kabineti' &&
               activeItem !== 'Qabullar' &&
-              activeItem !== 'Navbatlar'
+              activeItem !== 'Navbatlar' &&
+              activeItem !== 'Tablo boshqaruvi'
             "
             class="clinic-demo-note"
           >
