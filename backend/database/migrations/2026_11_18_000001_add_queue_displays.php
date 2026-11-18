@@ -169,6 +169,9 @@ SQL);
 
     public function down(): void
     {
-        throw new RuntimeException('Forward-only display configuration migration.');
+        if (DB::selectOne('SELECT current_user AS name')->name !== 'blusser_owner' || DB::table('queue_displays')->exists()) {
+            throw new RuntimeException('Display configurations exist; use a forward migration.');
+        }
+        DB::unprepared('DROP FUNCTION governance.display_feed(uuid,uuid), governance.display_save(uuid,uuid,bigint,jsonb), governance.display_delete(uuid,uuid,bigint), governance.display_index(uuid), governance.display_scheduled_room(uuid,uuid,uuid,date,time), governance.display_record(public.queue_displays), governance.display_branch_allowed(text,uuid); DROP TABLE public.queue_displays;');
     }
 };
