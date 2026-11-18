@@ -978,4 +978,50 @@ WORKER;
         $this->assertSame(0, DB::table('queue_tickets')->count());
         $this->assertSame('called', $this->queue($a, 'call', $att['ticket']['id'], ['expected_version' => 1])['ticket']['status']);
     }
+
+    public function test_display_configuration_and_real_called_queue_are_branch_scoped_and_private(): void
+    {
+        $fixtures = $this->fixture();
+        $a = $this->reference($fixtures['a']);
+        $b = $this->reference($fixtures['b']);
+        $jar = $this->clinicSession($a);
+        $id = (string) Str::uuid();
+        $url = '/api/v1/clinic/displays/'.$id;
+        $payload = [
+            'branch_id' => $a['branch'], 'expected_version' => 0,
+            'name' => 'Synthetic waiting room', 'zone' => 'Main', 'floor' => '1',
+            'room_ids' => [$a['room']['id']], 'sound' => true, 'theme' => 'dark', 'language' => 'uz',
+        ];
+        $this->browser($jar, 'PUT', $url, $payload, false)->assertStatus(419);
+        $this->browser($jar, 'PUT', $url, [...$payload, 'room_ids' => [$b['room']['id']]])->assertUnprocessable();
+        $this->browser($jar, 'PUT', $url, $payload)->assertOk()->assertJsonPath('id', $id)->assertJsonPath('version', 1);
+        $this->browser($jar, 'PUT', $url, $payload)->assertOk()->assertJsonPath('version', 1);
+        $index = '/api/v1/clinic/displays?branch_id='.$a['branch'];
+        $this->browser($jar, 'GET', $index)->assertOk()->assertJsonPath('data.0.id', $id)->assertJsonPath('rooms.0.id', $a['room']['id']);
+        $feed = $url.'/feed?branch_id='.$a['branch'];
+        $this->browser($jar, 'GET', $feed)->assertOk()->assertJsonPath('called', [])->assertJsonPath('next', []);
+        // The linked reservation identifies the room independently of the current work shift.
+        $appt = $this->command($a);
+        $att = $this->command($a, 'check_in', $appt['id'], ['expected_version' => 1]);
+        $ticket = $att['ticket'];
+        $db = DB::connection('migration');
+        $today = $db->selectOne("SELECT (now() AT TIME ZONE coalesce(b.timezone,t.timezone))::date::text AS day FROM branches b JOIN tenants t ON t.id=b.tenant_id WHERE b.id=?", [$a['branch']])->day;
+        // Future-date fixture appointments are deliberately normalized to the current queue day only in the isolated test database.
+        $db->table('queue_tickets')->where('id', $ticket['id'])->update(['local_date' => $today]);
+        $this->browser($jar, 'GET', $feed)->assertOk()->assertJsonPath('next.0.ticket', 'O-001')->assertJsonPath('next.0.room', '101');
+        $this->queue($a, 'call', $ticket['id'], ['expected_version' => 1]);
+        $response = $this->browser($jar, 'GET', $feed)->assertOk()->assertJsonPath('called.0.ticket', 'O-001')->assertJsonPath('called.0.room', '101')->assertJsonPath('next', []);
+        $this->assertArrayNotHasKey('patient_id', $response->json('called.0'));
+        $this->assertArrayNotHasKey('patient_name', $response->json('called.0'));
+        $this->assertStringNotContainsString($a['patient']['id'], $response->getContent());
+        $this->queue($a, 'start', $ticket['id'], $this->startData($a, 2));
+        $this->browser($jar, 'GET', $feed)->assertOk()->assertJsonPath('called', []);
+        $otherJar = $this->clinicSession($b);
+        $this->browser($otherJar, 'GET', $feed)->assertForbidden();
+        $this->browser($otherJar, 'GET', $url.'/feed?branch_id='.$b['branch'])->assertNotFound();
+        $this->browser($jar, 'PUT', $url, [...$payload, 'expected_version' => 1, 'name' => 'Updated display'])->assertOk()->assertJsonPath('version', 2);
+        $this->browser($jar, 'PUT', $url, [...$payload, 'expected_version' => 1])->assertConflict();
+        $this->browser($jar, 'DELETE', $url, ['branch_id' => $a['branch'], 'expected_version' => 2])->assertOk();
+        $this->browser($jar, 'GET', $feed)->assertNotFound();
+    }
 }
