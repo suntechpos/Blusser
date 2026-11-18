@@ -8,6 +8,7 @@ use App\Modules\Platform\Http\ClinicController as PlatformController;
 use App\Modules\Platform\Http\HealthController;
 use App\Modules\Queues\Http\DoctorWorkspaceController;
 use App\Modules\Queues\Http\QueueController;
+use App\Modules\Queues\Http\DisplayController;
 use App\Modules\Queues\Http\VisitClinicalNoteController;
 use App\Modules\Queues\Http\VisitRecommendationController;
 use App\Modules\Queues\Http\VisitReferralController;
@@ -73,6 +74,10 @@ Route::prefix('v1')->middleware('first-party')->group(function () {
                 Route::put('visits/{visit}/prescriptions/{prescription}', [VisitPrescriptionController::class, 'update'])->whereUuid('visit')->whereUuid('prescription');
                 Route::get('visits/{visit}/diagnosis', [VisitDiagnosisController::class, 'show'])->whereUuid('visit');
                 Route::put('visits/{visit}/diagnosis', [VisitDiagnosisController::class, 'save'])->whereUuid('visit');
+                Route::get('displays', [DisplayController::class, 'index']);
+                Route::get('displays/{display}/feed', [DisplayController::class, 'feed'])->whereUuid('display');
+                Route::put('displays/{display}', [DisplayController::class, 'save'])->whereUuid('display');
+                Route::delete('displays/{display}', [DisplayController::class, 'destroy'])->whereUuid('display');
                 Route::get('queue-tickets', [QueueController::class, 'index']);
                 Route::post('queue-tickets', [QueueController::class, 'store']);
                 Route::get('queue-tickets/{ticket}', [QueueController::class, 'show'])->whereUuid('ticket');
