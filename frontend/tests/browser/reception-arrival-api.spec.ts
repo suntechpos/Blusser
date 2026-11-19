@@ -120,7 +120,8 @@ test("scheduled patient check-in uses appointment version, shows server ticket a
   await expect(form.getByText("Bugungi yozilgan qabullar")).toBeVisible();
   await form.locator('input[name="arrival-appointment"]').check();
   await form.getByRole("button", { name: "Keldi — navbatga qo‘shish" }).click();
-  await expect(form).toContainText("Navbat raqami: 2");
+  await expect(form).not.toBeVisible();
+  await expect(page.locator(".rp-page .rp-toast")).toContainText("Navbat raqami: 2");
   expect(calls).toBe(1);
 });
 
@@ -243,6 +244,38 @@ test("two scheduled arrivals can be confirmed together without creating new appo
   await expect(form.locator(".rp-arrival-appointment.selected")).toHaveCount(1);
   await checks.nth(1).check();
   await form.getByRole("button", { name: "Keldi — 2 ta navbatga qo‘shish" }).click();
-  await expect(form).toContainText("2 ta qabul navbatga qo‘shildi");
+  await expect(form).not.toBeVisible();
+  await expect(page.locator(".rp-page .rp-toast")).toContainText("2 ta qabul navbatga qo‘shildi. Navbat raqamlari: 1, 2");
   expect(calls).toEqual(rows.map(row => row.id));
+});
+
+test("partial scheduled check-in failure keeps arrival modal open", async ({ page }) => {
+  await bookingSession(page);
+  const rows = [0, 1].map(i => ({
+    id: "70000000-0000-4000-8000-00000000003" + i,
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    room_id: ids.room, service_id: ids.service,
+    starts_at: i ? "2026-10-23T05:00:00Z" : "2026-10-23T04:00:00Z",
+    ends_at: i ? "2026-10-23T05:30:00Z" : "2026-10-23T04:30:00Z",
+    version: 3, status: "scheduled",
+  }));
+  await page.route("**/api/v1/clinic/patients/*/appointments**", route =>
+    route.fulfill({ json: { data: rows, meta: { total: rows.length } } }));
+  await page.route("**/api/v1/clinic/appointments/*/check-in", async route => {
+    const id = new URL(route.request().url()).pathname.split("/").at(-2)!;
+    if (id === rows[1]!.id) return route.fulfill({ status: 409, json: { message: "Conflict" } });
+    const a = rows[0]!;
+    a.status = "checked_in";
+    return route.fulfill({ json: { appointment: a, visit: { id, status: "queued" }, ticket: { id, number: 1, status: "waiting", kind: "scheduled" } } });
+  });
+  await open(page);
+  const form = dialog(page);
+  await form.getByRole("button", { name: "Oldindan yozilgan" }).click();
+  await form.getByRole("button", { name: /Aliyeva Mohira/ }).click();
+  await form.getByRole("checkbox", { name: "Barchasini tanlash" }).check();
+  await form.getByRole("button", { name: "Keldi — 2 ta navbatga qo‘shish" }).click();
+  await expect(form).toBeVisible();
+  await expect(form.getByRole("alert")).toContainText("Saqlangan qabullar takror yaratilmaydi");
+  await expect(form.locator('input[name="arrival-appointment"]').first()).toBeDisabled();
+  await expect(form.locator('input[name="arrival-appointment"]').last()).toBeEnabled();
 });
