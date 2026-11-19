@@ -804,10 +804,12 @@ function openArrival() {
   arrival.value = true;
   menu.value = "";
 }
-async function onArrivalSaved(result: { kind: "scheduled" | "walk_in" | "patient"; number?: number }) {
+async function onArrivalSaved(result: { kind: "scheduled" | "walk_in" | "patient"; number?: number; numbers?: number[] }) {
   toast.value = result.kind === "patient"
     ? "Bemor PostgreSQL bazasida saqlandi."
-    : "Bemor navbatga qo‘shildi. Navbat raqami: " + result.number;
+    : result.numbers && result.numbers.length > 1
+      ? result.numbers.length + " ta qabul navbatga qo‘shildi. Navbat raqamlari: " + result.numbers.join(", ")
+      : "Bemor navbatga qo‘shildi. Navbat raqami: " + result.number;
   await Promise.all([load(), loadQueueCount(), loadSide()]);
 }
 function focusSearch() {
