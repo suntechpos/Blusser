@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import axios from "axios";
+import { CalendarDays, Users, FilePlus, UserRound, Stethoscope, Info } from "lucide-vue-next";
 import ReceptionDialog from "./ReceptionDialog.vue";
 import ReceptionPatientSearch from "./ReceptionPatientSearch.vue";
 import ReceptionPatientForm from "./ReceptionPatientForm.vue";
@@ -49,6 +50,7 @@ const eligibleAppointments = computed(() => appointments.value.filter(a => a.sta
 const selectedAppointments = computed(() => eligibleAppointments.value.filter(a => appointmentIds.value.includes(a.id)));
 const allSelected = computed(() => eligibleAppointments.value.length > 0 && selectedAppointments.value.length === eligibleAppointments.value.length);
 function toggleAll() { appointmentIds.value = allSelected.value ? [] : eligibleAppointments.value.map(a => a.id); }
+const statusLabel = (status: string) => (({ scheduled: "Yozilgan", checked_in: "Kelgan", in_progress: "Qabulda", completed: "Yakunlangan", cancelled: "Bekor qilingan", no_show: "Kelmagan" } as Record<string, string>)[status] ?? status);
 const appointmentsLoading = ref(false);
 const appointmentsError = ref("");
 let alive = true;
@@ -277,12 +279,12 @@ async function submit() {
       <div v-if="confirmation" role="status" class="rp-toast">{{ confirmation }}</div>
       <p v-if="error" role="alert" class="rp-error">{{ error }}</p>
       <div class="rp-segment rp-arrival-modes" role="group" aria-label="Kelish turi">
-        <button type="button" :class="{ active: mode === 'scheduled' }" :disabled="saving" @click="mode = 'scheduled'">Oldindan yozilgan</button>
-        <button type="button" :class="{ active: mode === 'walk_in' }" :disabled="saving" @click="mode = 'walk_in'">Jonli navbat</button>
-        <button type="button" :class="{ active: mode === 'patient' }" :disabled="saving" @click="mode = 'patient'">Faqat ro‘yxatga olish</button>
+        <button type="button" :class="{ active: mode === 'scheduled' }" :disabled="saving" @click="mode = 'scheduled'"><CalendarDays :size="18" /> Oldindan yozilgan</button>
+        <button type="button" :class="{ active: mode === 'walk_in' }" :disabled="saving" @click="mode = 'walk_in'"><Users :size="18" /> Jonli navbat</button>
+        <button type="button" :class="{ active: mode === 'patient' }" :disabled="saving" @click="mode = 'patient'"><FilePlus :size="18" /> Faqat ro‘yxatga olish</button>
       </div>
       <fieldset :disabled="saving || completed" class="rp-arrival-fields">
-        <div class="rp-form-grid">
+        <div class="rp-form-grid rp-arrival-branch">
           <label>Filial <span>*</span>
             <select v-model="branchId" aria-label="Kelish filiali">
               <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
@@ -307,18 +309,32 @@ async function submit() {
 
         <template v-if="selected && mode === 'scheduled' && !creating">
           <section class="rp-section">
-            <h3>Bugungi yozilgan qabullar</h3>
+            <div class="rp-arrival-section-heading">
+              <h3>Bugungi yozilgan qabullar</h3>
+              <label v-if="!appointmentsLoading && !appointmentsError && eligibleAppointments.length" class="rp-arrival-select-all">
+                <input type="checkbox" :checked="allSelected" :indeterminate.prop="selectedAppointments.length > 0 && !allSelected" @change="toggleAll" />
+                <span>Barchasini tanlash</span>
+              </label>
+            </div>
             <p v-if="appointmentsLoading" role="status">Qabullar yuklanmoqda…</p>
             <div v-else-if="appointmentsError" role="alert" class="rp-error">{{ appointmentsError }}</div>
             <template v-else-if="appointments.length">
-              <label v-if="eligibleAppointments.length" class="rp-arrival-appointment"><input type="checkbox" :checked="allSelected" @change="toggleAll" /> Barchasini tanlash</label>
-              <label v-for="a in appointments" :key="a.id" class="rp-arrival-appointment">
-                <input v-model="appointmentIds" type="checkbox" name="arrival-appointment" :value="a.id" :disabled="a.status !== 'scheduled'" />
-                <span>
-                  <strong>{{ localTime(a.starts_at, zone) }} · {{ a.status === 'scheduled' ? 'Yozilgan' : a.status === 'checked_in' ? 'Kelgan' : a.status }}</strong>
-                  <small>{{ doctors.find((d) => d.id === a.doctor_id)?.name ?? 'Shifokor' }} · {{ doctors.find((d) => d.id === a.doctor_id)?.services.find((s) => s.id === a.service_id)?.name ?? 'Qabul xizmati' }}</small>
-                </span>
-              </label>
+              <div class="rp-arrival-cards">
+                <label v-for="a in appointments" :key="a.id" class="rp-arrival-appointment" :class="{ selected: appointmentIds.includes(a.id), unavailable: a.status !== 'scheduled' }">
+                  <input v-model="appointmentIds" type="checkbox" name="arrival-appointment" :value="a.id" :disabled="a.status !== 'scheduled'" />
+                  <div class="rp-arrival-card-main">
+                    <div class="rp-arrival-card-top">
+                      <strong class="rp-arrival-time">{{ localTime(a.starts_at, zone) }}</strong>
+                      <span class="rp-arrival-status" :class="a.status"><CalendarDays :size="14" /> {{ statusLabel(a.status) }}</span>
+                    </div>
+                    <div class="rp-arrival-card-details">
+                      <span class="rp-arrival-doctor"><UserRound :size="16" /><strong>{{ doctors.find(d => d.id === a.doctor_id)?.name ?? 'Shifokor' }}</strong></span>
+                      <span class="rp-arrival-service"><Stethoscope :size="16" />{{ doctors.find(d => d.id === a.doctor_id)?.services.find(s => s.id === a.service_id)?.name ?? 'Qabul xizmati' }}</span>
+                    </div>
+                  </div>
+                </label>
+              </div>
+              <p class="rp-arrival-info"><Info :size="16" /> Bir bemor bir kunda bir nechta yozuvga kelgan deb belgilanishi mumkin.</p>
             </template>
             <p v-else class="rp-empty">Bu bemorning bugungi yozilgan qabuli yo‘q.</p>
           </section>
