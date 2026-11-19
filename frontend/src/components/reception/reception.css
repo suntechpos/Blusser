@@ -1315,3 +1315,6 @@
   .rp-arrival-service { padding-left: 0; border-left: 0; }
   .rp-dialog:has(.rp-arrival-fields) .rp-dialog-footer { flex-wrap: wrap; }
 }
+
+.rp-arrival-card-details > .rp-arrival-room { margin-left: auto; background: #dce8f8; border-radius: 20px; padding: 3px 9px; font-size: 12px; }
+@media (max-width:680px) { .rp-arrival-card-details > .rp-arrival-room { margin-left: 0; } }
