@@ -1015,7 +1015,13 @@ WORKER;
         $this->assertArrayNotHasKey('patient_name', $response->json('called.0'));
         $this->assertStringNotContainsString($a['patient']['id'], $response->getContent());
         $this->queue($a, 'start', $ticket['id'], $this->startData($a, 2));
-        $this->browser($jar, 'GET', $feed)->assertOk()->assertJsonPath('called', []);
+        $this->browser($jar, 'GET', $feed)->assertOk()
+            ->assertJsonPath('called.0.ticket', 'O-001')
+            ->assertJsonPath('called.0.room', '101')
+            ->assertJsonPath('called.0.status', 'in_progress')
+            ->assertJsonPath('next', []);
+        $this->queue($a, 'complete', $ticket['id'], ['expected_version' => 3]);
+        $this->browser($jar, 'GET', $feed)->assertOk()->assertJsonPath('called', [])->assertJsonPath('next', []);
         $otherJar = $this->clinicSession($b);
         $this->browser($otherJar, 'GET', $feed)->assertForbidden();
         $this->browser($otherJar, 'GET', $url.'/feed?branch_id='.$b['branch'])->assertNotFound();
