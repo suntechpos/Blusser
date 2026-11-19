@@ -1030,4 +1030,26 @@ WORKER;
         $this->browser($jar, 'DELETE', $url, ['branch_id' => $a['branch'], 'expected_version' => 2])->assertOk();
         $this->browser($jar, 'GET', $feed)->assertNotFound();
     }
+
+    public function test_same_patient_cannot_be_called_by_two_doctors(): void
+    {
+        $ids = $this->fixture();
+        $a = $this->reference($ids['a']);
+        $first = $this->queue($a);
+        $db = DB::connection('migration');
+        $membership = (string) Str::uuid();
+        $db->table('tenant_memberships')->insert(['id' => $membership, 'tenant_id' => $a['tenant'], 'user_id' => $ids['b']['user'], 'role_id' => $a['role']]);
+        $db->table('membership_branches')->insert(['id' => (string) Str::uuid(), 'tenant_id' => $a['tenant'], 'membership_id' => $membership, 'branch_id' => $a['branch']]);
+        $doctor = $this->scheduleCommand($a, 'doctors', ['membership_id' => $membership, 'specialty_id' => $a['specialty']['id'], 'branch_ids' => [$a['branch']], 'service_ids' => [$a['service']], 'active' => true]);
+        $second = $this->queue($a, data: [...$this->walk($a), 'doctor_id' => $doctor['id']]);
+        $firstId = $first['ticket']['id'];
+        $secondId = $second['ticket']['id'];
+        $this->queue($a, 'call', $firstId, ['expected_version' => 1]);
+        $this->denied(fn () => $this->queue($a, 'call', $secondId, ['expected_version' => 1]), 'conflict');
+        $this->queue($a, 'start', $firstId, $this->startData($a, 2));
+        $this->denied(fn () => $this->queue($a, 'call', $secondId, ['expected_version' => 1]), 'conflict');
+        $this->assertSame('waiting', $db->table('queue_tickets')->where('id', $secondId)->value('status'));
+        $this->queue($a, 'complete', $firstId, ['expected_version' => 3]);
+        $this->assertSame('called', $this->queue($a, 'call', $secondId, ['expected_version' => 1])['ticket']['status']);
+    }
 }
