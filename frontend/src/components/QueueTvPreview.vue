@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Monitor, Clock3, Volume2, Maximize, ArrowRight } from 'lucide-vue-next'
-type QueueRow = { ticket: string; room: string; call_key?: string }
+type QueueRow = { ticket: string; room: string; call_key?: string; status?: 'called' | 'in_progress' }
 const props = defineProps<{ rooms: string[]; theme: 'dark' | 'light'; language: 'uz' | 'ru'; sound: boolean; compact?: boolean; feed?: { clinic: string; timezone: string; local_date: string; called: QueueRow[]; next: QueueRow[] } | null; connectionError?: boolean; live?: boolean }>()
 const ru = computed(() => props.language === 'ru')
 const copy = computed(() => ru.value ? {
-  title:'Электронная очередь', demo:'ДЕМО', calling:'СЕЙЧАС ВЫЗЫВАЕТСЯ', ticket:'НОМЕР ОЧЕРЕДИ', room:'КАБИНЕТ', enter:'Пожалуйста, пройдите в кабинет!', called:'Вызванные номера', next:'Следующие номера', number:'Номер', cabinet:'Кабинет', empty:'Нет номеров', footer:'Ваше здоровье важно для нас!', sound:'Звуковые объявления', fullscreen:'Полный экран'
+  title:'Электронная очередь', demo:'ДЕМО', calling:'СЕЙЧАС ВЫЗЫВАЕТСЯ', ticket:'НОМЕР ОЧЕРЕДИ', room:'КАБИНЕТ', enter:'Пожалуйста, пройдите в кабинет!', called:'На приёме', receiving:'СЕЙЧАС НА ПРИЁМЕ', receivingHint:'Приём продолжается', next:'Следующие номера', number:'Номер', cabinet:'Кабинет', empty:'Нет номеров', footer:'Ваше здоровье важно для нас!', sound:'Звуковые объявления', fullscreen:'Полный экран'
 } : {
-  title:'Elektron navbat', demo:'DEMO', calling:'HOZIR CHAQIRILMOQDA', ticket:'NAVBAT RAQAMI', room:'KABINET', enter:'Marhamat, qabulga kiring!', called:'Chaqirilgan navbatlar', next:'Keyingi navbatlar', number:'Navbat', cabinet:'Kabinet', empty:'Navbat mavjud emas', footer:'Sog‘lig‘ingiz biz uchun muhim!', sound:'Ovozli e’lon', fullscreen:'To‘liq ekran'
+  title:'Elektron navbat', demo:'DEMO', calling:'HOZIR CHAQIRILMOQDA', ticket:'NAVBAT RAQAMI', room:'KABINET', enter:'Marhamat, qabulga kiring!', called:'Qabulda', receiving:'HOZIR QABULDA', receivingHint:'Qabul davom etmoqda', next:'Keyingi navbatlar', number:'Navbat', cabinet:'Kabinet', empty:'Navbat mavjud emas', footer:'Sog‘lig‘ingiz biz uchun muhim!', sound:'Ovozli e’lon', fullscreen:'To‘liq ekran'
 })
 const called = computed(() => props.feed?.called ?? [])
 const next = computed(() => props.feed?.next ?? [])
@@ -36,14 +36,14 @@ async function fullscreen(){if(!root.value?.requestFullscreen)return;try{await r
     </header>
     <main class="tv-main">
       <section class="tv-call">
-        <div class="tv-kicker"><i></i>{{ copy.calling }}</div>
+        <div class="tv-kicker"><i></i>{{ current?.status === 'in_progress' ? copy.receiving : copy.calling }}</div>
         <div v-if="current" class="tv-current">
           <div><strong>{{ current.ticket }}</strong><span>{{ copy.ticket }}</span></div>
           <ArrowRight class="tv-arrow" />
           <div><strong>{{ current.room }}</strong><span>{{ copy.room }}</span></div>
         </div>
         <div v-else class="tv-empty">{{ connectionError ? (ru ? "Связь с сервером потеряна" : "Server bilan aloqa uzildi") : !feed ? (ru ? "Загрузка…" : "Yuklanmoqda…") : copy.empty }}</div>
-        <p v-if="current" class="tv-invite">{{ copy.enter }}</p>
+        <p v-if="current" class="tv-invite">{{ current.status === 'in_progress' ? copy.receivingHint : copy.enter }}</p>
       </section>
       <div class="tv-lists">
         <section v-for="group in [{title:copy.called, rows:called, kind:'called'}, {title:copy.next, rows:next, kind:'next'}]" :key="group.kind" class="tv-list" :class="group.kind">
