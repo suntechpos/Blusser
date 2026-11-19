@@ -100,19 +100,21 @@ async function load(){
     const entries=await Promise.all(eligible.slice(i,i+4).map(async d=>{
      const choices=d.services.filter(s=>!serviceFilter.value||s.id===serviceFilter.value);
      const byStart=new Map<string,{slot:BookingSlot;service:string}>();
-     let failure="";
-     for(const service of choices){
-      if(request!==serial)break;
-      try{
-       const slots=await bookingAvailability(d.id,branch.value,service.id,date.value,zone.value);
-       for(const slot of slots){
-        const key=slot.starts_at+"|"+slot.room_id;
-        const prior=byStart.get(key);
-        if(!prior||Date.parse(slot.ends_at)<Date.parse(prior.slot.ends_at))byStart.set(key,{slot,service:service.id});
-       }
-      }catch(e){failure=errorText(e)}
+     const results=await Promise.all(choices.map(async service=>{
+      try{return {service:service.id,slots:await bookingAvailability(d.id,branch.value,service.id,date.value,zone.value),error:""}}
+      catch(e){return {service:service.id,slots:[] as BookingSlot[],error:errorText(e)}}
+     }));
+     if(request!==serial)return {id:d.id,entries:[],error:""};
+     const failures:string[]=[];
+     for(const result of results){
+      if(result.error)failures.push(result.error);
+      for(const slot of result.slots){
+       const key=slot.starts_at+"|"+slot.room_id;
+       const prior=byStart.get(key);
+       if(!prior||Date.parse(slot.ends_at)<Date.parse(prior.slot.ends_at))byStart.set(key,{slot,service:result.service});
+      }
      }
-     return {id:d.id,entries:[...byStart.values()].sort((a,b)=>Date.parse(a.slot.starts_at)-Date.parse(b.slot.starts_at)),error:failure};
+     return {id:d.id,entries:[...byStart.values()].sort((a,b)=>Date.parse(a.slot.starts_at)-Date.parse(b.slot.starts_at)),error:failures[0]||""};
     }));
     if(request!==serial)return;
     for(const e of entries){
