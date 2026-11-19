@@ -21,7 +21,7 @@ type Attendance = {
 };
 const emit = defineEmits<{
   close: [];
-  saved: [result: { kind: Mode; number?: number }];
+  saved: [result: { kind: Mode; number?: number; numbers?: number[] }];
 }>();
 const branches = computed(() => session.branches.filter((b) => b.active));
 const branchId = ref(session.branch || branches.value[0]?.id || "");
@@ -251,12 +251,15 @@ async function submit() {
       if (!alive) return;
       if (successful.length) {
         confirmation.value = successful.length === 1 ? "Bemor navbatga qo‘shildi. Navbat raqami: " + successful[0] : successful.length + " ta qabul navbatga qo‘shildi. Navbat raqamlari: " + successful.join(", ");
-        emit("saved", { kind: "scheduled", number: successful[0]! });
+        emit("saved", { kind: "scheduled", number: successful[0]!, numbers: successful });
       }
       if (failed.length) {
         error.value = failed.join(" | ") + ". Saqlangan qabullar takror yaratilmaydi.";
         reloadAppointments.value++;
-      } else completed.value = true;
+      } else {
+        completed.value = true;
+        emit("close");
+      }
       return;
     } else {
       if (!doctor.value || !services.value.some((s) => s.id === serviceId.value)) return;
