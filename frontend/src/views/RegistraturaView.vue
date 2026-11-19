@@ -18,6 +18,7 @@ import {
 } from "lucide-vue-next";
 import BookingDialog from "../components/reception/BookingDialog.vue";
 import ArrivalDialog from "../components/reception/ArrivalDialog.vue";
+import QueueTicketPrintDialog from "../components/reception/QueueTicketPrintDialog.vue";
 import ReceptionDialog from "../components/reception/ReceptionDialog.vue";
 import DateField from "../components/employees/DateField.vue";
 import { initials, uzDate } from "../mocks/reception";
@@ -72,6 +73,17 @@ function rememberedReceptionDate(branchId: string): string | null {
     return null; // Restricted storage must not prevent registration.
   }
 }
+type PrintableTicket = {
+  number: number;
+  patientName: string;
+  doctorName: string;
+  serviceName: string;
+  roomName?: string;
+  date: string;
+  time: string;
+};
+type QueuePrintData = { clinicName: string; branchName: string; tickets: PrintableTicket[] };
+const queuePrint = ref<QueuePrintData | null>(null);
 const listDate = ref(rememberedReceptionDate(branch.value) ?? today.value),
   tab = ref("all"),
   query = ref(""),
@@ -804,12 +816,19 @@ function openArrival() {
   arrival.value = true;
   menu.value = "";
 }
-async function onArrivalSaved(result: { kind: "scheduled" | "walk_in" | "patient"; number?: number; numbers?: number[] }) {
+async function onArrivalSaved(result: { kind: "scheduled" | "walk_in" | "patient"; number?: number; numbers?: number[]; tickets?: PrintableTicket[] }) {
   toast.value = result.kind === "patient"
     ? "Bemor PostgreSQL bazasida saqlandi."
     : result.numbers && result.numbers.length > 1
       ? result.numbers.length + " ta qabul navbatga qo‘shildi. Navbat raqamlari: " + result.numbers.join(", ")
       : "Bemor navbatga qo‘shildi. Navbat raqami: " + result.number;
+  if (result.tickets?.length) {
+    queuePrint.value = {
+      clinicName: session.clinics.find(c => c.id === session.user?.active_tenant_id)?.name ?? "Klinika",
+      branchName: branches.value.find(b => b.id === branch.value)?.name ?? "",
+      tickets: result.tickets,
+    };
+  }
   await Promise.all([load(), loadQueueCount(), loadSide()]);
 }
 function focusSearch() {
@@ -1272,6 +1291,12 @@ function focusSearch() {
       v-if="arrival"
       @close="arrival = false"
       @saved="onArrivalSaved"
+    /><QueueTicketPrintDialog
+      v-if="queuePrint"
+      :clinic-name="queuePrint.clinicName"
+      :branch-name="queuePrint.branchName"
+      :tickets="queuePrint.tickets"
+      @close="queuePrint = null"
     /><ReceptionDialog
       v-if="detail"
       title="Qabul ma’lumotlari"
