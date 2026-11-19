@@ -816,7 +816,7 @@ function openArrival() {
   arrival.value = true;
   menu.value = "";
 }
-async function onArrivalSaved(result: { kind: "scheduled" | "walk_in" | "patient"; number?: number; numbers?: number[]; tickets?: PrintableTicket[] }) {
+async function onArrivalSaved(result: { kind: "scheduled" | "walk_in" | "patient"; number?: number; numbers?: number[]; branchName?: string; tickets?: PrintableTicket[] }) {
   toast.value = result.kind === "patient"
     ? "Bemor PostgreSQL bazasida saqlandi."
     : result.numbers && result.numbers.length > 1
@@ -825,7 +825,7 @@ async function onArrivalSaved(result: { kind: "scheduled" | "walk_in" | "patient
   if (result.tickets?.length) {
     queuePrint.value = {
       clinicName: session.clinics.find(c => c.id === session.user?.active_tenant_id)?.name ?? "Klinika",
-      branchName: branches.value.find(b => b.id === branch.value)?.name ?? "",
+      branchName: result.branchName ?? branches.value.find(b => b.id === branch.value)?.name ?? "",
       tickets: result.tickets,
     };
   }
