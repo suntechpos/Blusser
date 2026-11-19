@@ -230,8 +230,8 @@ async function submit() {
       }
       if (!alive) return;
       if (successful.length) {
-        confirmation.value = successful.length + " ta qabul navbatga qo‘shildi. Navbat raqamlari: " + successful.join(", ");
-        emit("saved", { kind: "scheduled", number: successful[0] });
+        confirmation.value = successful.length === 1 ? "Bemor navbatga qo‘shildi. Navbat raqami: " + successful[0] : successful.length + " ta qabul navbatga qo‘shildi. Navbat raqamlari: " + successful.join(", ");
+        emit("saved", { kind: "scheduled", number: successful[0]! });
       }
       if (failed.length) {
         error.value = failed.join(" | ") + ". Saqlangan qabullar takror yaratilmaydi.";
