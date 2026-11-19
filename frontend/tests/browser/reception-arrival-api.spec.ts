@@ -279,3 +279,31 @@ test("partial scheduled check-in failure keeps arrival modal open", async ({ pag
   await expect(form.locator('input[name="arrival-appointment"]').first()).toBeDisabled();
   await expect(form.locator('input[name="arrival-appointment"]').last()).toBeEnabled();
 });
+
+test("walk-in queue success opens a printable ticket with the server-issued number", async ({ page }) => {
+  const fixture = await bookingSession(page);
+  await page.route("**/api/v1/clinic/queue-tickets**", async route => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      return route.fulfill({ status: 201, json: {
+        visit: { id: "90000000-0000-4000-8000-000000000090", status: "queued" },
+        ticket: { id: "80000000-0000-4000-8000-000000000090", number: 27, kind: "walk_in", status: "waiting" },
+      }});
+    }
+    return route.fulfill({ json: { data: [], meta: { total: 0, page: 1, per_page: 8 } } });
+  });
+  await open(page);
+  const form = dialog(page);
+  await form.getByRole("button", { name: /Aliyeva Mohira/ }).click();
+  await form.getByLabel("Jonli navbat shifokori").selectOption(ids.doctor);
+  await form.getByLabel("Jonli navbat xizmati").selectOption(ids.service);
+  await form.getByRole("button", { name: "Jonli navbatga qo‘shish" }).click();
+  const printDialog = page.getByRole("dialog", { name: "Navbat taloni" });
+  await expect(printDialog).toBeVisible();
+  await expect(printDialog).toContainText("27");
+  await expect(printDialog).toContainText("Aliyeva Mohira");
+  await expect(printDialog).toContainText("Tish shifokori");
+  await expect(printDialog.getByRole("button", { name: /Chop etish/ })).toBeVisible();
+  expect(fixture.requests.filter(r => r.method === "POST" && r.path.endsWith("/queue-tickets"))).toHaveLength(1);
+});
+
