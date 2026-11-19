@@ -1255,34 +1255,63 @@
   padding: 0;
   min-width: 0;
 }
+/* Arrival-only card layout. Checkbox dimensions must not inherit text-input sizing. */
+.rp-dialog:has(.rp-arrival-fields) { width: min(880px, calc(100vw - 32px)); }
+.rp-dialog .rp-arrival-modes { border: 0; border-bottom: 1px solid #dce6f9; border-radius: 0; gap: 6px; margin-bottom: 12px; }
+.rp-dialog .rp-arrival-modes button { gap: 8px; min-height: 40px; border: 0; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; padding: 7px 9px; }
+.rp-dialog .rp-arrival-modes button.active { background: #e8f2ff; border-bottom-color: #0866ff; font-weight: 600; }
+.rp-dialog .rp-arrival-branch { margin-bottom: 12px; }
+.rp-arrival-fields .rp-other-patient { border: 1px solid #d4e1f7; border-radius: 7px; padding: 7px 10px; }
+.rp-arrival-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.rp-dialog .rp-arrival-section-heading h3 { margin: 0; }
+.rp-dialog .rp-arrival-select-all { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.rp-dialog .rp-arrival-select-all > span { color: #143064; }
+.rp-dialog .rp-arrival-fields input[type="checkbox"] {
+  appearance: auto;
+  accent-color: #0866ff;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  max-width: 20px;
+  padding: 0;
+  margin: 0;
+  flex: 0 0 20px;
+  cursor: pointer;
+}
+.rp-arrival-cards { display: grid; gap: 10px; }
 .rp-dialog .rp-arrival-appointment {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  margin-top: 8px;
+  gap: 16px;
+  padding: 12px 16px;
   border: 1px solid #dce7f9;
-  border-radius: 8px;
+  border-radius: 9px;
+  background: #fff;
+  min-height: 74px;
+  cursor: pointer;
 }
-.rp-dialog .rp-arrival-appointment input[type="radio"] {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  min-height: 18px;
-}
-.rp-dialog .rp-arrival-appointment strong,
-.rp-dialog .rp-arrival-appointment small {
-  display: block;
-  overflow-wrap: anywhere;
-}
-.rp-dialog .rp-arrival-appointment small {
-  color: #6983a7;
-  font-size: 12px;
-  margin-top: 3px;
-}
+.rp-dialog .rp-arrival-appointment.selected { border-color: #317cff; background: #e8f3ff; }
+.rp-dialog .rp-arrival-appointment:not(.unavailable):hover { border-color: #317cff; }
+.rp-dialog .rp-arrival-appointment.unavailable { background: #f5f7fb; cursor: default; }
+.rp-dialog .rp-arrival-appointment input:disabled { cursor: default; }
+.rp-arrival-card-main { min-width: 0; border-left: 1px solid #cfddf5; padding-left: 15px; display: grid; gap: 7px; }
+.rp-arrival-card-top, .rp-arrival-card-details { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.rp-arrival-time { color: #102045; background: #d7e8ff; padding: 2px 10px; border-radius: 20px; font-size: 17px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.rp-arrival-status { display: inline-flex; align-items: center; gap: 5px; background: #edf1f8; color: #526d95; padding: 3px 9px; border-radius: 20px; font-size: 12px; }
+.rp-arrival-status.scheduled, .rp-arrival-status.checked_in { background: #dff5e9; color: #087448; }
+.rp-arrival-status.in_progress { background: #eee5ff; color: #7028e4; }
+.rp-arrival-status.cancelled, .rp-arrival-status.no_show { background: #fce8ec; color: #b8374e; }
+.rp-arrival-card-details > span { display: inline-flex; align-items: center; gap: 7px; color: #46638e; min-width: 0; overflow-wrap: anywhere; }
+.rp-arrival-card-details svg, .rp-arrival-info svg { flex: none; color: #607da7; }
+.rp-arrival-doctor strong { color: #102045; font-weight: 600; }
+.rp-arrival-service { border-left: 1px solid #cbd9ed; padding-left: 10px; }
+.rp-arrival-info { display: flex; align-items: flex-start; gap: 8px; color: #617daa; font-size: 12px; margin: 12px 0 3px; }
 @media (max-width: 680px) {
-  .rp-dialog .rp-arrival-modes {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
+  .rp-dialog .rp-arrival-modes { display: grid; grid-template-columns: 1fr; }
+  .rp-dialog .rp-arrival-appointment { padding: 10px; gap: 10px; }
+  .rp-arrival-card-main { padding-left: 10px; }
+  .rp-arrival-card-details { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .rp-arrival-service { padding-left: 0; border-left: 0; }
+  .rp-dialog:has(.rp-arrival-fields) .rp-dialog-footer { flex-wrap: wrap; }
 }
