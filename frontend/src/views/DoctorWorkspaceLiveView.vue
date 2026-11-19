@@ -317,7 +317,19 @@ onMounted(() => {
   void nextTick(updateTabArrows);
   window.addEventListener("resize", updateTabArrows);
 });
-onUnmounted(() => window.removeEventListener("resize", updateTabArrows));
+let queueRefresh: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  queueRefresh = setInterval(async () => {
+    if (loading.value || calling.value || starting.value || date.value !== clinicToday.value || !feed.value?.doctor || !feed.value?.tickets.some(t => t.blocked_reason)) return;
+    const current = feed.value;
+    const serial = sequence;
+    try {
+      const fresh = await getDoctorWorkspace({ date: date.value, doctor_id: doctorId.value, branch_id: branchId.value });
+      if (sequence === serial && feed.value === current && !calling.value && !starting.value) feed.value = fresh;
+    } catch { /* keep last known queue state until manual refresh */ }
+  }, 3000);
+});
+onUnmounted(() => { window.removeEventListener("resize", updateTabArrows); if (queueRefresh) clearInterval(queueRefresh); ++sequence; });
 
 type DisplayRow = WorkspacePatientRow & {
   key: string;
@@ -346,7 +358,7 @@ const rows = computed<DisplayRow[]>(() => {
 // Actual queue tickets only; a future appointment is not callable before check-in.
 // A patient clicked in the list is strictly a read-only detail selection.
 const nextTicket = computed(() => feed.value?.tickets
-  .filter((row) => row.status === "waiting")
+  .filter((row) => row.status === "waiting" && !row.blocked_reason)
   .sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "") || a.id.localeCompare(b.id))[0] || null);
 const clinicToday = computed(() => {
   const zone = feed.value?.branch?.timezone || "Asia/Tashkent";
@@ -380,6 +392,10 @@ async function callNext() {
   if (!callAllowed.value || !nextTicket.value) return;
   // Snapshot the oldest waiting ticket, not the selected/search-filtered patient.
   const ticket = nextTicket.value;
+  if (ticket.starts_at && Date.parse(ticket.starts_at) > Date.now()) {
+    const time = new Intl.DateTimeFormat("uz-UZ", { hour: "2-digit", minute: "2-digit", timeZone: feed.value?.branch?.timezone || "Asia/Tashkent" }).format(new Date(ticket.starts_at));
+    if (!window.confirm("Bemorning qabuli " + time + " ga belgilangan. Hozir chaqirasizmi?")) return;
+  }
   calling.value = true;
   try {
     if (!Number.isInteger(ticket.version) || !ticket.version || ticket.version < 1) {
@@ -896,6 +912,7 @@ function genderLabel(gender: string | null) {
                   <small v-if="row.historicDate">№{{ row.number || '—' }} · {{ row.historicDate }}</small>
                   <small v-else>{{ visitTime(row) }}</small>
                   <small>{{ row.service }}<template v-if="row.historicBranchName"> · {{ row.historicBranchName }}</template></small>
+                  <small v-if="row.blocked_reason" class="dw-blocked-patient">{{ row.blocked_reason === 'patient_busy' ? 'Bemor boshqa shifokor qabulida yoki chaqirilgan' : 'Oldingi qabul yakunlanishi kutilmoqda' }}</small>
                 </span>
                 <span class="dw-badge" :class="completed(row) ? 'green' : row.status === 'in_progress' ? 'blue' : 'yellow'">
                   {{ statusText(row) }}
@@ -960,7 +977,7 @@ function genderLabel(gender: string | null) {
           Bemorlarni faqat bugungi navbatdan chaqirish mumkin.
         </p>
         <p v-else-if="feed?.doctor && !nextTicket && !loading" class="dw-call-hint">
-          Navbatda chaqiriladigan bemor yo‘q.
+          Navbatda chaqirishga tayyor bemor yo‘q.
         </p>
         <p class="dw-live-footer">Ro‘yxat registratura ma’lumotlari asosida ko‘rsatilmoqda.</p>
       </aside>
@@ -1395,4 +1412,5 @@ function genderLabel(gender: string | null) {
 .dw-call-hint { margin: 8px 8px 0 !important; text-align: center; font-size: 12px; }
 .dw-live-footer { color: #7890a9; padding: 10px 16px; font-size: 12px; }
 @media (max-width: 1050px) { .dw-live-filters { width: 100%; } .dw-live-visit dl > div { grid-template-columns: 110px 1fr; } }
+.dw-blocked-patient { color: #b66b08 !important; font-weight: 600; white-space: normal; }
 </style>
