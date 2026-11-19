@@ -43,7 +43,12 @@ const serviceId = ref("");
 const catalogLoading = ref(false);
 const catalogError = ref("");
 const appointments = ref<Appointment[]>([]);
-const appointmentId = ref("");
+const appointmentIds = ref<string[]>([]);
+const reloadAppointments = ref(0);
+const eligibleAppointments = computed(() => appointments.value.filter(a => a.status === "scheduled"));
+const selectedAppointments = computed(() => eligibleAppointments.value.filter(a => appointmentIds.value.includes(a.id)));
+const allSelected = computed(() => eligibleAppointments.value.length > 0 && selectedAppointments.value.length === eligibleAppointments.value.length);
+function toggleAll() { appointmentIds.value = allSelected.value ? [] : eligibleAppointments.value.map(a => a.id); }
 const appointmentsLoading = ref(false);
 const appointmentsError = ref("");
 let alive = true;
@@ -52,14 +57,14 @@ let catalogSequence = 0;
 
 const doctor = computed(() => doctors.value.find((d) => d.id === doctorId.value));
 const services = computed(() => doctor.value?.services ?? []);
-const selectedAppointment = computed(() => appointments.value.find((a) => a.id === appointmentId.value));
+
 const canSubmit = computed(() => {
   if (saving.value || completed.value || !branchId.value) return false;
   if (creating.value) return canReception("patient");
   if (!selected.value) return false;
   if (mode.value === "patient") return canReception("patient");
   if (mode.value === "walk_in") return canReception("walkIn") && !!doctor.value && !!serviceId.value;
-  return canReception("checkIn") && selectedAppointment.value?.status === "scheduled";
+  return canReception("checkIn") && selectedAppointments.value.length > 0 && !appointmentsLoading.value && !appointmentsError.value;
 });
 
 onBeforeUnmount(() => {
@@ -71,7 +76,7 @@ watch(() => session.epoch, () => emit("close"));
 watch(branchId, () => {
   doctorId.value = "";
   serviceId.value = "";
-  appointmentId.value = "";
+  appointmentIds.value = [];
   error.value = "";
   completed.value = false;
   confirmation.value = "";
@@ -84,7 +89,7 @@ watch(mode, () => {
   confirmation.value = "";
 });
 watch(selected, () => {
-  appointmentId.value = "";
+  appointmentIds.value = [];
   error.value = "";
   errors.value = {};
   completed.value = false;
@@ -107,10 +112,10 @@ watch([branchId, mode], async () => {
   }
 }, { immediate: true });
 
-watch([() => selected.value?.id, branchId, mode, zone], async () => {
+watch([() => selected.value?.id, branchId, mode, zone, reloadAppointments], async () => {
   const serial = ++appointmentsSequence;
   appointments.value = [];
-  appointmentId.value = "";
+  appointmentIds.value = [];
   appointmentsError.value = "";
   const patientId = selected.value?.id;
   if (mode.value !== "scheduled" || !patientId || !branchId.value || !zone.value) return;
@@ -208,13 +213,31 @@ async function submit() {
     }
     let result: Attendance;
     if (mode.value === "scheduled") {
-      const appointment = selectedAppointment.value;
-      if (!appointment || appointment.status !== "scheduled") return;
-      const response = await clinicRequest<Attendance>(
-        "appointments/" + appointment.id + "/check-in",
-        { method: "POST", body: { expected_version: appointment.version } },
-      );
-      result = response.data;
+      const chosen = [...selectedAppointments.value].sort((a,b) => a.starts_at.localeCompare(b.starts_at));
+      const successful: number[] = [];
+      const failed: string[] = [];
+      for (const appointment of chosen) {
+        if (!alive) return;
+        try {
+          const response = await clinicRequest<Attendance>(
+            "appointments/" + appointment.id + "/check-in",
+            { method: "POST", body: { expected_version: appointment.version } },
+          );
+          successful.push(response.data.ticket.number);
+          appointments.value = appointments.value.map(a => a.id === appointment.id ? { ...a, status: "checked_in" } : a);
+          appointmentIds.value = appointmentIds.value.filter(id => id !== appointment.id);
+        } catch (e) { failed.push(localTime(appointment.starts_at, zone.value) + " — " + bookingError(e)); }
+      }
+      if (!alive) return;
+      if (successful.length) {
+        confirmation.value = successful.length + " ta qabul navbatga qo‘shildi. Navbat raqamlari: " + successful.join(", ");
+        emit("saved", { kind: "scheduled", number: successful[0] });
+      }
+      if (failed.length) {
+        error.value = failed.join(" | ") + ". Saqlangan qabullar takror yaratilmaydi.";
+        reloadAppointments.value++;
+      } else completed.value = true;
+      return;
     } else {
       if (!doctor.value || !services.value.some((s) => s.id === serviceId.value)) return;
       await ensureBranch();
@@ -288,10 +311,11 @@ async function submit() {
             <p v-if="appointmentsLoading" role="status">Qabullar yuklanmoqda…</p>
             <div v-else-if="appointmentsError" role="alert" class="rp-error">{{ appointmentsError }}</div>
             <template v-else-if="appointments.length">
+              <label v-if="eligibleAppointments.length" class="rp-arrival-appointment"><input type="checkbox" :checked="allSelected" @change="toggleAll" /> Barchasini tanlash</label>
               <label v-for="a in appointments" :key="a.id" class="rp-arrival-appointment">
-                <input v-model="appointmentId" type="radio" name="arrival-appointment" :value="a.id" :disabled="a.status !== 'scheduled'" />
+                <input v-model="appointmentIds" type="checkbox" name="arrival-appointment" :value="a.id" :disabled="a.status !== 'scheduled'" />
                 <span>
-                  <strong>{{ localTime(a.starts_at, zone) }} · {{ a.status === 'scheduled' ? 'Yozilgan' : a.status }}</strong>
+                  <strong>{{ localTime(a.starts_at, zone) }} · {{ a.status === 'scheduled' ? 'Yozilgan' : a.status === 'checked_in' ? 'Kelgan' : a.status }}</strong>
                   <small>{{ doctors.find((d) => d.id === a.doctor_id)?.name ?? 'Shifokor' }} · {{ doctors.find((d) => d.id === a.doctor_id)?.services.find((s) => s.id === a.service_id)?.name ?? 'Qabul xizmati' }}</small>
                 </span>
               </label>
@@ -334,7 +358,7 @@ async function submit() {
         class="rp-button rp-primary"
         :disabled="creating ? saving || !canReception('patient') : !canSubmit"
         @click="creating ? createPatient() : submit()"
-      >{{ saving ? 'Saqlanmoqda…' : creating ? 'Bemorni saqlash' : mode === 'patient' ? 'Ro‘yxatga olish' : mode === 'scheduled' ? 'Keldi — navbatga qo‘shish' : 'Jonli navbatga qo‘shish' }}</button>
+      >{{ saving ? 'Saqlanmoqda…' : creating ? 'Bemorni saqlash' : mode === 'patient' ? 'Ro‘yxatga olish' : mode === 'scheduled' ? (selectedAppointments.length > 1 ? 'Keldi — ' + selectedAppointments.length + ' ta navbatga qo‘shish' : 'Keldi — navbatga qo‘shish') : 'Jonli navbatga qo‘shish' }}</button>
     </template>
   </ReceptionDialog>
 </template>
