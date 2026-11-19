@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import axios from "axios";
-import { CalendarDays, Users, FilePlus, UserRound, Stethoscope, Info } from "lucide-vue-next";
+import { CalendarDays, Users, FilePlus, UserRound, Stethoscope, Info, MapPin } from "lucide-vue-next";
 import ReceptionDialog from "./ReceptionDialog.vue";
 import ReceptionPatientSearch from "./ReceptionPatientSearch.vue";
 import ReceptionPatientForm from "./ReceptionPatientForm.vue";
@@ -44,6 +44,7 @@ const serviceId = ref("");
 const catalogLoading = ref(false);
 const catalogError = ref("");
 const appointments = ref<Appointment[]>([]);
+const roomNames = ref<Record<string, string>>({});
 const appointmentIds = ref<string[]>([]);
 const reloadAppointments = ref(0);
 const eligibleAppointments = computed(() => appointments.value.filter(a => a.status === "scheduled"));
@@ -97,6 +98,23 @@ watch(selected, () => {
   completed.value = false;
   confirmation.value = "";
 });
+
+let roomSequence = 0;
+watch([branchId, mode], async () => {
+  const serial = ++roomSequence;
+  roomNames.value = {};
+  if (mode.value !== "scheduled" || !branchId.value || !can("rooms.view")) return;
+  try {
+    const names: Record<string, string> = {};
+    for (let page = 1; ; page++) {
+      const { data } = await clinicRequest<{ data: { id: string; number: string }[]; meta: { total: number } }>("rooms", { params: { branch_id: branchId.value, page, per_page: 100 } });
+      if (!alive || serial !== roomSequence) return;
+      for (const room of data.data) names[room.id] = room.number;
+      if (Object.keys(names).length >= data.meta.total || !data.data.length) break;
+    }
+    if (alive && serial === roomSequence) roomNames.value = names;
+  } catch { /* Room labels are optional; check-in does not require room catalogue access. */ }
+}, { immediate: true });
 
 watch([branchId, mode], async () => {
   const serial = ++catalogSequence;
@@ -330,6 +348,7 @@ async function submit() {
                     <div class="rp-arrival-card-details">
                       <span class="rp-arrival-doctor"><UserRound :size="16" /><strong>{{ doctors.find(d => d.id === a.doctor_id)?.name ?? 'Shifokor' }}</strong></span>
                       <span class="rp-arrival-service"><Stethoscope :size="16" />{{ doctors.find(d => d.id === a.doctor_id)?.services.find(s => s.id === a.service_id)?.name ?? 'Qabul xizmati' }}</span>
+                    <span v-if="roomNames[a.room_id]" class="rp-arrival-room"><MapPin :size="14" />{{ /xona|kabinet/i.test(roomNames[a.room_id]!) ? roomNames[a.room_id] : roomNames[a.room_id] + '-xona' }}</span>
                     </div>
                   </div>
                 </label>
