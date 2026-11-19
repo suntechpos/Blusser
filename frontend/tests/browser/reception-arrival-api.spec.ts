@@ -230,6 +230,18 @@ test("two scheduled arrivals can be confirmed together without creating new appo
   await form.getByRole("button", { name: "Oldindan yozilgan" }).click();
   await form.getByRole("button", { name: /Aliyeva Mohira/ }).click();
   await form.getByRole("checkbox", { name: "Barchasini tanlash" }).check();
+  const checks = form.locator('input[name="arrival-appointment"]');
+  await expect(checks).toHaveCount(2);
+  for (const checkbox of await checks.all()) {
+    await expect(checkbox).toBeChecked();
+    const bounds = await checkbox.boundingBox();
+    expect(bounds?.width).toBeLessThanOrEqual(24);
+    expect(bounds?.height).toBeLessThanOrEqual(24);
+  }
+  await expect(form.locator(".rp-arrival-appointment.selected")).toHaveCount(2);
+  await checks.nth(1).uncheck();
+  await expect(form.locator(".rp-arrival-appointment.selected")).toHaveCount(1);
+  await checks.nth(1).check();
   await form.getByRole("button", { name: "Keldi — 2 ta navbatga qo‘shish" }).click();
   await expect(form).toContainText("2 ta qabul navbatga qo‘shildi");
   expect(calls).toEqual(rows.map(row => row.id));
