@@ -23,6 +23,7 @@ export interface WorkspacePatientRow {
   service: string;
   status: string;
   version?: number;
+  blocked_reason?: 'patient_busy' | 'earlier_appointment' | null;
   called_at?: string | null;
   started_at?: string | null;
   appointment_id: string | null;
