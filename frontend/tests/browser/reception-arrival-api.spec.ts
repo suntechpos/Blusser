@@ -203,3 +203,34 @@ test("tomorrow's scheduled appointment AND today's live queue remain visible tog
   await expect(page.locator(".rp-list tbody")).toContainText("09:00");
 });
 
+
+test("two scheduled arrivals can be confirmed together without creating new appointments", async ({ page }) => {
+  await bookingSession(page);
+  const rows = [0, 1].map(i => ({
+    id: "70000000-0000-4000-8000-00000000002" + i,
+    patient_id: ids.patient, doctor_id: ids.doctor, branch_id: ids.branch,
+    room_id: ids.room, service_id: ids.service,
+    starts_at: i ? "2026-10-23T05:00:00Z" : "2026-10-23T04:00:00Z",
+    ends_at: i ? "2026-10-23T05:30:00Z" : "2026-10-23T04:30:00Z",
+    version: 3, status: "scheduled",
+  }));
+  await page.route("**/api/v1/clinic/patients/*/appointments**", route =>
+    route.fulfill({ json: { data: rows, meta: { total: rows.length } } }));
+  const calls: string[] = [];
+  await page.route("**/api/v1/clinic/appointments/*/check-in", async route => {
+    const id = new URL(route.request().url()).pathname.split("/").at(-2)!;
+    expect(route.request().postDataJSON()).toEqual({ expected_version: 3 });
+    calls.push(id);
+    const a = rows.find(row => row.id === id)!;
+    a.status = "checked_in";
+    await route.fulfill({ json: { appointment: a, visit: { id, status: "queued" }, ticket: { id, number: calls.length, status: "waiting", kind: "scheduled" } } });
+  });
+  await open(page);
+  const form = dialog(page);
+  await form.getByRole("button", { name: "Oldindan yozilgan" }).click();
+  await form.getByRole("button", { name: /Aliyeva Mohira/ }).click();
+  await form.getByRole("checkbox", { name: "Barchasini tanlash" }).check();
+  await form.getByRole("button", { name: "Keldi — 2 ta navbatga qo‘shish" }).click();
+  await expect(form).toContainText("2 ta qabul navbatga qo‘shildi");
+  expect(calls).toEqual(rows.map(row => row.id));
+});
