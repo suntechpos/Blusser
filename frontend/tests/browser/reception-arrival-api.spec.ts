@@ -302,7 +302,8 @@ test("walk-in queue success opens a printable ticket with the server-issued numb
   await expect(printDialog).toBeVisible();
   await expect(printDialog).toContainText("27");
   await expect(printDialog).toContainText("Aliyeva Mohira");
-  await expect(printDialog).toContainText("Tish shifokori");
+  await expect(printDialog).toContainText("Aziz Karimov");
+  await expect(printDialog).toContainText("Birlamchi konsultatsiya");
   await expect(printDialog.getByRole("button", { name: /Chop etish/ })).toBeVisible();
   expect(fixture.requests.filter(r => r.method === "POST" && r.path.endsWith("/queue-tickets"))).toHaveLength(1);
 });
