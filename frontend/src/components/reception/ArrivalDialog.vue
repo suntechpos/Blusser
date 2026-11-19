@@ -19,9 +19,18 @@ type Attendance = {
   visit: { id: string; status: string };
   ticket: { id: string; number: number; kind: string; status: string };
 };
+type PrintableTicket = {
+  number: number;
+  patientName: string;
+  doctorName: string;
+  serviceName: string;
+  roomName?: string;
+  date: string;
+  time: string;
+};
 const emit = defineEmits<{
   close: [];
-  saved: [result: { kind: Mode; number?: number; numbers?: number[] }];
+  saved: [result: { kind: Mode; number?: number; numbers?: number[]; tickets?: PrintableTicket[] }];
 }>();
 const branches = computed(() => session.branches.filter((b) => b.active));
 const branchId = ref(session.branch || branches.value[0]?.id || "");
@@ -235,6 +244,7 @@ async function submit() {
     if (mode.value === "scheduled") {
       const chosen = [...selectedAppointments.value].sort((a,b) => a.starts_at.localeCompare(b.starts_at));
       const successful: number[] = [];
+      const printable: PrintableTicket[] = [];
       const failed: string[] = [];
       for (const appointment of chosen) {
         if (!alive) return;
@@ -244,6 +254,16 @@ async function submit() {
             { method: "POST", body: { expected_version: appointment.version } },
           );
           successful.push(response.data.ticket.number);
+          const assignedDoctor = doctors.value.find(d => d.id === appointment.doctor_id);
+          printable.push({
+            number: response.data.ticket.number,
+            patientName: selected.value.name,
+            doctorName: assignedDoctor?.name ?? "Shifokor",
+            serviceName: assignedDoctor?.services.find(s => s.id === appointment.service_id)?.name ?? "Qabul xizmati",
+            roomName: roomNames.value[appointment.room_id],
+            date: localDay(Date.parse(appointment.starts_at), zone.value),
+            time: localTime(appointment.starts_at, zone.value),
+          });
           appointments.value = appointments.value.map(a => a.id === appointment.id ? { ...a, status: "checked_in" } : a);
           appointmentIds.value = appointmentIds.value.filter(id => id !== appointment.id);
         } catch (e) { failed.push(localTime(appointment.starts_at, zone.value) + " — " + bookingError(e)); }
@@ -251,7 +271,7 @@ async function submit() {
       if (!alive) return;
       if (successful.length) {
         confirmation.value = successful.length === 1 ? "Bemor navbatga qo‘shildi. Navbat raqami: " + successful[0] : successful.length + " ta qabul navbatga qo‘shildi. Navbat raqamlari: " + successful.join(", ");
-        emit("saved", { kind: "scheduled", number: successful[0]!, numbers: successful });
+        emit("saved", { kind: "scheduled", number: successful[0]!, numbers: successful, tickets: printable });
       }
       if (failed.length) {
         error.value = failed.join(" | ") + ". Saqlangan qabullar takror yaratilmaydi.";
@@ -278,7 +298,19 @@ async function submit() {
     if (!alive) return;
     completed.value = true;
     confirmation.value = "Bemor navbatga qo‘shildi. Navbat raqami: " + result.ticket.number;
-    emit("saved", { kind: mode.value, number: result.ticket.number });
+    emit("saved", {
+      kind: mode.value,
+      number: result.ticket.number,
+      tickets: [{
+        number: result.ticket.number,
+        patientName: selected.value.name,
+        doctorName: doctor.value?.name ?? "Shifokor",
+        serviceName: services.value.find(s => s.id === serviceId.value)?.name ?? "Qabul xizmati",
+        date: today.value,
+        time: localTime(Date.now(), zone.value),
+      }],
+    });
+    if (mode.value === "walk_in") emit("close");
   } catch (e) {
     if (alive) error.value = axios.isAxiosError(e) && e.response?.status === 409
       ? "Qabul yoki navbat holati o‘zgardi. Ma’lumotlarni yangilang va qayta tekshiring."
