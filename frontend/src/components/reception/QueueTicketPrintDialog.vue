@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Printer, Ticket, X } from "lucide-vue-next";
+import { Printer, X } from "lucide-vue-next";
 import ReceptionDialog from "./ReceptionDialog.vue";
 
 type PrintableTicket = {
